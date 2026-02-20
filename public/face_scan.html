@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="km">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>ស្កេនមុខកត់វត្តមាន (Face Scan)</title>
+  <style>
+    :root{font-size:16px;color-scheme:light}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0b1220;color:#e5e7eb}
+    header{position:sticky;top:0;background:rgba(11,18,32,0.92);backdrop-filter:blur(8px);border-bottom:1px solid rgba(148,163,184,0.18);padding:12px 14px;z-index:10}
+    header h1{font-size:1.05rem;margin:0;display:flex;align-items:center;gap:10px;justify-content:space-between}
+    header a{color:#93c5fd;text-decoration:none;font-size:0.95rem}
+    main{padding:14px;max-width:860px;margin:0 auto}
+    .grid{display:grid;grid-template-columns:1fr;gap:10px}
+    .card{background:rgba(15,23,42,0.75);border:1px solid rgba(148,163,184,0.18);border-radius:12px;padding:12px}
+    label{display:block;font-size:0.9rem;color:#cbd5e1;margin-bottom:6px}
+    input,select,button{width:100%;border-radius:10px;border:1px solid rgba(148,163,184,0.25);background:#0b1220;color:#e5e7eb;padding:12px 12px;font-size:1rem}
+    button{border:0;cursor:pointer;font-weight:650}
+    button.primary{background:#22c55e;color:#04110a}
+    button.secondary{background:#111827;color:#e5e7eb;border:1px solid rgba(148,163,184,0.22)}
+    button:disabled{opacity:0.55;cursor:not-allowed}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .videoWrap{position:relative;border-radius:14px;overflow:hidden;background:#000;border:1px solid rgba(148,163,184,0.22)}
+    video{width:100%;height:auto;display:block;transform:scaleX(-1)}
+    .hint{color:#94a3b8;font-size:0.9rem;line-height:1.35}
+    .badge{display:inline-block;padding:6px 10px;border-radius:999px;font-size:0.85rem;border:1px solid rgba(148,163,184,0.22);background:rgba(2,6,23,0.6)}
+    .ok{color:#86efac}
+    .warn{color:#fde68a}
+    .err{color:#fecaca}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    pre{white-space:pre-wrap;margin:0}
+    @media (min-width:860px){.grid{grid-template-columns:1.25fr 0.75fr}}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>
+      <span>ស្កេនមុខកត់វត្តមាន</span>
+      <a href="/face_enroll.html">Enroll មុខ</a>
+    </h1>
+  </header>
+
+  <main>
+    <div class="grid">
+      <section class="card">
+        <div class="row" style="margin-bottom:10px">
+          <div style="flex:1 1 180px">
+            <label>របៀប</label>
+            <select id="mode">
+              <option value="checkIn">Check-in</option>
+              <option value="checkOut">Check-out</option>
+            </select>
+          </div>
+          <div style="flex:1 1 180px">
+            <label>កាលបរិច្ឆេទ (YYYY-MM-DD)</label>
+            <input id="date" class="mono" placeholder="2026-02-04" inputmode="numeric" />
+          </div>
+        </div>
+
+        <div class="videoWrap">
+          <video id="video" playsinline autoplay muted></video>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <button id="start" class="primary" type="button">បើកកាមេរ៉ា</button>
+          <button id="scan" class="secondary" type="button" disabled>ស្កេនមុខ + រក Match</button>
+          <button id="save" class="primary" type="button" disabled>រក្សាទុកវត្តមាន</button>
+          <button id="stop" class="secondary" type="button" disabled>បិទកាមេរ៉ា</button>
+        </div>
+
+        <p class="hint" style="margin:10px 0 0">
+          កម្រិត match (threshold) default = <span class="mono">0.52</span>។ បើច្រើន false match សូមបន្ថយ threshold (ឲ្យតឹង)។
+        </p>
+      </section>
+
+      <aside class="card">
+        <div class="row" style="gap:8px">
+          <div style="flex:1 1 180px">
+            <label>Matched Staff ID</label>
+            <input id="staffId" class="mono" placeholder="(auto)" />
+          </div>
+          <div style="flex:1 1 180px">
+            <label>ឈ្មោះ</label>
+            <input id="fullName" placeholder="(auto)" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div style="flex:1 1 180px">
+            <label>ម៉ោង (HH:MM)</label>
+            <input id="time" class="mono" placeholder="08:00" inputmode="numeric" />
+          </div>
+          <div style="flex:1 1 180px">
+            <label>Threshold</label>
+            <input id="threshold" class="mono" placeholder="0.52" inputmode="decimal" />
+          </div>
+        </div>
+
+        <div style="margin-top:10px">
+          <span id="support" class="badge warn">កំពុងទាញ face models...</span>
+        </div>
+
+        <pre id="result" style="margin-top:10px"></pre>
+
+        <p class="hint" style="margin-top:10px">
+          សំខាន់: Camera នៅលើទូរស័ព្ទត្រូវការ <span class="mono">HTTPS</span> (ឬ localhost) ដើម្បីអនុញ្ញាត getUserMedia។
+        </p>
+      </aside>
+    </div>
+
+    <script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="/face_scan.js"></script>
+  </main>
+</body>
+</html>

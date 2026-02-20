@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="km">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>បញ្ជីវត្តមាន</title>
+  <style>
+    body{font-family:Arial, Helvetica, sans-serif;margin:12px}
+    .container{max-width:1100px;margin:0 auto}
+    h2{margin-bottom:8px}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+    input,button,select{padding:8px;border:1px solid #ccc;border-radius:4px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border:1px solid #eee;text-align:left;font-size:14px}
+    th{background:#f3f4f6}
+    .note{color:#666;margin-top:8px}
+    @media (max-width:800px){table,thead,tbody,th,td,tr{display:block}thead{display:none}td{border:0;padding:6px}tr{margin-bottom:8px}td:before{font-weight:600;display:inline-block;width:120px}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>បញ្ជីវត្តមាន</h2>
+    <div class="controls">
+      <input id="filterStaff" placeholder="លេខកាត់/StaffId" />
+      <input id="fromDate" placeholder="From (yyyy-mm-dd)" />
+      <input id="toDate" placeholder="To (yyyy-mm-dd)" />
+      <button id="btnLoad">Refresh</button>
+      <button id="btnCSV">Export CSV</button>
+    </div>
+
+    <div id="tableWrap">
+      <table id="attTable"><thead><tr>
+        <th>លេខកាត់</th>
+        <th>ឈ្មោះ</th>
+        <th>ថ្ងៃ</th>
+        <th>ម៉ោងចូល</th>
+        <th>ម៉ោងចេញ</th>
+        <th>អនុញ្ញាត</th>
+        <th>កំណត់សម្គាល់</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+    <div id="status" class="note"></div>
+  </div>
+
+  <script src="/attendance_list.js"></script>
+</body>
+</html>

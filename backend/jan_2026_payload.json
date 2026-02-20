@@ -1,0 +1,60 @@
+[
+  {
+    "staffId": "EMP001",
+    "name": "EMP001 Name",
+    "year": 2026,
+    "month": 1,
+    "dailyData": [
+      { "day": 1, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 2, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 3, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 4, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 5, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 6, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 7, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 8, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 9, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 10, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 11, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 12, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 13, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 14, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 15, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 16, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 17, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 18, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 19, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 20, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 21, "checkIn": "08:00", "checkOut": "17:00" }
+    ]
+  },
+  {
+    "staffId": "EMP002",
+    "name": "EMP002 Name",
+    "year": 2026,
+    "month": 1,
+    "dailyData": [
+      { "day": 1, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 2, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 3, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 4, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 5, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 6, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 7, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 8, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 9, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 10, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 11, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 12, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 13, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 14, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 15, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 16, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 17, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 18, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 19, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 20, "checkIn": "08:00", "checkOut": "17:00" },
+      { "day": 21, "checkIn": "08:00", "checkOut": "17:00" }
+    ]
+  }
+]

@@ -1,0 +1,2 @@
+const fs=require('fs');const p='d:/DB/web_V4/src/pages/ReplayfilePage.jsx';const s=fs.readFileSync(p,'utf8');const opens=[];const openRegex=/</g;for(let i=0;i<s.length;i++){if(s.slice(i,i+4)==='<div'){opens.push({i,tag:'div'});}if(s.slice(i,i+6)==='</div>'){if(opens.length) opens.pop(); else console.log('extra close at',i);}}
+if(opens.length===0) console.log('All divs closed'); else {console.log('Unclosed div count',opens.length);const last=opens[opens.length-1];console.log('Last unclosed at',last.i);console.log('context:', s.slice(Math.max(0,last.i-120), last.i+120));}

@@ -1,0 +1,30 @@
+{
+  "staffId": "EMP001",
+  "name": "ឯម ចាន់ដា",
+  "year": 2025,
+  "month": 12,
+  "dailyData": [
+    {"day": 21, "checkIn": "08:00", "checkOut": "17:00"},
+    {"day": 22, "checkIn": "08:15", "checkOut": "17:30"},
+    {"day": 23, "checkIn": "08:00", "checkOut": "17:00"},
+    {"day": 24, "checkIn": "08:00", "checkOut": "17:00"},
+    {"day": 25, "checkIn": "08:30", "checkOut": "17:15"},
+    {"day": 26, "checkIn": "08:00", "checkOut": "17:00"},
+    {"day": 29, "checkIn": "08:00", "checkOut": "17:00"},
+    {"day": 30, "checkIn": "08:00", "checkOut": "17:00"},
+    {"day": 31, "checkIn": "08:00", "checkOut": "17:00"}
+  ],
+  "dayWorkCount": 9,
+  "attendanceCount": 9,
+  "workTime": "72",
+  "clock": "0",
+  "clockCount": 0,
+  "checkinLateMinutes": 0,
+  "checkinLateCount": 0,
+  "checkoutEarlyMinutes": 0,
+  "checkoutEarlyCount": 0,
+  "checkoutOvertimeMinutes": 0,
+  "checkoutOvertimeCount": 0,
+  "absentCount": 0,
+  "leaveCount": 0
+}

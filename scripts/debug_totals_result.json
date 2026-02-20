@@ -1,0 +1,12 @@
+{
+  "asOf": "2026-01-21",
+  "activeTotal": 1546,
+  "hospitalCount": 392,
+  "workerCount": 108,
+  "unionDedup": 500,
+  "unionAgeOver60": 22,
+  "unionAge60OrBelow": 478,
+  "unionNoAge": 0,
+  "retiredThenContinuedCount": 0,
+  "retiredThenContinuedSamples": []
+}

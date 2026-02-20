@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="km">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>ស្កេនវត្តមាន (Moved)</title>
+  <meta http-equiv="refresh" content="0; url=/mobileApp/attendance" />
+  <style>
+    body{margin:24px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    a{color:#2563eb}
+  </style>
+  <script>
+    (() => {
+      try {
+        const u = new URL(window.location.href);
+        const mode = (u.searchParams.get('mode') || '').trim();
+        const slot = (u.searchParams.get('slot') || '').trim();
+        if (mode || slot) {
+          const qs = new URLSearchParams();
+          if (mode) qs.set('mode', mode);
+          if (slot) qs.set('slot', slot);
+          window.location.replace(`/mobileApp/scan?${qs.toString()}`);
+          return;
+        }
+      } catch {
+        // ignore
+      }
+      window.location.replace('/mobileApp/attendance');
+    })();
+  </script>
+</head>
+<body>
+  កំពុងប្ដូរទៅផេកស្កេនថ្មី... បើមិនប្ដូរដោយស្វ័យប្រវត្តិ សូមចុច <a href="/mobileApp/attendance">ទីនេះ</a>.
+</body>
+</html>

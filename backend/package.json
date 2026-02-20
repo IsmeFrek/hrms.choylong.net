@@ -1,0 +1,41 @@
+{
+  "type": "module",
+  "name": "hrms-backend",
+  "version": "1.0.0",
+  "description": "HRMS Backend API with Node.js, Express and MongoDB",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "seed:signatures": "node scripts/seedSignatures.js",
+    "test:signatures": "node scripts/testSignatures.js",
+    "check:telegram": "node check-telegram-config.js",
+    "list:users": "node list-users.js",
+    "add:telegram": "node add-telegram-id.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "concurrently": "^9.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^7.5.0",
+    "multer": "^1.4.5-lts.1",
+    "puppeteer": "^24.36.1",
+    "twilio": "^5.3.4",
+    "validator": "^13.9.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "hrms",
+    "nodejs",
+    "mongodb",
+    "express"
+  ],
+  "author": "HRMS Team",
+  "license": "MIT"
+}
