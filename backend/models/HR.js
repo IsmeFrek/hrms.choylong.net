@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const hrSchema = new mongoose.Schema({
   no: { type: Number, unique: true },
   staffId: { type: String, unique: true },
+  checkinmeId: { type: String, index: true }, // Link to Checkinme Employee ID
   khmerName: { type: String },
   name: { type: String },
   gender: { type: String, enum: ['Male', 'Female'] },
@@ -160,6 +161,22 @@ const hrSchema = new mongoose.Schema({
     End: { type: Date },
     image: { type: String }
   },
+  // Out of Cadre subdocument
+  outOfCadre: {
+    newWorkplace: { type: String },
+    Start: { type: Date },
+    End: { type: Date },
+    status: { type: String },
+    image: { type: String },
+    other: { type: String }
+  },
+  // Maternity leave subdocument
+  maternity: {
+    reason: { type: String },
+    startDate: { type: Date },
+    endDate: { type: Date },
+    image: { type: String }
+  },
   officerType: { type: String },
   position: { type: String },
   skill: { type: String },
@@ -197,6 +214,9 @@ const hrSchema = new mongoose.Schema({
   dateJoinedMinistry: {
     type: Date
   },
+  // Probation tracking
+  probationEndDate: { type: Date },
+  probationStatus: { type: String },
   salastSalaryIncrementDate: { type: String },
   workOther: { type: String },
   degreeLevel: { type: String },
@@ -251,6 +271,10 @@ const hrSchema = new mongoose.Schema({
   isPartTime: { type: Boolean, default: false },
   image: { type: String },
   other: { type: String },
+  customPattern: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
   salaryPromotionDate: {
     type: Date
   },
@@ -259,7 +283,16 @@ const hrSchema = new mongoose.Schema({
   },
   // Medal/Award
   medalType: { type: String },
-  medalReceivedDate: { type: Date }
+  medalReceivedDate: { type: Date },
+  // Date when new entry was finalized (បិទបញ្ជីបុគ្គលិកថ្មី)
+  entryClosingDate: { type: Date },
+  // Store ID card photo transform data
+  idCardTransform: {
+    x: { type: Number },
+    y: { type: Number },
+    w: { type: Number },
+    h: { type: Number }
+  }
 }, {
   timestamps: true
 });
@@ -305,12 +338,18 @@ hrSchema.pre('validate', function(next) {
     // New unpaid fields
     'unpaid.Start',
     'unpaid.End',
+    'outOfCadre.Start',
+    'outOfCadre.End',
+    'maternity.startDate',
+    'maternity.endDate',
+    'probationEndDate',
   'nominationStartDate',
     'dateJoinedMinistry',
     'salaryPromotionDate',
     'resignationDate',
     'dateRemoved',
-    'resignDate'
+    'resignDate',
+    'entryClosingDate'
   ];
   for (const field of dateFields) {
     // support nested paths like 'stu.studyStart'
@@ -341,15 +380,35 @@ hrSchema.pre('validate', function(next) {
         target[last] = parsed;
         continue;
       }
-      // invalid date string -> validation error
-      const err = new mongoose.Error.ValidationError(this);
-      err.addError(field, new mongoose.Error.ValidatorError({ message: `${field} has invalid date format` }));
-      return next(err);
+      // invalid date string -> clear the field instead of failing validation
+      console.warn(`HR pre-validate: clearing invalid date string for field ${field}:`, val);
+      target[last] = undefined;
+      continue;
     }
-    // unsupported type
-    const err = new mongoose.Error.ValidationError(this);
-    err.addError(field, new mongoose.Error.ValidatorError({ message: `${field} has unsupported type` }));
-    return next(err);
+    // unsupported type (e.g., number/object) -> clear the field instead of failing validation
+    console.warn(`HR pre-validate: clearing unsupported date type for field ${field}:`, val);
+    target[last] = undefined;
+    continue;
+  }
+  // Normalize bloodGroup values: fix common typos like '0+' -> 'O+' and
+  // clear invalid enums so they don't block unrelated updates (e.g. unpaid leave).
+  if (this.bloodGroup != null && this.bloodGroup !== '') {
+    try {
+      let bg = String(this.bloodGroup).trim();
+      // Common typo: numeric zero instead of letter O
+      if (bg === '0+' || bg === '0＋') bg = 'O+';
+      if (bg === '0-' || bg === '0－') bg = 'O-';
+      const allowed = ['A+','A-','B+','B-','AB+','AB-','O+','O-'];
+      if (!allowed.includes(bg)) {
+        console.warn('HR pre-validate: clearing invalid bloodGroup value:', this.bloodGroup);
+        this.bloodGroup = undefined;
+      } else {
+        this.bloodGroup = bg;
+      }
+    } catch (e) {
+      console.warn('HR pre-validate: failed to normalize bloodGroup, clearing it:', e && e.message);
+      this.bloodGroup = undefined;
+    }
   }
   // Normalize childrenList DOBs if present
   if (Array.isArray(this.childrenList)) {
@@ -373,13 +432,15 @@ hrSchema.pre('validate', function(next) {
           this.childrenList[i].dob = parsed;
           continue;
         }
-        const err = new mongoose.Error.ValidationError(this);
-        err.addError(`childrenList.${i}.dob`, new mongoose.Error.ValidatorError({ message: `childrenList.${i}.dob has invalid date format` }));
-        return next(err);
+        // invalid child DOB string -> clear instead of failing validation
+        console.warn(`HR pre-validate: clearing invalid child DOB at childrenList.${i}.dob:`, val);
+        this.childrenList[i].dob = undefined;
+        continue;
       }
-      const err = new mongoose.Error.ValidationError(this);
-      err.addError(`childrenList.${i}.dob`, new mongoose.Error.ValidatorError({ message: `childrenList.${i}.dob has unsupported type` }));
-      return next(err);
+      // unsupported type -> clear instead of failing validation
+      console.warn(`HR pre-validate: clearing unsupported child DOB type at childrenList.${i}.dob:`, val);
+      this.childrenList[i].dob = undefined;
+      continue;
     }
   }
   // Normalize educationList dates if present
@@ -399,14 +460,14 @@ hrSchema.pre('validate', function(next) {
         if (parsed) {
           this.educationList[i].startDate = parsed;
         } else {
-          const err = new mongoose.Error.ValidationError(this);
-          err.addError(`educationList.${i}.startDate`, new mongoose.Error.ValidatorError({ message: `educationList.${i}.startDate has invalid date format` }));
-          return next(err);
+          // invalid string -> clear instead of failing validation
+          console.warn(`HR pre-validate: clearing invalid education startDate at educationList.${i}.startDate:`, sVal);
+          this.educationList[i].startDate = undefined;
         }
       } else {
-        const err = new mongoose.Error.ValidationError(this);
-        err.addError(`educationList.${i}.startDate`, new mongoose.Error.ValidatorError({ message: `educationList.${i}.startDate has unsupported type` }));
-        return next(err);
+        // unsupported type -> clear instead of failing validation
+        console.warn(`HR pre-validate: clearing unsupported education startDate type at educationList.${i}.startDate:`, sVal);
+        this.educationList[i].startDate = undefined;
       }
 
       // endDate
@@ -421,14 +482,14 @@ hrSchema.pre('validate', function(next) {
         if (parsed) {
           this.educationList[i].endDate = parsed;
         } else {
-          const err = new mongoose.Error.ValidationError(this);
-          err.addError(`educationList.${i}.endDate`, new mongoose.Error.ValidatorError({ message: `educationList.${i}.endDate has invalid date format` }));
-          return next(err);
+          // invalid string -> clear instead of failing validation
+          console.warn(`HR pre-validate: clearing invalid education endDate at educationList.${i}.endDate:`, eVal);
+          this.educationList[i].endDate = undefined;
         }
       } else {
-        const err = new mongoose.Error.ValidationError(this);
-        err.addError(`educationList.${i}.endDate`, new mongoose.Error.ValidatorError({ message: `educationList.${i}.endDate has unsupported type` }));
-        return next(err);
+        // unsupported type -> clear instead of failing validation
+        console.warn(`HR pre-validate: clearing unsupported education endDate type at educationList.${i}.endDate:`, eVal);
+        this.educationList[i].endDate = undefined;
       }
     }
   }
@@ -449,14 +510,14 @@ hrSchema.pre('validate', function(next) {
         if (parsed) {
           this.documents[i].startDate = parsed;
         } else {
-          const err = new mongoose.Error.ValidationError(this);
-          err.addError(`documents.${i}.startDate`, new mongoose.Error.ValidatorError({ message: `documents.${i}.startDate has invalid date format` }));
-          return next(err);
+          // invalid string -> clear instead of failing validation
+          console.warn(`HR pre-validate: clearing invalid document startDate at documents.${i}.startDate:`, sVal);
+          this.documents[i].startDate = undefined;
         }
       } else {
-        const err = new mongoose.Error.ValidationError(this);
-        err.addError(`documents.${i}.startDate`, new mongoose.Error.ValidatorError({ message: `documents.${i}.startDate has unsupported type` }));
-        return next(err);
+        // unsupported type -> clear instead of failing validation
+        console.warn(`HR pre-validate: clearing unsupported document startDate type at documents.${i}.startDate:`, sVal);
+        this.documents[i].startDate = undefined;
       }
 
       // endDate
@@ -471,14 +532,14 @@ hrSchema.pre('validate', function(next) {
         if (parsed) {
           this.documents[i].endDate = parsed;
         } else {
-          const err = new mongoose.Error.ValidationError(this);
-          err.addError(`documents.${i}.endDate`, new mongoose.Error.ValidatorError({ message: `documents.${i}.endDate has invalid date format` }));
-          return next(err);
+          // invalid string -> clear instead of failing validation
+          console.warn(`HR pre-validate: clearing invalid document endDate at documents.${i}.endDate:`, eVal);
+          this.documents[i].endDate = undefined;
         }
       } else {
-        const err = new mongoose.Error.ValidationError(this);
-        err.addError(`documents.${i}.endDate`, new mongoose.Error.ValidatorError({ message: `documents.${i}.endDate has unsupported type` }));
-        return next(err);
+        // unsupported type -> clear instead of failing validation
+        console.warn(`HR pre-validate: clearing unsupported document endDate type at documents.${i}.endDate:`, eVal);
+        this.documents[i].endDate = undefined;
       }
 
       // expiryDate
@@ -493,14 +554,14 @@ hrSchema.pre('validate', function(next) {
         if (parsed) {
           this.documents[i].expiryDate = parsed;
         } else {
-          const err = new mongoose.Error.ValidationError(this);
-          err.addError(`documents.${i}.expiryDate`, new mongoose.Error.ValidatorError({ message: `documents.${i}.expiryDate has invalid date format` }));
-          return next(err);
+          // invalid string -> clear instead of failing validation
+          console.warn(`HR pre-validate: clearing invalid document expiryDate at documents.${i}.expiryDate:`, xVal);
+          this.documents[i].expiryDate = undefined;
         }
       } else {
-        const err = new mongoose.Error.ValidationError(this);
-        err.addError(`documents.${i}.expiryDate`, new mongoose.Error.ValidatorError({ message: `documents.${i}.expiryDate has unsupported type` }));
-        return next(err);
+        // unsupported type -> clear instead of failing validation
+        console.warn(`HR pre-validate: clearing unsupported document expiryDate type at documents.${i}.expiryDate:`, xVal);
+        this.documents[i].expiryDate = undefined;
       }
     }
   }

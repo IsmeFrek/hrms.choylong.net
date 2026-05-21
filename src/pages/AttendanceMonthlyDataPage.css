@@ -1,0 +1,41 @@
+.leave-summary-card {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  font-family: 'Inter', sans-serif;
+}
+
+.leave-summary-card .card-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  padding-bottom: 0.5rem;
+}
+
+.leave-summary-card h2 {
+  font-family: 'Inter', sans-serif;
+}
+
+.toggle-btn, .show-btn {
+  transition: all 0.2s ease;
+}
+
+.toggle-btn:hover, .show-btn:hover {
+  transform: translateY(-1px);
+}
+
+.leave-table th {
+  background-color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
+  color: #333;
+}
+
+.leave-table td {
+  color: #444;
+}
+
+.leave-table tr:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}

@@ -14,6 +14,9 @@ const FaceProfileSchema = new mongoose.Schema({
   // Store multiple descriptors per staff (for better robustness)
   descriptors: { type: [FaceDescriptorSchema], default: [] },
 
+  // Optional small preview image (data URL) for UI tables
+  snapshot: { type: String, default: '' },
+
   consent: {
     given: { type: Boolean, default: false },
     at: { type: Date },

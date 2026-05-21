@@ -34,13 +34,13 @@ const formatDate = (iso) => {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toISOString().slice(0,10);
+    return d.toISOString().slice(0, 10);
   } catch { return iso; }
 };
 
 const downloadCsv = (rows) => {
   if (!rows || !rows.length) return;
-  const headers = ['ស.រ','ល.រ','គោត្តនាម និងនាម','អក្សរឡាតាំង','ភេទ','តួនាទី','ថ្ងៃខែឆ្នាំកណើត','លេខធនាគា','មុខងារ','ប្រាក់ឧបត្ថម្ភ'];
+  const headers = ['ស.រ', 'ល.រ', 'គោត្តនាម និងនាម', 'អក្សរឡាតាំង', 'ភេទ', 'តួនាទី', 'ថ្ងៃខែឆ្នាំកណើត', 'លេខធនាគា', 'មុខងារ', 'ប្រាក់ឧបត្ថម្ភ'];
   const csvRows = [headers.join(',')];
   for (const r of rows) {
     const vals = [

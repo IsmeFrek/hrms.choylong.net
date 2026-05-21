@@ -98,8 +98,16 @@ export default function AttendanceDayAttendanceDataPage() {
 	const parseMinutes = (s) => {
 		if (!s) return null;
 		const str = String(s).trim();
-		const m = str.match(/^(\d{1,2}):(\d{2})$/);
+		let m = str.match(/^(\d{1,2}):(\d{2})$/);
 		if (m) return Number(m[1]) * 60 + Number(m[2]);
+		m = str.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)/i);
+		if (m) {
+			let h = Number(m[1]);
+			const isPM = m[3].toUpperCase() === 'PM';
+			if (isPM && h < 12) h += 12;
+			if (!isPM && h === 12) h = 0;
+			return h * 60 + Number(m[2]);
+		}
 		const dt = new Date(str);
 		if (!isNaN(dt.getTime())) return dt.getHours() * 60 + dt.getMinutes();
 		return null;
@@ -128,19 +136,47 @@ export default function AttendanceDayAttendanceDataPage() {
 		return Math.max(0, diff);
 	};
 
-	const formatHMTo12 = (hm) => {
-		const m = String(hm || '').trim().match(/^(\d{1,2}):(\d{2})$/);
-		if (!m) return '';
-		const sourceHour = m[1];
-		const keepLeadingZero = sourceHour.length === 2 && sourceHour.startsWith('0');
-		let h = Number(sourceHour);
-		const mm = m[2];
-		if (!Number.isFinite(h)) return '';
-		const ampm = h >= 12 ? 'PM' : 'AM';
-		h = h % 12;
-		if (h === 0) h = 12;
-		const hh = keepLeadingZero && h < 10 ? String(h).padStart(2, '0') : String(h);
-		return `${hh}:${mm} ${ampm}`;
+	const formatHMTo12 = (input) => {
+		if (!input) return '';
+		const s = String(input).trim();
+
+		// 1. Try to find EXISTING AM/PM format (common in noisy strings)
+		// e.g. "2026-04-06 05:42 PM - Good Time: 03:30 PM" -> extracts "05:42 PM"
+		const ampmMatch = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)/i);
+		if (ampmMatch) {
+			let hh = parseInt(ampmMatch[1], 10);
+			const mm = ampmMatch[2];
+			const ampm = ampmMatch[3].toUpperCase();
+			return `${hh.toString().padStart(2, '0')}:${mm} ${ampm}`;
+		}
+
+		// 2. Try to find the FIRST HH:mm pattern that looks like a time
+		// e.g. "2024-04-06 17:42" -> extracts "17:42"
+		const hmMatch = s.match(/(?:^|\s|T)(\d{1,2}):(\d{2})(?::\d{2})?(?:\s|$|-)/);
+		if (hmMatch) {
+			let hh = parseInt(hmMatch[1], 10);
+			const mm = hmMatch[2];
+			const ampm = hh >= 12 ? 'PM' : 'AM';
+			hh = hh % 12 || 12;
+			return `${hh.toString().padStart(2, '0')}:${mm} ${ampm}`;
+		}
+
+		// 3. Try ISO or Date string conversion
+		if (s.includes('T') || s.includes('-') || s.includes('/')) {
+			const d = new Date(s);
+			if (!isNaN(d.getTime())) {
+				const hours = d.getHours();
+				const minutes = d.getMinutes();
+				const ampm = hours >= 12 ? 'PM' : 'AM';
+				let h = hours % 12;
+				if (h === 0) h = 12;
+				const hh = h < 10 ? String(h).padStart(2, '0') : String(h);
+				const mm = String(minutes).padStart(2, '0');
+				return `${hh}:${mm} ${ampm}`;
+			}
+		}
+
+		return s;
 	};
 
 	const bestDailyEntryForDate = (row, dateISO) => {
@@ -156,9 +192,11 @@ export default function AttendanceDayAttendanceDataPage() {
 		const ci = (entry.checkIn || '').toString().trim();
 		const co = (entry.checkOut || '').toString().trim();
 		const status = (entry.status || '').toString().toLowerCase();
+		// Absent (no scan, not leave/rest) -> highlight red
+		if (!ci && !co && status === 'absent') return '#ff9999';
 		if (ci && co) return 'white';
 		if (status === 'leave') return '#FFFACD';
-		if (status === 'rest' || status === 'dayoff' || status === 'off' || status === 'holiday') return '#ADD8E6';
+		if (status === 'rest' || status === 'dayoff' || status === 'off' || status === 'holiday') return '#C084FC';
 		if (ci && !co) return '#90EE90';
 		return 'white';
 	};
@@ -242,7 +280,7 @@ export default function AttendanceDayAttendanceDataPage() {
 		const coMin = parseMinutes(entry?.checkOut);
 		const grace = Number.isFinite(Number(graceMinutes)) ? Number(graceMinutes) : 15;
 
-		const lateMinutes = !isDayOff && shiftStartMin !== null && ciMin !== null ? Math.max(0, ciMin - (shiftStartMin + grace)) : 0;
+		const lateMinutes = !isDayOff && shiftStartMin !== null && ciMin !== null && ciMin > (shiftStartMin + grace) ? Math.max(0, ciMin - shiftStartMin) : 0;
 		// For overnight shifts, treat checkout that is earlier than start/end as next day.
 		const coMinAdj = coMin !== null && shiftEndMin !== null && coMin < Math.min(shiftEndMin, shiftStartMin ?? shiftEndMin) ? coMin + 24 * 60 : coMin;
 		const earlyMinutes = !isDayOff && shiftEndMin !== null && coMinAdj !== null ? Math.max(0, shiftEndMin - coMinAdj) : 0;
@@ -302,31 +340,57 @@ export default function AttendanceDayAttendanceDataPage() {
 					const statusLower = String(status || '').toLowerCase();
 					const hasIn = !!ci;
 					const hasOut = !!co;
-					const isOffByStatus = statusLower === 'rest' || statusLower === 'dayoff' || statusLower === 'off' || statusLower === 'holiday';
+					let isOffByStatus = statusLower === 'rest' || statusLower === 'dayoff' || statusLower === 'off' || statusLower === 'holiday';
+					
+					// បើគាត់មានម៉ោងត្រូវធ្វើគឺធ្វើ (If they have a working schedule, ignore Checkinme's holiday/rest status)
+					if (isOffByStatus && hasScheduleTime && !isDayOffBySchedule) {
+						isOffByStatus = false;
+					}
+
 					const effectiveStatus =
-						statusLower ||
+						(isOffByStatus ? statusLower : '') ||
+						(statusLower === 'leave' ? 'leave' : '') ||
 						(isDayOffBySchedule && !hasIn && !hasOut ? 'rest' : ((hasIn || hasOut) ? 'present' : 'absent'));
 					const isOff = isOffByStatus || effectiveStatus === 'rest' || isDayOffBySchedule;
 
 					const forgotCount = typeof r?.forgotCount === 'number' ? r.forgotCount : (hasIn && !hasOut ? 1 : 0);
-					const absentCount = typeof r?.absentCount === 'number' ? r.absentCount : ((isOff || isDayOffBySchedule) ? 0 : (effectiveStatus === 'absent' ? 1 : 0));
-					const leaveCount = typeof r?.leaveCount === 'number' ? r.leaveCount : (effectiveStatus === 'leave' ? 1 : 0);
+					const absentCount = (() => {
+						if (isOff || isDayOffBySchedule) return 0;
+						if (effectiveStatus === 'absent') return 1;
+						if (typeof r?.absentCount === 'number') return r.absentCount;
+						return 0;
+					})();
+					const leaveCount = typeof r?.leaveCount === 'number' && statusLower !== 'leave' ? r.leaveCount : (effectiveStatus === 'leave' ? 1 : 0);
 
-					const dayWorkCount = typeof r?.dayWorkCount === 'number' ? r.dayWorkCount : (isOff ? 0 : 1);
-					const attendanceCount = typeof r?.attendanceCount === 'number' ? r.attendanceCount : ((hasIn || hasOut) ? 1 : 0);
+					const dayWorkCount = (() => {
+						if (isOff || isDayOffBySchedule) return 0;
+						if (hasScheduleTime && !isDayOffBySchedule) return 1; // Force Day Work = 1 if they have a schedule
+						if (typeof r?.dayWorkCount === 'number') return r.dayWorkCount;
+						return 1;
+					})();
+					const attendanceCount = typeof r?.attendanceCount === 'number' && !hasIn && !hasOut ? r.attendanceCount : ((hasIn || hasOut) ? 1 : 0);
+
+					// Column A: if already provided from DB/import, keep it.
+					// Otherwise, for an absent working day, default A = 1 (but never for Day Off).
+					const autoA = (() => {
+						const rawA = r?.A;
+						if (rawA !== null && typeof rawA !== 'undefined' && String(rawA).trim() !== '') return rawA;
+						if (isOff || isDayOffBySchedule) return '';
+						return absentCount > 0 ? 1 : '';
+					})();
 
 					const workTime = typeof r?.workTime === 'number'
 						? r.workTime
 						: (hasIn && hasOut ? clockMinutes : 0);
 					const clockCount = typeof r?.clockCount === 'number' ? r.clockCount : (hasIn ? 1 : 0) + (hasOut ? 1 : 0);
 
-					const lateCount = typeof r?.checkinLateCount === 'number' ? r.checkinLateCount : (effectiveStatus === 'late' ? 1 : sched.lateCount);
-					const earlyCount = typeof r?.checkoutEarlyCount === 'number' ? r.checkoutEarlyCount : (effectiveStatus === 'early' ? 1 : sched.earlyCount);
+					const lateCount = typeof r?.checkinLateCount === 'number' && r.checkinLateCount > 0 ? r.checkinLateCount : (effectiveStatus === 'late' ? 1 : sched.lateCount);
+					const earlyCount = typeof r?.checkoutEarlyCount === 'number' && r.checkoutEarlyCount > 0 ? r.checkoutEarlyCount : (effectiveStatus === 'early' ? 1 : sched.earlyCount);
 
-					const checkinLateMinutes = typeof r?.checkinLateMinutes === 'number' ? r.checkinLateMinutes : sched.lateMinutes;
-					const checkoutEarlyMinutes = typeof r?.checkoutEarlyMinutes === 'number' ? r.checkoutEarlyMinutes : sched.earlyMinutes;
-					const checkoutOvertimeMinutes = typeof r?.checkoutOvertimeMinutes === 'number' ? r.checkoutOvertimeMinutes : sched.overtimeMinutes;
-					const checkoutOvertimeCount = typeof r?.checkoutOvertimeCount === 'number' ? r.checkoutOvertimeCount : sched.overtimeCount;
+					const checkinLateMinutes = typeof r?.checkinLateMinutes === 'number' && r.checkinLateMinutes > 0 ? r.checkinLateMinutes : sched.lateMinutes;
+					const checkoutEarlyMinutes = typeof r?.checkoutEarlyMinutes === 'number' && r.checkoutEarlyMinutes > 0 ? r.checkoutEarlyMinutes : sched.earlyMinutes;
+					const checkoutOvertimeMinutes = typeof r?.checkoutOvertimeMinutes === 'number' && r.checkoutOvertimeMinutes > 0 ? r.checkoutOvertimeMinutes : sched.overtimeMinutes;
+					const checkoutOvertimeCount = typeof r?.checkoutOvertimeCount === 'number' && r.checkoutOvertimeCount > 0 ? r.checkoutOvertimeCount : sched.overtimeCount;
 
 					return {
 						staffId,
@@ -348,7 +412,7 @@ export default function AttendanceDayAttendanceDataPage() {
 						checkoutOvertimeCount,
 						absentCount,
 						leaveCount,
-						A: r?.A || '',
+						A: autoA,
 						Plech: String(r?.Plech || '').trim() || (hasIn && !hasOut ? '1' : ''),
 						forgotCount
 					};
@@ -390,8 +454,8 @@ export default function AttendanceDayAttendanceDataPage() {
 			staffId: rec.staffId,
 			name: rec.name || '',
 			date: dateFromDate,
-			checkIn: rec.dailyEntry?.checkIn || '',
-			checkOut: rec.dailyEntry?.checkOut || '',
+			checkIn: formatHMTo12(rec.dailyEntry?.checkIn),
+			checkOut: formatHMTo12(rec.dailyEntry?.checkOut),
 			status: rec.dailyEntry?.status || ''
 		});
 		setModalOpen(true);
@@ -489,7 +553,7 @@ export default function AttendanceDayAttendanceDataPage() {
 					absentCount: 0,
 					leaveCount: 0,
 					A: '',
-					Plech: ''
+					plech: ''
 				};
 
 				const checkIn = String(entry?.checkIn || '').trim();
@@ -499,7 +563,7 @@ export default function AttendanceDayAttendanceDataPage() {
 				if (checkIn && checkOut) cell = `${checkIn} - ${checkOut}`;
 				else cell = checkIn || checkOut || '';
 
-				record.dailyData.push({ date: dayISO, _cell: cell });
+				record.dailyData.push({ date: dayISO, _cell: cell, status });
 
 				const hasIn = !!checkIn;
 				const hasOut = !!checkOut;
@@ -611,8 +675,11 @@ export default function AttendanceDayAttendanceDataPage() {
 					row.push(record.checkoutOvertimeCount || '');
 					row.push(record.absentCount || '');
 					row.push(record.leaveCount || '');
-					row.push(record.A || '');
-					row.push(record.Plech || '');
+					const exportA = (record.A !== null && typeof record.A !== 'undefined' && String(record.A).trim() !== '')
+						? record.A
+						: ((record.absentCount || 0) > 0 ? 1 : '');
+					row.push(exportA);
+					row.push(record.Plech || record.plech || '');
 					return row;
 				})
 			];
@@ -630,8 +697,24 @@ export default function AttendanceDayAttendanceDataPage() {
 				for (let c = 0; c < rows[r].length; c++) {
 					const cellRef = XLSX.utils.encode_col(c) + (r + 1);
 					if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' };
-					ws[cellRef].s = { font: baseFont, alignment: centerAlignment, border: borders };
-					if (r < 3) ws[cellRef].s.fill = { fgColor: { rgb: 'FFE6E6' } };
+					let style = { font: baseFont, alignment: centerAlignment, border: borders };
+					if (r < 3) {
+						style = { ...style, fill: { fgColor: { rgb: 'FFE6E6' } } };
+					} else if (r >= 3 && c >= 2 && c < 2 + dates.length) {
+						// Body daily cells: color by status (absent = red, day off = purple)
+						const recIdx = r - 3;
+						const dayIdx = c - 2;
+						const rec = exportData[recIdx];
+						const dayISO = dateISOs[dayIdx];
+						const dd = rec && rec.dailyData ? rec.dailyData.find((x) => x?.date === dayISO) : null;
+						const s = dd && dd.status ? String(dd.status).toLowerCase() : '';
+							if (s === 'absent') {
+								style = { ...style, fill: { fgColor: { rgb: 'FF9999' } } };
+							} else if (s === 'rest' || s === 'dayoff' || s === 'off' || s === 'holiday') {
+								style = { ...style, fill: { fgColor: { rgb: 'C084FC' } } };
+						}
+					}
+					ws[cellRef].s = style;
 				}
 			}
 			const colWidths = [12, 15, ...Array(dates.length).fill(15), 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 10, 10];
@@ -737,13 +820,33 @@ export default function AttendanceDayAttendanceDataPage() {
 				const headers = raw[headerRowIdx] || [];
 				const dayWorkIdxInFile = (headers || []).findIndex((h) => String(h).trim().toLowerCase() === 'day work');
 				const dailyStartIdx = 2;
-				const dateISOs = [dateFromDate];
 				const effectiveDailyColCount = dayWorkIdxInFile > dailyStartIdx ? (dayWorkIdxInFile - dailyStartIdx) : 1;
 				if (effectiveDailyColCount <= 0) throw new Error('Invalid pivot format: no daily columns');
-				if (effectiveDailyColCount !== 1) {
-					throw new Error('Import supports only 1 day: please export/import a single-day Excel file.');
+
+				// Build dateISOs for each daily column. Prefer header dates (year>=2000),
+				// otherwise map by column index from the selected `dateFromDate`.
+				const dateISOs = [];
+				const baseDate = parseISOToLocalDate(dateFromDate);
+				for (let i = 0; i < effectiveDailyColCount; i++) {
+					const colIdx = dailyStartIdx + i;
+					let dateISO = '';
+					const headerVal = headers?.[colIdx];
+					if (headerVal !== null && typeof headerVal !== 'undefined' && String(headerVal).trim() !== '') {
+						const parsed = parseAnyDateToISO(headerVal);
+						if (parsed) {
+							const y = Number(String(parsed).slice(0, 4));
+							if (Number.isFinite(y) && y >= 2000) dateISO = parsed;
+						}
+					}
+					if (!dateISO && !isNaN(baseDate.getTime())) {
+						const d = new Date(baseDate);
+						d.setDate(baseDate.getDate() + i);
+						dateISO = ymdLocal(d);
+					}
+					dateISOs.push(dateISO);
 				}
-				const isSingleDay = true;
+
+				const isSingleDay = effectiveDailyColCount === 1;
 
 				for (let r = headerRowIdx + 2; r < raw.length; r++) {
 					const row = raw[r];
@@ -808,14 +911,6 @@ export default function AttendanceDayAttendanceDataPage() {
 						const checkOut = parts[1] || '';
 
 						let dateISO = dateISOs[0];
-						const headerVal = headers?.[colIdx];
-						if (typeof headerVal === 'string' && String(headerVal).trim()) {
-							const parsed = parseAnyDateToISO(headerVal);
-							if (parsed) {
-								const y = Number(String(parsed).slice(0, 4));
-								if (Number.isFinite(y) && y >= 2000) dateISO = parsed;
-							}
-						}
 						if (!dateISO) {
 							skippedRows++;
 							continue;
@@ -853,19 +948,7 @@ export default function AttendanceDayAttendanceDataPage() {
 						const checkIn = parts[0] || '';
 						const checkOut = parts[1] || '';
 
-						// IMPORTANT: Our exports often use day-of-month numbers (e.g., 5, 6) as headers.
-						// If we parse a number as an "Excel serial date" it becomes year 1900 in DB.
-						// So we map by column index to the selected date range, and only trust header
-						// values when they look like a real date (>= year 2000).
 						let dateISO = dateISOs[i];
-						const headerVal = headers?.[colIdx];
-						if (typeof headerVal === 'string' && String(headerVal).trim()) {
-							const parsed = parseAnyDateToISO(headerVal);
-							if (parsed) {
-								const y = Number(String(parsed).slice(0, 4));
-								if (Number.isFinite(y) && y >= 2000) dateISO = parsed;
-							}
-						}
 						if (!dateISO) {
 							skippedRows++;
 							continue;
@@ -1384,8 +1467,8 @@ export default function AttendanceDayAttendanceDataPage() {
 							const entry = rec.dailyEntry;
 							const bg = getDayCellBackground(entry);
 							const cellText = entry?.checkIn && entry?.checkOut
-								? `${entry.checkIn} - ${entry.checkOut}`
-								: (entry?.checkIn || entry?.checkOut || '');
+								? `${formatHMTo12(entry.checkIn)} - ${formatHMTo12(entry.checkOut)}`
+								: (formatHMTo12(entry?.checkIn) || formatHMTo12(entry?.checkOut) || '');
 
 							return (
 								<tr key={rec.staffId}>
@@ -1402,9 +1485,10 @@ export default function AttendanceDayAttendanceDataPage() {
 												{isDayOffShiftTitle(rec.shiftTitle)
 													? 'វេន: Day Off'
 													: (() => {
-														const s = formatHMTo12(rec.shiftStart) || (rec.shiftStart || '-');
-														const e = formatHMTo12(rec.shiftEnd) || (rec.shiftEnd || '-');
-														return `វេន: ${s} - ${e}`;
+														const schedText = rec.shiftStart && rec.shiftEnd
+															? `${formatHMTo12(rec.shiftStart)} - ${formatHMTo12(rec.shiftEnd)}`
+															: (formatHMTo12(rec.shiftStart) || formatHMTo12(rec.shiftEnd) || rec.shiftTitle || '');
+														return `វេន: ${schedText}`;
 													})()}
 											</div>
 										)}

@@ -717,9 +717,9 @@ export default function HRSkillSummaryPage() {
                       <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{row.female}</td>
                       <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{row.otherCount > 0 ? row.otherCount : ''}</td>
                     </tr>
-          ))}
-        </tbody>
-        <tfoot>
+                  ))}
+              </tbody>
+              <tfoot>
                 {(() => {
                   // Summary row for all skills in summary table (unique HR by gender)
                   const uniqueHR = new Map();
@@ -749,7 +749,7 @@ export default function HRSkillSummaryPage() {
           </>
         )}
         {/* By Type Table */}
-  {(reportType === 'byType' || reportType === 'both' || reportType === 'group') && (
+        {(reportType === 'byType' || reportType === 'both' || reportType === 'group') && (
           <>
             <div style={{ fontWeight: 'bold', fontSize: '14px', margin: '18px 0 8px 0', textAlign: 'center', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif" }}>
               របាយការណ៍សរុបជំនាញ តាមប្រភេទមន្រ្តីរាជការ និងកិច្ចសន្យា
@@ -761,67 +761,67 @@ export default function HRSkillSummaryPage() {
               <table className="a4-report-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', background: '#fff' }}>
                 <thead>
                   <tr style={{ background: '#e3e3e3' }}>
-                      <th style={{ border: '1px solid #ddd', padding: '6px' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <input type="checkbox" checked={headerColumnChecks.index} onChange={(e) => toggleHeaderColumn('index', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
-                          <span>ល.រ</span>
-                        </label>
-                      </th>
-                      <th style={{ border: '1px solid #ddd', padding: '6px' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <input type="checkbox" checked={headerColumnChecks.skill_group_tech} onChange={(e) => toggleHeaderColumn('skill_group_tech', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
-                          <span>ជំនាញបច្ចេកទេស</span>
-                        </label>
-                      </th>
-                      <th style={{ border: '1px solid #ddd', padding: '6px' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <input type="checkbox" checked={headerColumnChecks.skill_group_plain} onChange={(e) => toggleHeaderColumn('skill_group_plain', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
-                          <span>ជំនាញ</span>
-                        </label>
-                      </th>
-                      <th style={{ border: '1px solid #ddd', padding: '6px' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <input type="checkbox" checked={headerColumnChecks.total} onChange={(e) => toggleHeaderColumn('total', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
-                          <span>សរុប</span>
-                        </label>
-                      </th>
-                      <th style={{ border: '1px solid #ddd', padding: '6px' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <input type="checkbox" checked={headerColumnChecks.female_overall} onChange={(e) => toggleHeaderColumn('female_overall', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
-                          <span>ស្រី</span>
-                        </label>
-                      </th>
-                      <th style={{ border: '1px solid #ddd', padding: '6px' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <input type="checkbox" checked={headerColumnChecks.civil} onChange={(e) => toggleHeaderColumn('civil', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
-                          <span>មន្រ្តីរាជការ</span>
-                        </label>
-                      </th>
-                      <th style={{ border: '1px solid #ddd', padding: '6px' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <input type="checkbox" checked={headerColumnChecks.female_civil} onChange={(e) => toggleHeaderColumn('female_civil', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
-                          <span>ស្រី</span>
-                        </label>
-                      </th>
-                      <th style={{ border: '1px solid #ddd', padding: '6px' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <input type="checkbox" checked={headerColumnChecks.contract} onChange={(e) => toggleHeaderColumn('contract', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
-                          <span>កិច្ចសន្យា</span>
-                        </label>
-                      </th>
-                      <th style={{ border: '1px solid #ddd', padding: '6px' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <input type="checkbox" checked={headerColumnChecks.female_contract} onChange={(e) => toggleHeaderColumn('female_contract', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
-                          <span>ស្រី</span>
-                        </label>
-                      </th>
-                      <th style={{ border: '1px solid #ddd', padding: '6px' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <input type="checkbox" checked={headerColumnChecks.other} onChange={(e) => toggleHeaderColumn('other', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
-                          <span>ផ្សេងៗ</span>
-                        </label>
-                      </th>
-                    </tr>
+                    <th style={{ border: '1px solid #ddd', padding: '6px' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={headerColumnChecks.index} onChange={(e) => toggleHeaderColumn('index', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
+                        <span>ល.រ</span>
+                      </label>
+                    </th>
+                    <th style={{ border: '1px solid #ddd', padding: '6px' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={headerColumnChecks.skill_group_tech} onChange={(e) => toggleHeaderColumn('skill_group_tech', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
+                        <span>ជំនាញបច្ចេកទេស</span>
+                      </label>
+                    </th>
+                    <th style={{ border: '1px solid #ddd', padding: '6px' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={headerColumnChecks.skill_group_plain} onChange={(e) => toggleHeaderColumn('skill_group_plain', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
+                        <span>ជំនាញ</span>
+                      </label>
+                    </th>
+                    <th style={{ border: '1px solid #ddd', padding: '6px' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={headerColumnChecks.total} onChange={(e) => toggleHeaderColumn('total', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
+                        <span>សរុប</span>
+                      </label>
+                    </th>
+                    <th style={{ border: '1px solid #ddd', padding: '6px' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={headerColumnChecks.female_overall} onChange={(e) => toggleHeaderColumn('female_overall', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
+                        <span>ស្រី</span>
+                      </label>
+                    </th>
+                    <th style={{ border: '1px solid #ddd', padding: '6px' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={headerColumnChecks.civil} onChange={(e) => toggleHeaderColumn('civil', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
+                        <span>មន្រ្តីរាជការ</span>
+                      </label>
+                    </th>
+                    <th style={{ border: '1px solid #ddd', padding: '6px' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={headerColumnChecks.female_civil} onChange={(e) => toggleHeaderColumn('female_civil', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
+                        <span>ស្រី</span>
+                      </label>
+                    </th>
+                    <th style={{ border: '1px solid #ddd', padding: '6px' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={headerColumnChecks.contract} onChange={(e) => toggleHeaderColumn('contract', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
+                        <span>កិច្ចសន្យា</span>
+                      </label>
+                    </th>
+                    <th style={{ border: '1px solid #ddd', padding: '6px' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={headerColumnChecks.female_contract} onChange={(e) => toggleHeaderColumn('female_contract', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
+                        <span>ស្រី</span>
+                      </label>
+                    </th>
+                    <th style={{ border: '1px solid #ddd', padding: '6px' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={headerColumnChecks.other} onChange={(e) => toggleHeaderColumn('other', e.nativeEvent.ctrlKey || e.nativeEvent.metaKey)} />
+                        <span>ផ្សេងៗ</span>
+                      </label>
+                    </th>
+                  </tr>
                 </thead>
                 <tbody>
                   {(() => {
@@ -861,58 +861,58 @@ export default function HRSkillSummaryPage() {
                           : (r.name || '');
 
                         return (
-                              <tr key={`group-${idx}`}
-                                  onDragOver={e => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'move'; } catch (err) {} setDragOverTarget({ kind: 'group', id: r.groupIndex }); }}
-                                  onDragLeave={() => setDragOverTarget(null)}
-                                  onDrop={e => handleDropOnGroup(e, r.groupIndex)}>
-                                <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{idx + 1}</td>
-                                <td style={{ border: '1px solid #ddd', padding: '6px', fontWeight: '600' }}>
-                                  {editingGroupIndex === r.groupIndex ? (
-                                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-                                      <input autoFocus value={editingGroupNameVal} onChange={e => setEditingGroupNameVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveEditGroup(r.groupIndex); if (e.key === 'Escape') cancelEditGroup(); }} style={{ padding: '4px', border: '1px solid #ccc', borderRadius: '4px' }} />
-                                      <button onClick={(e) => { e.stopPropagation(); saveEditGroup(r.groupIndex); }} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #2b7cff', background: '#2b7cff', color: '#fff', cursor: 'pointer' }}>រក្សា</button>
-                                      <button onClick={(e) => { e.stopPropagation(); cancelEditGroup(); }} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}>បោះបង់</button>
+                          <tr key={`group-${idx}`}
+                            onDragOver={e => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'move'; } catch (err) { } setDragOverTarget({ kind: 'group', id: r.groupIndex }); }}
+                            onDragLeave={() => setDragOverTarget(null)}
+                            onDrop={e => handleDropOnGroup(e, r.groupIndex)}>
+                            <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{idx + 1}</td>
+                            <td style={{ border: '1px solid #ddd', padding: '6px', fontWeight: '600' }}>
+                              {editingGroupIndex === r.groupIndex ? (
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                                  <input autoFocus value={editingGroupNameVal} onChange={e => setEditingGroupNameVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveEditGroup(r.groupIndex); if (e.key === 'Escape') cancelEditGroup(); }} style={{ padding: '4px', border: '1px solid #ccc', borderRadius: '4px' }} />
+                                  <button onClick={(e) => { e.stopPropagation(); saveEditGroup(r.groupIndex); }} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #2b7cff', background: '#2b7cff', color: '#fff', cursor: 'pointer' }}>រក្សា</button>
+                                  <button onClick={(e) => { e.stopPropagation(); cancelEditGroup(); }} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}>បោះបង់</button>
+                                </div>
+                              ) : (
+                                <div style={{ cursor: 'pointer' }} onDoubleClick={() => startEditGroup(r.groupIndex)}>{displayGroupLabel} <small style={{ color: '#666' }}>({Array.isArray(r.skills) ? r.skills.length : 0})</small></div>
+                              )}
+                            </td>
+                            <td style={{ border: '1px solid #ddd', padding: '6px', fontSize: '12px', color: '#444', lineHeight: '1.3', maxWidth: '410px', wordBreak: 'break-word', background: (dragOverTarget && dragOverTarget.kind === 'group' && dragOverTarget.id === r.groupIndex) ? '#f0f8ff' : 'transparent' }}>
+                              {Array.isArray(r.skills) && r.skills.length > 0 ? (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                  {r.skills.map((s, si) => (
+                                    <div key={s + si} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                      <div draggable onDragStart={e => {
+                                        try {
+                                          const payload = JSON.stringify({ skill: s, fromGroup: r.groupIndex });
+                                          e.dataTransfer.setData('application/json', payload);
+                                          e.dataTransfer.setData('text/plain', payload);
+                                          e.dataTransfer.effectAllowed = 'copyMove';
+                                        } catch (err) { }
+                                      }} style={{ display: 'inline-block', padding: '4px 8px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px', cursor: 'grab', fontSize: '12px' }}>{s}</div>
+                                      <button title="ដកចេញ" onClick={e => { e.stopPropagation(); removeSkillFromGroup(r.groupIndex, s); }} style={{ border: '1px solid #ccc', background: '#fff', padding: '2px 6px', borderRadius: '12px', cursor: 'pointer', fontSize: '11px' }}>x</button>
                                     </div>
-                                  ) : (
-                                    <div style={{ cursor: 'pointer' }} onDoubleClick={() => startEditGroup(r.groupIndex)}>{displayGroupLabel} <small style={{ color: '#666' }}>({Array.isArray(r.skills) ? r.skills.length : 0})</small></div>
-                                  )}
-                                </td>
-                                <td style={{ border: '1px solid #ddd', padding: '6px', fontSize: '12px', color: '#444', lineHeight: '1.3', maxWidth: '410px', wordBreak: 'break-word', background: (dragOverTarget && dragOverTarget.kind === 'group' && dragOverTarget.id === r.groupIndex) ? '#f0f8ff' : 'transparent' }}>
-                                  {Array.isArray(r.skills) && r.skills.length > 0 ? (
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                      {r.skills.map((s, si) => (
-                                        <div key={s + si} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                          <div draggable onDragStart={e => {
-                                            try {
-                                              const payload = JSON.stringify({ skill: s, fromGroup: r.groupIndex });
-                                              e.dataTransfer.setData('application/json', payload);
-                                              e.dataTransfer.setData('text/plain', payload);
-                                              e.dataTransfer.effectAllowed = 'copyMove';
-                                            } catch (err) { }
-                                          }} style={{ display: 'inline-block', padding: '4px 8px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px', cursor: 'grab', fontSize: '12px' }}>{s}</div>
-                                          <button title="ដកចេញ" onClick={e => { e.stopPropagation(); removeSkillFromGroup(r.groupIndex, s); }} style={{ border: '1px solid #ccc', background: '#fff', padding: '2px 6px', borderRadius: '12px', cursor: 'pointer', fontSize: '11px' }}>x</button>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : ''}
-                                </td>
-                                <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.total}</td>
-                                <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.female}</td>
-                                <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.civil}</td>
-                                <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.femaleCivil}</td>
-                                <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.contract}</td>
-                                <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.femaleContract}</td>
-                                <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.other > 0 ? r.other : ''}</td>
-                              </tr>
-                            );
+                                  ))}
+                                </div>
+                              ) : ''}
+                            </td>
+                            <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.total}</td>
+                            <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.female}</td>
+                            <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.civil}</td>
+                            <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.femaleCivil}</td>
+                            <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.contract}</td>
+                            <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.femaleContract}</td>
+                            <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{r.other > 0 ? r.other : ''}</td>
+                          </tr>
+                        );
                       }
                       // ungrouped skill row — allow dragging into groups
                       const plainSkill = r.skill || String(r.label).replace(/\s*\(\d+\)$/, '');
                       return (
                         <tr key={`skill-${idx}`}
-                            onDragOver={e => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'copy'; } catch (err) {} setDragOverTarget({ kind: 'skill', id: plainSkill }); }}
-                            onDragLeave={() => setDragOverTarget(null)}
-                            onDrop={e => handleDropOnSkill(e, plainSkill)}>
+                          onDragOver={e => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'copy'; } catch (err) { } setDragOverTarget({ kind: 'skill', id: plainSkill }); }}
+                          onDragLeave={() => setDragOverTarget(null)}
+                          onDrop={e => handleDropOnSkill(e, plainSkill)}>
                           <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{idx + 1}</td>
                           <td style={{ border: '1px solid #ddd', padding: '4px' }}>{plainSkill}</td>
                           <td style={{ border: '1px solid #ddd', padding: '4px' }}>
@@ -968,7 +968,7 @@ export default function HRSkillSummaryPage() {
                     const sumGroupFemaleContract = rows.reduce((a, r) => a + (r.femaleContract || 0), 0);
                     const sumGroupOther = rows.reduce((a, r) => a + (r.other || 0), 0);
                     return (
-                        <tr style={{ background: '#c8f7c8', fontWeight: 'bold' }}>
+                      <tr style={{ background: '#c8f7c8', fontWeight: 'bold' }}>
                         <td colSpan={3} style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'right' }}>សរុបក្រុមជំនាញ</td>
                         <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{sumGroupTotal}</td>
                         <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{sumGroupFemale}</td>
@@ -1029,9 +1029,9 @@ export default function HRSkillSummaryPage() {
                     if (filterGender === 'Other') finalRows = filtered.filter(row => row.other > 0);
                     return finalRows.map((row, idx) => (
                       <tr key={row.skills_Kh}
-                          onDragOver={e => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'copy'; } catch (err) {} setDragOverTarget({ kind: 'skill', id: row.skills_Kh }); }}
-                          onDragLeave={() => setDragOverTarget(null)}
-                          onDrop={e => handleDropOnSkill(e, row.skills_Kh)}>
+                        onDragOver={e => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'copy'; } catch (err) { } setDragOverTarget({ kind: 'skill', id: row.skills_Kh }); }}
+                        onDragLeave={() => setDragOverTarget(null)}
+                        onDrop={e => handleDropOnSkill(e, row.skills_Kh)}>
                         <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{idx + 1}</td>
                         <td style={{ border: '1px solid #ddd', padding: '4px' }}>{row.skills_Kh}</td>
                         <td style={{ border: '1px solid #ddd', padding: '4px', textAlign: 'center' }}>{row.total}</td>
@@ -1105,7 +1105,7 @@ export default function HRSkillSummaryPage() {
           <div>© ក្រសួងសាធារណការ និងដឹកជញ្ជូន</div>
         </div>
       </div>
-  <div style={{ minWidth: '340px', padding: '24px 0 0 24px', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ minWidth: '340px', padding: '24px 0 0 24px', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', background: '#fff', borderRadius: '12px', boxShadow: '0 4px 16px #e0e0e0', border: '1px solid #eee', padding: '24px 24px 24px 24px', marginBottom: '24px' }}>
           {/* Report type filter in sidebar */}
           <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: '8px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif" }}>ប្រភេទរបាយការណ៍:</div>
@@ -1160,21 +1160,21 @@ export default function HRSkillSummaryPage() {
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '12px', marginBottom: '6px' }}>ជំនាញដែលអាចចាប់</div>
                         <div id="available-skills"
-                             onDragOver={e => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'copy'; } catch (err) {} setDragOverTarget({ kind: 'available' }); }}
-                             onDragLeave={e => { setDragOverTarget(null); }}
-                             onDrop={(e) => {
-                          try {
-                            const raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
-                            const data = raw ? JSON.parse(raw) : null;
-                            if (data && data.skill && typeof data.fromGroup === 'number') {
-                              setGroups(prev => prev.map((g, idx) => {
-                                if (idx === data.fromGroup) return { ...g, skills: g.skills.filter(s => s !== data.skill) };
-                                return g;
-                              }));
-                            }
-                          } catch (err) { /* ignore */ }
-                          finally { setDragOverTarget(null); }
-                        }} style={{ minHeight: '120px', padding: '8px', border: dragOverTarget && dragOverTarget.kind === 'available' ? '2px dashed #2b7cff' : '1px dashed #ccc', borderRadius: '6px', background: '#fafafa', overflow: 'auto' }}>
+                          onDragOver={e => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'copy'; } catch (err) { } setDragOverTarget({ kind: 'available' }); }}
+                          onDragLeave={e => { setDragOverTarget(null); }}
+                          onDrop={(e) => {
+                            try {
+                              const raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
+                              const data = raw ? JSON.parse(raw) : null;
+                              if (data && data.skill && typeof data.fromGroup === 'number') {
+                                setGroups(prev => prev.map((g, idx) => {
+                                  if (idx === data.fromGroup) return { ...g, skills: g.skills.filter(s => s !== data.skill) };
+                                  return g;
+                                }));
+                              }
+                            } catch (err) { /* ignore */ }
+                            finally { setDragOverTarget(null); }
+                          }} style={{ minHeight: '120px', padding: '8px', border: dragOverTarget && dragOverTarget.kind === 'available' ? '2px dashed #2b7cff' : '1px dashed #ccc', borderRadius: '6px', background: '#fafafa', overflow: 'auto' }}>
                           {allSkillNames.filter(s => !groups.some(g => g.skills.includes(s))).map(s => (
                             <div key={s} draggable onDragStart={e => {
                               try {

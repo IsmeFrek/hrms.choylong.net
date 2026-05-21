@@ -39,3 +39,9 @@ export const deleteGeoFencePolicy = async (id) =>
     method: 'DELETE',
     headers: authHeaders(),
   }));
+
+export const fetchActiveDepartments = async () =>
+  json(await fetch('/api/departments/active', { headers: authHeaders() }));
+
+export const resolveMapLink = async (url) =>
+  json(await fetch(`/api/geo-fence/resolve-link?url=${encodeURIComponent(url)}`, { headers: authHeaders() }));

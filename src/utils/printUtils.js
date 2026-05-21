@@ -27,9 +27,9 @@ export const openPrintSheet = (recordId, options = {}) => {
   } = options;
 
   const url = `${API_BASE}/file-transfers/${recordId}/print-sheet?fontSize=${fontSize}&lineHeight=${lineHeight}&autoprint=${autoprint}`;
-  
+
   const printWindow = window.open(url, 'printSheet', windowFeatures);
-  
+
   if (!printWindow) {
     alert('សូមអនុញ្ញាតការបើកផ្ទាំងថ្មីសម្រាប់ការព្រីន');
     return;
@@ -37,7 +37,7 @@ export const openPrintSheet = (recordId, options = {}) => {
 
   // Focus the print window
   printWindow.focus();
-  
+
   return printWindow;
 };
 
@@ -56,7 +56,7 @@ export const getPrintData = async (recordId) => {
     const headers = {
       'Content-Type': 'application/json'
     };
-    
+
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -222,17 +222,17 @@ export const printDirectly = (htmlContent) => {
   printFrame.style.position = 'absolute';
   printFrame.style.top = '-10000px';
   printFrame.style.left = '-10000px';
-  
+
   document.body.appendChild(printFrame);
-  
+
   const printDoc = printFrame.contentDocument || printFrame.contentWindow.document;
   printDoc.open();
   printDoc.write(htmlContent);
   printDoc.close();
-  
+
   printFrame.contentWindow.focus();
   printFrame.contentWindow.print();
-  
+
   // Clean up after printing
   setTimeout(() => {
     document.body.removeChild(printFrame);
@@ -250,12 +250,12 @@ export const printFileTransfer = async (recordId, method = 'window', options = {
     switch (method) {
       case 'window':
         return openPrintSheet(recordId, options);
-        
+
       case 'direct':
         const data = await getPrintData(recordId);
         const html = generatePrintHTML(data, options);
         return printDirectly(html);
-        
+
       case 'download':
         const printData = await getPrintData(recordId);
         const printHTML = generatePrintHTML(printData, options);
@@ -269,7 +269,7 @@ export const printFileTransfer = async (recordId, method = 'window', options = {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         return true;
-        
+
       default:
         throw new Error(`Unknown print method: ${method}`);
     }

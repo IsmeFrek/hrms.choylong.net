@@ -15,6 +15,14 @@ const ShiftGroupSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  month: {
+    type: Number,
+    min: 1,
+    max: 12
+  },
+  year: {
+    type: Number
+  },
   endDate: {
     type: Date
   },
@@ -30,6 +38,18 @@ const ShiftGroupSchema = new mongoose.Schema({
     employeeCount: {
       type: Number,
       default: 0
+    },
+    categoryId: {
+      type: String,
+      default: ''
+    },
+    startShiftIndex: {
+      type: Number,
+      default: 0
+    },
+    customPattern: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
     }
   }],
   shifts: [{
@@ -91,6 +111,9 @@ const ShiftGroupSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  holidayDates: [{
+    type: String
+  }],
   isActive: {
     type: Boolean,
     default: true
@@ -98,6 +121,10 @@ const ShiftGroupSchema = new mongoose.Schema({
   createdBy: {
     type: String,
     default: 'system'
+  },
+  manualOverrides: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
   },
   updatedBy: {
     type: String,

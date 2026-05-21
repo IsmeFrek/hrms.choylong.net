@@ -8,6 +8,12 @@ const Layout = ({ children, activeSection, onSectionChange }) => {
   const [sidebarCompact, setSidebarCompact] = useState(false); // desktop compact flag
   const [isMobile, setIsMobile] = useState(false);
   const { user } = useAuth();
+  const [footerSettings, setFooterSettings] = useState({
+    text: 'សូមស្វាគមន៍មកកាន់ប្រព័ន្ធគ្រប់គ្រងបុគ្គលិក (HRMS) នៃមន្ទីរពេទ្យបង្អែកខេត្តកោះកុង | រក្សាសិទ្ធិគ្រប់យ៉ាងដោយមន្ទីរពេទ្យបង្អែកខេត្តកោះកុង (២០២៦) | បច្ចេកវិទ្យាទំនើប ដើម្បីប្រសិទ្ធភាពការងារ',
+    speed: 25,
+    showLogo: true,
+    logoUrl: '/hospital_logo.png'
+  });
 
   const toggleSidebar = () => {
     if (isMobile) {
@@ -27,6 +33,27 @@ const Layout = ({ children, activeSection, onSectionChange }) => {
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch('/api/report-settings/group/ui-settings');
+        const data = await res.json();
+        if (data && data.settings) {
+          setFooterSettings({
+            text: data.settings.footer_text || footerSettings.text,
+            speed: parseInt(data.settings.footer_speed) || 25,
+            showLogo: data.settings.show_footer_logo !== undefined ? data.settings.show_footer_logo : true,
+            logoUrl: data.settings.footer_logo_url || '/hospital_logo.png'
+          });
+        }
+      } catch (e) { /* ignore */ }
+    };
+    fetchSettings();
+    // Refresh every 5 minutes
+    const timer = setInterval(fetchSettings, 300000);
+    return () => clearInterval(timer);
   }, []);
 
   return (
@@ -85,8 +112,32 @@ const Layout = ({ children, activeSection, onSectionChange }) => {
       </div>
 
       {/* Footer (below main content) */}
-      <footer className="fixed bottom-0 left-0 w-full z-50 bg-blue-300 border-t border-gray-200 h-8 flex items-center justify-center">
-        <div className="text-sm text-gray-900">Footer</div>
+      <footer className="fixed bottom-0 left-0 w-full z-50 bg-blue-600 h-8 flex items-center overflow-hidden border-t border-blue-400 shadow-inner">
+        <div className="w-full relative flex items-center h-full">
+          <div 
+            className="flex animate-marquee"
+            style={{ animationDuration: `${footerSettings.speed}s` }}
+          >
+            {/* First copy */}
+            <div className="flex-shrink-0 min-w-[100vw] flex items-center justify-around pr-[20vw]">
+              <div className="flex items-center gap-3">
+                {footerSettings.showLogo && <img src={footerSettings.logoUrl} alt="Logo" className="w-5 h-5 object-contain" />}
+                <span className="text-[13px] font-medium text-white whitespace-nowrap">
+                  {footerSettings.text}
+                </span>
+              </div>
+            </div>
+            {/* Second copy for seamless loop */}
+            <div className="flex-shrink-0 min-w-[100vw] flex items-center justify-around pr-[20vw]">
+              <div className="flex items-center gap-3">
+                {footerSettings.showLogo && <img src={footerSettings.logoUrl} alt="Logo" className="w-5 h-5 object-contain" />}
+                <span className="text-[13px] font-medium text-white whitespace-nowrap">
+                  {footerSettings.text}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </footer>
     </div>
   );

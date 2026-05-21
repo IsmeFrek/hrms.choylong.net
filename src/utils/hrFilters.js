@@ -25,8 +25,22 @@ export const isPreparedForDeletion = (emp) => {
 // or the record has resign/removal data that is not prepared-for-deletion.
 export const isCountedActive = (emp) => {
   if (!emp) return false;
-  const s = (emp.status || '').toString();
-  if (s === 'Resigned' || s === 'Deleted' || s === 'resigned' || s === 'deleted') return false;
+
+  const parseDateSafe = (v) => {
+    if (!v) return null;
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const resDate = parseDateSafe(emp.resignDate || emp.resignationDate || emp.dateRemoved);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // If resignation date is in the future, they are still considered active regardless of status string
+  if (resDate && resDate > today) return true;
+
+  const s = (emp.status || '').toString().toLowerCase();
+  if (s === 'resigned' || s === 'deleted' || s === 'inactive') return false;
   const hasResign = hasResignData(emp);
   const hasExplicitRemoval = isExplicitlyRemoved(emp);
   const prepared = isPreparedForDeletion(emp) && !hasExplicitRemoval;

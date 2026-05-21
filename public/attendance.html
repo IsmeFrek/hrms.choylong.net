@@ -15,11 +15,15 @@
     input,textarea,select{width:100%;padding:10px;margin-top:6px;border:1px solid #ccc;border-radius:4px;font-size:1rem}
     button{margin-top:14px;padding:12px 16px;border-radius:6px;background:#16a34a;color:#fff;border:0;font-size:1rem}
     button.secondary{background:#eee;color:#111;border:1px solid #ccc;margin-right:8px}
-    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .row{display:flex;flex-direction:column;gap:12px;align-items:stretch}
     .small{flex:1 1 140px;min-width:120px}
     .note{color:#444;margin-top:8px;font-size:0.95rem}
-    form{background:transparent}
+    form{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;margin-top:8px;box-shadow:0 6px 18px rgba(15,23,42,0.06)}
     input[type=file]{padding:6px}
+    .form-row-multi{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+    .form-field{display:flex;flex-direction:column;min-width:140px;flex:0 0 auto}
+    .form-field.notes{flex:1 1 260px}
+    .form-actions-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px}
     @media (min-width:700px){
       input,textarea,select{font-size:0.98rem}
       .small{width:160px}
@@ -36,7 +40,7 @@
     .records-table{width:100%;border-collapse:collapse;min-width:520px;border:1px solid #e5e7eb}
     .records-table th,.records-table td{padding:5px 8px;border:1px solid #e5e7eb;text-align:left}
     .records-table{table-layout:fixed}
-    /* Column widths: 1:serial,2:staffId,3:fullName,4:date,5:checkIn,6:checkOut,7:notes,8:approved,9:actions */
+    /* Column widths: 1:serial,2:staffId,3:fullName,4:date,5:createdAt,6:checkIn,7:checkOut,8:notes,9:approved,10:actions */
     .records-table th:nth-child(1), .records-table td:nth-child(1){
       width: 3ch;
       max-width: 3ch;
@@ -50,51 +54,85 @@
     .records-table th:nth-child(2), .records-table td:nth-child(2){width:60px; text-align:center}
     .records-table th:nth-child(3), .records-table td:nth-child(3){width:80px;white-space:normal}
     .records-table th:nth-child(4), .records-table td:nth-child(4){width:60px; text-align:center}
-    .records-table th:nth-child(5), .records-table td:nth-child(5){width:50px; text-align:center}
+    .records-table th:nth-child(5), .records-table td:nth-child(5){width:80px; text-align:center}
     .records-table th:nth-child(6), .records-table td:nth-child(6){width:50px; text-align:center}
-    .records-table th:nth-child(7), .records-table td:nth-child(7){width:100px;white-space:normal}
-    .records-table th:nth-child(8), .records-table td:nth-child(8){width:50px; text-align:center}
-    .records-table th:nth-child(9), .records-table td:nth-child(9){width:50px;text-align:center}
-      /* Compact button used in table actions */
-      .btn-compact{padding:0px 0px;border-radius:0px;font-size:0.5rem;line-height:0;min-width:0px;display:inline-block}
-      .btn-compact.primary{background:#2563eb;color:#fff;border:0}
-      .btn-compact.danger{background:#ef4444;color:#fff;border:0}
+    .records-table th:nth-child(7), .records-table td:nth-child(7){width:50px; text-align:center}
+    .records-table th:nth-child(8), .records-table td:nth-child(8){width:100px;white-space:normal}
+    .records-table th:nth-child(9), .records-table td:nth-child(9){width:50px; text-align:center}
+    .records-table th:nth-child(10), .records-table td:nth-child(10){width:50px;text-align:center}
+    /* Compact button used in table actions */
+    .btn-compact{padding:0px 0px;border-radius:0px;font-size:1.5rem;line-height:0;min-width:0px;display:inline-block}
+    .btn-compact.primary{background:#2563eb;color:#fff;border:0}
+    .btn-compact.danger{background:#ef4444;color:#fff;border:0}
     .records-table thead th{background:#f8fafc}
+    .hidden-until-match{display:none !important}
+
+    /* Hero card for first-time Scan UI */
+    .pre-scan{display:flex;justify-content:center;margin:60px 0 50px}
+    .pre-scan-card{background:linear-gradient(135deg,#eff6ff,#ecfeff);border-radius:16px;padding:24px 28px;box-shadow:0 18px 60px rgba(15,23,42,0.18);max-width:820px;width:100%;text-align:center;border:3px solid #dbeafe}
+    .pre-scan-title{font-size:2.25rem;margin:0 0 6px;font-weight:600;color:#0736a3}
+    .pre-scan-sub{margin:0 0 18px;font-size:1.7rem;color:#01050c}
+    .pre-scan-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
     @media (max-width:20px){
       .records-table{min-width:320px}
-      .records-table th,.records-table td{padding:1px;font-size:0.8rem}
+      .records-table th,.records-table td{padding:1px;font-size:1.2rem}
       .container{padding:1px}
     }
+    /* Hide page title only */
+    body > h2{display:none}
   </style>
 </head>
 <body>
   <h2>បញ្ចូលវត្តមាន</h2>
+  <div id="preScanIntro" class="pre-scan">
+    <div class="pre-scan-card">
+      <div class="pre-scan-title">ស្កេនមុខ សម្រាប់កត់ត្រាវត្តមាន</div>
+      <p class="pre-scan-sub">សូមចុចប៊ូតុង "ស្កេនមុខ" ដើម្បីសម្គាល់វត្តមានមុនពេលបំពេញទំរង់។
+        <p class="pre-scan-sub">បើមិនទាន់មាន Face Profile សូមចុះឈ្មោះមុខ (Enroll) ជាមុន។
+      <div class="pre-scan-actions">
+        <button type="button" id="quickFaceScan" style="padding:10px 28px;border-radius:9999px;background:#16a34a;color:#fff;border:0;font-size:1.35rem;white-space:nowrap;cursor:pointer;box-shadow:0 3px 8px rgba(22,163,74,0.55)">ស្កេនមុខ</button>
+        <p><a href="/face_enroll.html" style="display:inline-flex;align-items:center;justify-content:center;padding:12px 28px;border-radius:9999px;border:1px solid #0ea5e9;background:#f0f9ff;color:#0369a1;text-decoration:none;font-size:1.35rem;white-space:nowrap;">ចុះឈ្មោះមុខ (Enroll)</a></p>
+      </div>
+    </div>
+  </div>
+
   <div class="container">
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 2px">
-      <a href="/mobileApp/attendance" style="display:inline-block;padding:10px 12px;border-radius:8px;background:#2563eb;color:#fff;text-decoration:none">ស្កេនវត្តមាន (ទូរស័ព្ទ)</a>
-      <a href="/face_scan.html" style="display:inline-block;padding:10px 12px;border-radius:8px;background:#16a34a;color:#fff;text-decoration:none">ស្កេនមុខ (Face Scan)</a>
-      <a href="/face_enroll.html" style="display:inline-block;padding:10px 12px;border-radius:8px;background:#0ea5e9;color:#fff;text-decoration:none">ចុះឈ្មោះមុខ (Enroll)</a>
-    </div>
   <form id="attendanceForm">
-    <label>លេខកាត់បុគ្គលិក<span class="req">*</span>
-      <input name="staffId" required placeholder="លេខកាត់ (ដូចជា 12345)" maxlength="30" />
-    </label>
+    <table class="form-rows">
+      <tr class="hidden-until-match">
+        <th>លេខកាត់បុគ្គលិក<span class="req">*</span></th>
+        <td>
+          <input name="staffId" required placeholder="លេខកាត់ (ដូចជា 12345)" maxlength="30" readonly />
+        </td>
+      </tr>
 
-    <label>គោត្តមាន និង នាម<span class="req">*</span>
-      <input name="fullName" required placeholder="ឈ្មោះ ពេញ" maxlength="100" />
-    </label>
+      <tr class="hidden-until-match">
+        <th>គោត្តមាន និង នាម<span class="req">*</span></th>
+        <td>
+          <input name="fullName" required placeholder="ឈ្មោះ ពេញ" maxlength="100" readonly />
+        </td>
+      </tr>
 
-    <div class="row">
-      <label class="small">ថ្ងៃខែឆ្នាំមានបញ្ហា<span class="req">*</span>
-        <input type="text" name="date" required placeholder="dd/mm/yyyy" pattern="\d{1,2}/\d{1,2}/\d{4}" inputmode="numeric" title="Format: dd/mm/yyyy" maxlength="10" />
-      </label>
-      <label class="small">ម៉ោងចូល<span class="req">*</span>
-        <input type="text" name="checkIn" required placeholder="HH:MM" maxlength="5" />
-      </label>
-      <label class="small">ម៉ោងចេញ<span class="req">*</span>
-        <input type="text" name="checkOut" required placeholder="HH:MM" maxlength="5" />
-      </label>
-    </div>
+      <tr class="hidden-until-match">
+        <th>ថ្ងៃខែឆ្នាំមានបញ្ហា<span class="req">*</span></th>
+        <td>
+          <input type="text" name="date" required placeholder="dd/mm/yyyy" pattern="\d{1,2}/\d{1,2}/\d{4}" inputmode="numeric" title="Format: dd/mm/yyyy" maxlength="10" />
+        </td>
+      </tr>
+
+      <tr class="hidden-until-match">
+        <th>ម៉ោងចូល<span class="req">*</span></th>
+        <td>
+          <input type="text" name="checkIn" required placeholder="HH:MM" maxlength="5" />
+        </td>
+      </tr>
+
+      <tr class="hidden-until-match">
+        <th>ម៉ោងចេញ</th>
+        <td>
+          <input type="text" name="checkOut" placeholder="HH:MM" maxlength="5" />
+        </td>
+      </tr>
 
     <label style="display:none">ស្កេនចូល (optional)
       <input type="file" name="scanIn" accept="image/*" />
@@ -105,32 +143,62 @@
 
     <!-- approval is handled by admin from the records list; removed select from form -->
 
-    <label>ផ្សេងៗ / កំណត់សម្គាល់<span class="req">*</span>
-      <input name="notes" list="notesList" required placeholder="ជ្រើសរើស ឬ សរសេរ កំណត់សម្គាល់..." maxlength="300" />
-      <datalist id="notesList">
-        <option value="យឺត (Late)"></option>
-        <option value="ភ្លេច"></option>
-        <option value="ភ្លេចស្កេនចុះយាម"></option>
-      
+      <tr class="hidden-until-match">
+        <th>ផ្សេងៗ / កំណត់សម្គាល់<span class="req">*</span></th>
+        <td>
+          <input name="notes" list="notesList" required placeholder="ជ្រើសរើស ឬ សរសេរ កំណត់សម្គាល់..." maxlength="300" />
+          <datalist id="notesList">
+            <option value="យឺត (Late)"></option>
+            <option value="ភ្លេច"></option>
+            <option value="ភ្លេចស្កេនចុះយាម"></option>
+          </datalist>
+        </td>
+      </tr>
 
-      </datalist>
-    </label>
-
-    <div style="display:flex;gap: 10px;flex-wrap:wrap;margin-top:1px">
-      <button type="submit">ដាក់ស្នើ</button>
-      <button type="button" class="secondary" onclick="document.getElementById('attendanceForm').reset()">លុប</button>
-      <button type="button" id="showRecords" class="secondary">បង្ហាញកំណត់ត្រា</button>
-    </div>
+      <tr class="hidden-until-match">
+        <th></th>
+        <td>
+          <div id="formActionButtons" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px">
+            <button type="submit">ដាក់ស្នើ</button>
+            <button type="button" class="secondary" onclick="document.getElementById('attendanceForm').reset()">លុប</button>
+            <button type="button" id="backToScan" class="secondary">ត្រឡប់ទៅកាតស្កេនមុខ</button>
+            <!-- Hidden helper button used by JS to load the records table -->
+            <button type="button" id="showRecords" style="display:none">បង្ហាញកំណត់ត្រា</button>
+          </div>
+        </td>
+      </tr>
+    </table>
   </form>
   </div>
 
+  <!-- Records table will be rendered here so it appears directly under the form -->
+  <div id="recordsList" class="note" style="margin-top:12px"></div>
+
   <div id="result" class="note"></div>
-  
-    <div id="recordsList" class="note" style="margin-top:1px"></div>
+
+  <!-- Simple camera modal for face capture on check-in -->
+  <div id="cameraModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#fff;padding:12px;border-radius:8px;max-width:420px;width:90%;box-shadow:0 10px 25px rgba(0,0,0,0.25);">
+      <h3 style="margin-top:0;margin-bottom:8px;font-size:1rem;">ថតមុខ សម្រាប់ម៉ោងចូល</h3>
+      <div style="display:flex;justify-content:center;margin-bottom:8px;">
+        <div style="position:relative;border-radius:9999px;overflow:hidden;background:#000;border:1px solid #e5e7eb;aspect-ratio:1/1;width:260px;max-width:100%;">
+          <video id="cameraPreview" autoplay playsinline style="width:100%;height:100%;object-fit:cover;background:#000;transform:scaleX(-1);"></video>
+        </div>
+      </div>
+      <canvas id="cameraCanvas" style="display:none"></canvas>
+      <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+        <button type="button" id="cameraCancelBtn" class="secondary">បោះបង់</button>
+        <button type="button" id="cameraCaptureBtn">ថត</button>
+      </div>
+    </div>
+  </div>
 
   <!-- flatpickr for friendly datepicker (altInput shows dd/mm/yyyy while value is ISO) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+  <!-- face-api.js for quick face scan (auto fill staffId + name) -->
+  <script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
   <script src="/attendance.js"></script>
 </body>

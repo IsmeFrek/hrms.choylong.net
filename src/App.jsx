@@ -9,8 +9,16 @@ import HRSkillSummaryPage from './pages/HRSkillSummaryPage.jsx';
 import DepartmentUnits from './pages/DepartmentUnits.jsx';
 import HrDisplayPage from './pages/HrDisplay.jsx';
 import AttendanceMonthlyReportPage from './pages/AttendanceMonthlyReportPage.jsx';
-import AttendancedayReportPage from './pages/AttendancedayReportPage.jsx';
+import AttendanceSumDayReportPage from './pages/AttendanceSumDayReportPage.jsx';
+import AttendanceMinistryReportPage from './pages/AttendanceMinistryReportPage.jsx';
+import AttendancedayReportPage from './pages/AttendanceDayReportPage.jsx';
 import DailyReportsPage from './pages/DailyReportsPage';
+import AttendanceDailyReportPage from './pages/AttendanceDailyReportPage.jsx';
+import AttendanceLeaveTodayPage from './pages/AttendanceLeaveTodayPage.jsx';
+import AttendanceDetailReportPage from './pages/AttendanceDetailReportPage.jsx';
+import GroupTimetablesPage from './pages/GroupTimetablesPage.jsx';
+import MeetingRoomPage from './pages/MeetingRoomPage.jsx';
+import MeetingRoomV2Page from './pages/MeetingRoomV2Page.jsx';
 
 import Layout from './components/Layout';
 import MinimalLayout from './components/MinimalLayout';
@@ -24,6 +32,7 @@ import HRPage from './components/HRPage';
 import UsersPage from './pages/UsersPage';
 import RolesPage from './pages/RolesPage';
 import EmployeeReportPage from './pages/EmployeeReportPage';
+import EvaluationReportPage from './pages/EvaluationReportPage';
 import EmployeeReport from './pages/EmployeeReport.jsx';
 import ShiftsPage from './pages/ShiftsPage';
 import RetirementReportPage from './pages/RetirementReportPage';
@@ -32,18 +41,27 @@ import PromotionByRotationReportPage from './pages/PromotionByRotationReportPage
 import PromotionByDiplomaReportPage from './pages/PromotionByDiplomaReportPage';
 import PromotionByHonorReportPage from './pages/PromotionByHonorReportPage';
 import UnpaidLeaveReportPage from './pages/UnpaidLeaveReportPage';
+import OutOfCadreReportPage from './pages/OutOfCadreReportPage';
 import OfficialDelistedReportPage from './pages/OfficialDelistedReportPage';
+import NewEmployeesThisMonthPage from './pages/NewEmployeesThisMonthPage';
 import MaternityLeaveReportPage from './pages/MaternityLeaveReportPage';
 import StudyLeaveReportPage from './pages/StudyLeaveReportPage';
+import LeaveRequestsPage from './pages/LeaveRequestsPage.jsx';
 import AttendancePage from './pages/AttendancePage';
 import AttendanceReportPage from './pages/AttendanceReportPage';
 import WorkCalendarPage from './pages/WorkCalendarPage';
 import WorkSchedulePage from './pages/WorkSchedulePage';
+import WorkSchedule1Page from './pages/WorkSchedule1Page';
 import AttendanceMonthlyDataPage from './pages/AttendanceMonthlyDataPage';
+import AttendancesumDayPage from './pages/AttendancesumDayPage';
 import AttendanceDayAttendanceDataPage from './pages/AttendanceDayAttendanceDataPage';
+// AttendanceBudgetPage removed; using AttendanceSumDayReportPage
+import AttendanceAuditPage from './pages/AttendanceAuditPage';
+import AttendanceMinistryPage from './pages/AttendanceMinistryPage';
 import GroupReportPage from './pages/GroupReportPage';
 // DocumentFlowPage removed
 import LetterPage from './pages/LetterPage';
+import InstructionLetterPage from './pages/InstructionLetterPage';
 import DirectorReportPage from './pages/DirectorReportPage.jsx';
 import DeputyDirectorReportPage from './pages/DeputyDirectorReportPage.jsx';
 import OfficeHeadReportPage from './pages/OfficeHeadReportPage.jsx';
@@ -87,6 +105,15 @@ import MobileAttendanceData from './pages/MobileAttendanceData.jsx';
 import MobileScanPage from './pages/MobileScanPage.jsx';
 import MobileFaceEnrollPage from './pages/MobileFaceEnrollPage.jsx';
 import GeoFencePoliciesPage from './pages/GeoFencePoliciesPage.jsx';
+import KamprakPage from './pages/KamprakPage.jsx';
+import StaffBiographyPage from './pages/StaffBiographyPage.jsx';
+import TelegramPage from './pages/TelegramPage.jsx';
+import TelegramMiniApp from './pages/TelegramMiniApp.jsx';
+import ActivityReportPage from './pages/ActivityReportPage.jsx';
+import SystemSettingsPage from './pages/SystemSettingsPage.jsx';
+import PublicStaffProfile from './pages/PublicStaffProfile.jsx';
+import EmployeeIDDocsPage from './pages/EmployeeIDDocsPage.jsx';
+import EmployeeOtherDocsPage from './pages/EmployeeOtherDocsPage.jsx';
 
 function RequireAuth({ children }) {
   const { isAuthenticated } = useAuth();
@@ -94,7 +121,8 @@ function RequireAuth({ children }) {
   const loc = useLocation();
   if (!isAuthenticated) {
     const redirect = encodeURIComponent(loc.pathname + loc.search);
-    return <Navigate to={`/login?redirect=${redirect}`} replace />;
+    const target = loc.pathname.includes('telegram') ? '/staff-login' : '/login';
+    return <Navigate to={`${target}?redirect=${redirect}`} replace />;
   }
 
   // Pending accounts (no permissions) should only see the pending approval page
@@ -122,7 +150,7 @@ function RootRedirect() {
 
 // Helper: wrap a page with the app Layout so Sidebar/header are present
 function LayoutWrapper({ section, children }) {
-  const handleSectionChange = () => {};
+  const handleSectionChange = () => { };
   return (
     <Layout activeSection={section} onSectionChange={handleSectionChange}>
       {children}
@@ -168,7 +196,7 @@ function StaffRegisterRoute() {
 function WorkCalendarRoute() {
   const perms = usePermission();
   return (
-    <PermissionGate allow={perms.canViewAttendance}>
+    <PermissionGate allow={perms.canViewAbsence || !!perms.user?.department}>
       <WorkCalendarPage />
     </PermissionGate>
   );
@@ -178,8 +206,18 @@ function WorkCalendarRoute() {
 function WorkScheduleRoute() {
   const perms = usePermission();
   return (
-    <PermissionGate allow={perms.canViewAttendance}>
+    <PermissionGate allow={perms.canViewWorkSchedule || !!perms.user?.department}>
       <WorkSchedulePage />
+    </PermissionGate>
+  );
+}
+
+// Small wrapper for WorkSchedule1Page
+function WorkSchedule1Route() {
+  const perms = usePermission();
+  return (
+    <PermissionGate allow={perms.canViewWorkSchedule}>
+      <WorkSchedule1Page />
     </PermissionGate>
   );
 }
@@ -188,8 +226,7 @@ function WorkScheduleRoute() {
 function ShiftsRoute() {
   const perms = usePermission();
   return (
-    // allow either settings viewers or HR viewers to manage/view shifts
-    <PermissionGate allow={perms.canViewSettings || perms.canViewHR}>
+    <PermissionGate allow={perms.canViewShifts}>
       <ShiftsPage />
     </PermissionGate>
   );
@@ -199,8 +236,26 @@ function ShiftsRoute() {
 function ShiftGroupsRoute() {
   const perms = usePermission();
   return (
-    <PermissionGate allow={perms.canViewAttendance}>
+    <PermissionGate allow={perms.canViewShiftGroups}>
       <ShiftGroupsPage />
+    </PermissionGate>
+  );
+}
+
+function GroupTimetablesRoute() {
+  const perms = usePermission();
+  return (
+    <PermissionGate allow={perms.canViewGroupTimetables}>
+      <GroupTimetablesPage />
+    </PermissionGate>
+  );
+}
+
+function MissionsRoute() {
+  const perms = usePermission();
+  return (
+    <PermissionGate allow={perms.canViewMissions}>
+      <MissionsPage />
     </PermissionGate>
   );
 }
@@ -240,13 +295,12 @@ function ProtectedApp() {
 
   // Sync activeSection with URL path so direct links / refresh show the correct section
   useEffect(() => {
-    const roles = Array.isArray(user?.roles) ? user.roles : [];
-    const isAdmin = roles.some((r) => (r?.name || r) === 'Admin');
-    const isStaffOnly = !isAdmin && roles.length === 1 && (roles[0]?.name || roles[0]) === 'User';
+    const isAdmin = perms.isAdmin;
+    const hasDashboardPerm = perms?.list?.includes('view:dashboard') || perms?.canViewHR || perms?.canViewEmployees || isAdmin;
 
     const path = (loc && loc.pathname) ? loc.pathname.replace(/^\//, '') : '';
     if (!path) {
-      setActiveSection(isStaffOnly ? 'my-hr' : 'dashboard');
+      setActiveSection(hasDashboardPerm ? 'dashboard' : 'staff-biography');
       return;
     }
     // Use first path segment as section id (e.g. 'study-leave-report' from '/study-leave-report')
@@ -264,7 +318,7 @@ function ProtectedApp() {
             <HRPage />
           </PermissionGate>
         );
-  // Removed employees page
+      // Removed employees page
       case 'skills':
         return (
           <PermissionGate allow={perms.canViewSkills}>
@@ -311,12 +365,12 @@ function ProtectedApp() {
 
       case 'my-hr':
         return (
-		  <PermissionGate allow={perms.canViewMyHr || perms.canViewSelfService}>
+          <PermissionGate allow={perms.canViewMyHr || perms.canViewSelfService}>
             <MyHrPage />
-		  </PermissionGate>
+          </PermissionGate>
         );
-      
-      
+
+
       case 'signatures':
         return (
           <PermissionGate allow={perms.canViewSignSchemas || perms.canManageSignSchemas || perms.canEditDocuments}>
@@ -333,25 +387,37 @@ function ProtectedApp() {
         );
       case 'attendance':
         return (
-          <PermissionGate allow={perms.canViewAttendance}>
+          <PermissionGate allow={perms.canViewAbsence}>
             <AttendancePage />
           </PermissionGate>
         );
       case 'work-calendar':
         return (
-          <PermissionGate allow={perms.canViewAttendance}>
+          <PermissionGate allow={perms.canViewAbsence}>
             <WorkCalendarPage />
           </PermissionGate>
         );
       case 'work-schedule':
         return (
-          <PermissionGate allow={perms.canViewAttendance}>
+          <PermissionGate allow={perms.canViewAbsence}>
             <WorkSchedulePage />
+          </PermissionGate>
+        );
+      case 'work-schedule1':
+        return (
+          <PermissionGate allow={perms.canViewAbsence}>
+            <WorkSchedule1Page />
+          </PermissionGate>
+        );
+      case 'group-timetables':
+        return (
+          <PermissionGate allow={perms.canViewWorkSchedule}>
+            <GroupTimetablesPage />
           </PermissionGate>
         );
       case 'attendance-report':
         return (
-          <PermissionGate allow={perms.canViewAttendance}>
+          <PermissionGate allow={perms.canViewAttendanceReport}>
             <AttendanceReportPage />
           </PermissionGate>
         );
@@ -361,10 +427,22 @@ function ProtectedApp() {
             <EmployeeReportPage />
           </PermissionGate>
         );
+      case 'employee-id-docs':
+        return (
+          <PermissionGate allow={perms.canViewEmployeeReport}>
+            <EmployeeIDDocsPage />
+          </PermissionGate>
+        );
+      case 'employee-other-docs':
+        return (
+          <PermissionGate allow={perms.canViewEmployeeReport}>
+            <EmployeeOtherDocsPage />
+          </PermissionGate>
+        );
       /* 'daily-report' removed: DailyReportsPage component deleted */
       case 'group-report':
         return (
-          <PermissionGate allow={perms.canViewAttendance}>
+          <PermissionGate allow={perms.canViewAttendanceReport}>
             <GroupReportPage />
           </PermissionGate>
         );
@@ -452,10 +530,28 @@ function ProtectedApp() {
             <PromotionByHonorReportPage />
           </PermissionGate>
         );
+      case 'leave-requests':
+        return (
+          <PermissionGate allow={perms.canViewLeaveRequests}>
+            <LeaveRequestsPage />
+          </PermissionGate>
+        );
       case 'unpaid-leave-report':
         return (
           <PermissionGate allow={perms.canViewUnpaidLeaveReport}>
             <UnpaidLeaveReportPage />
+          </PermissionGate>
+        );
+      case 'out-of-cadre-report':
+        return (
+          <PermissionGate allow={perms.canViewOutOfCadreLeaveReport || perms.canViewEmployeeReport}>
+            <OutOfCadreReportPage />
+          </PermissionGate>
+        );
+      case 'new-employees-this-month':
+        return (
+          <PermissionGate allow={perms.canViewNewEmployeesThisMonthReport}>
+            <NewEmployeesThisMonthPage />
           </PermissionGate>
         );
       case 'official-delisted-report':
@@ -466,13 +562,25 @@ function ProtectedApp() {
         );
       case 'attendance-monthly-report':
         return (
-          <PermissionGate allow={perms.canViewAttendanceMonthlyReport}>
+          <PermissionGate allow={perms.canViewAttendanceMonthly}>
             <AttendanceMonthlyReportPage />
+          </PermissionGate>
+        );
+      case 'attendance-ministry-report':
+        return (
+          <PermissionGate allow={perms.canViewAttendanceMonthlyReport}>
+            <AttendanceMinistryReportPage />
+          </PermissionGate>
+        );
+      case 'attendance-sum-dayreport':
+        return (
+          <PermissionGate allow={perms.canViewAttendanceSumDayReport}>
+            <AttendanceSumDayReportPage />
           </PermissionGate>
         );
       case 'attendance-day-report':
         return (
-          <PermissionGate allow={perms.canViewAttendanceMonthlyReport}>
+          <PermissionGate allow={perms.canViewAttendanceDaily}>
             <AttendancedayReportPage />
           </PermissionGate>
         );
@@ -482,10 +590,34 @@ function ProtectedApp() {
             <AttendanceMonthlyDataPage />
           </PermissionGate>
         );
+      case 'attendance-sum-day':
+        return (
+          <PermissionGate allow={perms.canViewAttendanceMonthlyData}>
+            <AttendancesumDayPage />
+          </PermissionGate>
+        );
       case 'attendance-day-data':
         return (
           <PermissionGate allow={perms.canViewAttendanceMonthlyData}>
             <AttendanceDayAttendanceDataPage />
+          </PermissionGate>
+        );
+      case 'attendance-budget':
+        return (
+          <PermissionGate allow={perms.canViewAttendanceReport}>
+            <AttendanceSumDayReportPage />
+          </PermissionGate>
+        );
+      case 'attendance-audit':
+        return (
+          <PermissionGate allow={perms.canViewAttendanceReport}>
+            <AttendanceAuditPage />
+          </PermissionGate>
+        );
+      case 'attendance-ministry':
+        return (
+          <PermissionGate allow={perms.canViewAttendanceReport}>
+            <AttendanceMinistryPage />
           </PermissionGate>
         );
       case 'maternity-leave-report':
@@ -494,12 +626,26 @@ function ProtectedApp() {
             <MaternityLeaveReportPage />
           </PermissionGate>
         );
+      case 'instruction-letters':
+        return (
+          <PermissionGate allow={perms.canViewDocuments}>
+            <InstructionLetterPage />
+          </PermissionGate>
+        );
+      case 'attendance-leave-today':
+        return (
+          <AttendanceLeaveTodayPage />
+        );
       case 'study-leave-report':
         return (
           <PermissionGate allow={perms.canViewStudyLeaveReport}>
             <StudyLeaveReportPage />
           </PermissionGate>
         );
+      case 'meeting-rooms':
+        return <MeetingRoomPage />;
+      case 'meeting-rooms-v2':
+        return <MeetingRoomV2Page />;
       case 'department-report':
         return (
           <div className="p-6">
@@ -532,6 +678,22 @@ function ProtectedApp() {
             <RolesPage />
           </PermissionGate>
         );
+      case 'activity-report':
+        return (
+          <PermissionGate allow={perms.isAdmin}>
+            <ActivityReportPage />
+          </PermissionGate>
+        );
+      case 'system-settings':
+        return (
+          <PermissionGate allow={perms.isAdmin}>
+            <SystemSettingsPage />
+          </PermissionGate>
+        );
+      case 'staff-biography':
+        return (
+          <StaffBiographyPage />
+        );
       default:
         return <Dashboard />;
     }
@@ -539,11 +701,11 @@ function ProtectedApp() {
 
   return (
     <Layout activeSection={activeSection} onSectionChange={handleSectionChange}>
-  {/* Removed employees header bar */}
+      {/* Removed employees header bar */}
 
       {renderContent()}
 
-  {/* Removed employees modals */}
+      {/* Removed employees modals */}
 
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover theme="light" />
     </Layout>
@@ -555,16 +717,18 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
-         <Route path="/" element={<RootRedirect />} />
-         <Route path="/mobile" element={<MobileApp />} />
-         <Route path="/mobileApp" element={<MobileApp />} />
-         <Route path="/mobileApp/attendance" element={<MobileAttendanceData />} />
-         <Route path="/mobileApp/scan" element={<MobileScanPage />} />
-         <Route path="/mobileApp/face-enroll" element={<MobileFaceEnrollPage />} />
-         <Route path="/hr-role-summary" element={<RequireAuth><LayoutWrapper section="hr-role-summary"><HRRoleSummaryPage /></LayoutWrapper></RequireAuth>} />
-         <Route path="/hr-skill-summary" element={<RequireAuth><LayoutWrapper section="hr-skill-summary"><HRSkillSummaryPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="/mobile" element={<MobileApp />} />
+          <Route path="/mobileApp" element={<MobileApp />} />
+          <Route path="/mobileApp/attendance" element={<MobileAttendanceData />} />
+          <Route path="/mobileApp/scan" element={<MobileScanPage />} />
+          <Route path="/mobileApp/face-enroll" element={<MobileFaceEnrollPage />} />
+          <Route path="/v/:id" element={<PublicStaffProfile />} />
+          <Route path="/hr-role-summary" element={<RequireAuth><LayoutWrapper section="hr-role-summary"><HRRoleSummaryPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/hr-skill-summary" element={<RequireAuth><LayoutWrapper section="hr-skill-summary"><HRSkillSummaryPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/geo-fence-policies" element={<RequireAuth><LayoutWrapper section="geo-fence-policies"><GeoFencePoliciesPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/signup" element={<RegisterPage />} />
           <Route path="/create-account" element={<RegisterPage />} />
           <Route path="/staff-login" element={<StaffLoginPage />} />
@@ -583,31 +747,48 @@ export default function App() {
           <Route path="/newpage" element={<RequireAuth><NewDocumentPage /></RequireAuth>} />
           <Route path="/work-calendar" element={<RequireAuth><LayoutWrapper section="work-calendar"><WorkCalendarRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/work-schedule" element={<RequireAuth><LayoutWrapper section="work-schedule"><WorkScheduleRoute /></LayoutWrapper></RequireAuth>} />
+          <Route path="/work-schedule1" element={<RequireAuth><LayoutWrapper section="work-schedule1"><WorkSchedule1Route /></LayoutWrapper></RequireAuth>} />
           <Route path="/shifts" element={<RequireAuth><LayoutWrapper section="shifts"><ShiftsRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/shift-groups" element={<RequireAuth><LayoutWrapper section="shift-groups"><ShiftGroupsRoute /></LayoutWrapper></RequireAuth>} />
+          <Route path="/group-timetables" element={<RequireAuth><LayoutWrapper section="group-timetables"><GroupTimetablesRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/geo-fence-policies" element={<RequireAuth><LayoutWrapper section="geo-fence-policies"><GeoFencePoliciesRoute /></LayoutWrapper></RequireAuth>} />
-          <Route path="/attendance-daily-report" element={<RequireAuth><LayoutWrapper section="attendance-daily-report"><DailyReportsPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/attendance-daily-report" element={<RequireAuth><LayoutWrapper section="attendance-daily-report"><AttendanceDailyReportPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/attendance-leave-today" element={<RequireAuth><LayoutWrapper section="attendance-leave-today"><AttendanceLeaveTodayPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/attendance-sum-dayreport" element={<RequireAuth><LayoutWrapper section="attendance-sum-dayreport"><AttendanceSumDayReportPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/attendance-ministry-report" element={<RequireAuth><LayoutWrapper section="attendance-ministry-report"><AttendanceMinistryReportPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/attendance-monthly-data" element={<RequireAuth><LayoutWrapper section="attendance-monthly-data"><AttendanceMonthlyDataPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/attendance-sum-day" element={<RequireAuth><LayoutWrapper section="attendance-sum-day"><AttendancesumDayPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/attendance-day-data" element={<RequireAuth><LayoutWrapper section="attendance-day-data"><AttendanceDayAttendanceDataPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/import-attendance" element={<RequireAuth><PermissionGate allow={true}><ImportAttendance /></PermissionGate></RequireAuth>} />
           <Route path="/file-transfer" element={<RequireAuth><LayoutWrapper section="file-transfer"><FileTransferPage /></LayoutWrapper></RequireAuth>} />
-          <Route path="/missions" element={<RequireAuth><LayoutWrapper section="missions"><MissionsPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/file-transfer-outgoing" element={<RequireAuth><LayoutWrapper section="file-transfer-outgoing"><FileTransferPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/missions" element={<RequireAuth><LayoutWrapper section="missions"><MissionsRoute /></LayoutWrapper></RequireAuth>} />
+          <Route path="/kamprak" element={<RequireAuth><LayoutWrapper section="kamprak"><KamprakPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/staff-biography" element={<RequireAuth><LayoutWrapper section="staff-biography"><StaffBiographyPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/staff-biography/:id" element={<RequireAuth><LayoutWrapper section="staff-biography"><StaffBiographyPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/file-transfer-stats" element={<RequireAuth><LayoutWrapper section="file-transfer-stats"><FileTransferStats /></LayoutWrapper></RequireAuth>} />
           <Route path="/send-feedback" element={<RequireAuth><LayoutWrapper section="send-feedback"><SendfeedbackPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/telegram-test" element={<RequireAuth><LayoutWrapper section="telegram-test"><TelegramTestPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/replay-file" element={<RequireAuth><MinimalLayout><ReplayfilePage /></MinimalLayout></RequireAuth>} />
           <Route path="/replay-file2" element={<RequireAuth><MinimalLayout><Replayfile2Page /></MinimalLayout></RequireAuth>} />
-          <Route path="/kshf_hospital_app/filetransfers1" element={<RequireAuth><LayoutWrapper section="file-transfer"><FileTransfer1Page /></LayoutWrapper></RequireAuth>} />
+          <Route path="/kshf_hospital_app/filetransfers-out" element={<RequireAuth><LayoutWrapper section="file-transfer"><FileTransfer1Page /></LayoutWrapper></RequireAuth>} />
           <Route path="/daily-attendance-report" element={<RequireAuth><DailyAttendanceReport /></RequireAuth>} />
           <Route path="/employee-report" element={<RequireAuth><LayoutWrapper section="employee-report"><EmployeeReportPage /></LayoutWrapper></RequireAuth>} />
-          <Route path="/employee-grants-report" element={<RequireAuth><LayoutWrapper section="employee-report"><EmployeeReport /></LayoutWrapper></RequireAuth>} />
+          <Route path="/evaluation" element={<RequireAuth><LayoutWrapper section="evaluation"><EvaluationReportPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/employee-id-docs" element={<RequireAuth><LayoutWrapper section="employee-id-docs"><EmployeeIDDocsPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/employee-other-docs" element={<RequireAuth><LayoutWrapper section="employee-other-docs"><EmployeeOtherDocsPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/retirement-report" element={<RequireAuth><LayoutWrapper section="retirement-report"><RetirementReportPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/new-employees-this-month" element={<RequireAuth><LayoutWrapper section="new-employees-this-month"><NewEmployeesThisMonthPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/official-delisted-report" element={<RequireAuth><LayoutWrapper section="official-delisted-report"><OfficialDelistedReportPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/department-report" element={<RequireAuth><LayoutWrapper section="department-report"><div className="p-6"><div className="text-center py-12"><h2 className="text-xl font-semibold text-gray-900">របាយការណ៍ផ្នែក</h2><p className="text-gray-600 mt-2">មុខងារនេះកំពុងបង្កើត...</p></div></div></LayoutWrapper></RequireAuth>} />
           <Route path="/profile" element={<RequireAuth><LayoutWrapper section="profile"><UserProfilePage /></LayoutWrapper></RequireAuth>} />
           <Route path="/link-telegram" element={<RequireAuth><LayoutWrapper section="link-telegram"><LinkTelegramPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/telegram" element={<TelegramPage />} />
+          <Route path="/telegram-mini-app" element={<RequireAuth><TelegramMiniApp /></RequireAuth>} />
           <Route path="/department-units" element={<RequireAuth><LayoutWrapper section="department-units"><DepartmentUnits /></LayoutWrapper></RequireAuth>} />
           <Route path="/hr" element={<RequireAuth><LayoutWrapper section="hr"><HRPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/meeting-rooms-v2" element={<RequireAuth><LayoutWrapper section="meeting-rooms-v2"><MeetingRoomV2Page /></LayoutWrapper></RequireAuth>} />
+          <Route path="/hr-display" element={<RequireAuth><LayoutWrapper section="hr"><HrDisplayPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/hr-display" element={<RequireAuth><LayoutWrapper section="hr"><HrDisplayPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/dashboard" element={<RequireAuth><ProtectedApp /></RequireAuth>} />
           {/* catch-all protected app: placed last so explicit client routes above are matched on refresh */}

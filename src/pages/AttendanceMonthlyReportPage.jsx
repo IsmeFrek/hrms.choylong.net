@@ -75,8 +75,18 @@ function formatMinutesAsHM(minutes) {
   return `${h}h ${mm}m`;
 }
 
+function parseHMToMinutesSimple(s) {
+  if (!s) return null;
+  const m = String(s).trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const mm = Number(m[2]);
+  if (!Number.isFinite(h) || !Number.isFinite(mm)) return null;
+  return h * 60 + mm;
+}
+
 function toKhmerDigits(n) {
-  const map = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+  const map = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
   return String(n).replace(/[0-9]/g, d => map[d]);
 }
 
@@ -84,8 +94,8 @@ function fmtKhmerLongDate(d) {
   if (!d) return '';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '';
-  const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
-  const dd = toKhmerDigits(String(dt.getDate()).padStart(1,'0'));
+  const khMonths = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
+  const dd = toKhmerDigits(String(dt.getDate()).padStart(1, '0'));
   const mmName = khMonths[dt.getMonth()];
   const yyyy = toKhmerDigits(dt.getFullYear());
   return `ថ្ងៃទី ${dd} ខែ ${mmName} ឆ្នាំ ${yyyy}`;
@@ -96,8 +106,8 @@ function fmtShortDate(d) {
   try {
     const dt = new Date(d);
     if (!isNaN(dt.getTime())) {
-      const dd = String(dt.getDate()).padStart(2,'0');
-      const mm = String(dt.getMonth()+1).padStart(2,'0');
+      const dd = String(dt.getDate()).padStart(2, '0');
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
       const yyyy = dt.getFullYear();
       return `${dd}/${mm}/${yyyy}`;
     }
@@ -194,7 +204,7 @@ export default function AttendanceMonthlyReportPage() {
     index: { label: 'ល.រ', width: 30, align: 'center', header: 'ល.រ' },
     name: { label: 'គោត្តនាម និងនាម', width: 100, align: 'left', header: 'គោត្តនាម និងនាម' },
     gender: { label: 'ភេទ', width: 30, align: 'center', header: 'ភេទ' },
-    position: { label: 'តូនាទី', width: 120, align: 'left', header: 'តូនាទី' },
+    position: { label: 'តួនាទី', width: 120, align: 'left', header: 'តួនាទី' },
     dayWorkCount: { label: 'ចំនួនថ្ងៃសរុប', width: 50, align: 'center', header: (<><div>ចំនួន</div><div>ថ្ងៃសរុប</div></>) },
     attendanceCount: { label: 'ចំនួនវត្តមាន', width: 50, align: 'center', header: (<><div>ចំនួន</div><div>វត្តមាន</div></>) },
     leaveCount: { label: 'ចំនួនច្បាប់', width: 50, align: 'center', header: (<><div>ចំនួន</div><div>ច្បាប់</div></>) },
@@ -211,8 +221,8 @@ export default function AttendanceMonthlyReportPage() {
   }), []);
 
   const defaultCols = useMemo(() => ([
-    'index','name','gender','position','dayWorkCount','attendanceCount','leaveCount','leaveType','A','workTime',
-    'lateEarly','plech','totalAbsent','percentage','absentToDeduct','other','totalLeaveComment'
+    'index', 'name', 'gender', 'position', 'dayWorkCount', 'attendanceCount', 'leaveCount', 'leaveType', 'A', 'workTime',
+    'lateEarly', 'plech', 'totalAbsent', 'percentage', 'absentToDeduct', 'other', 'totalLeaveComment'
   ]), []);
 
   const [visibleCols, setVisibleCols] = useState(() => {
@@ -359,14 +369,17 @@ export default function AttendanceMonthlyReportPage() {
       setLoading(true);
       setError('');
       try {
-        // Use Monthly Attendance Data (/attendance/monthly-data) and join HR data for name/gender/position.
         const from = new Date(fromDate);
         const to = new Date(toDate);
         if (isNaN(from.getTime()) || isNaN(to.getTime())) throw new Error('Invalid date range');
 
-        const [hrRes] = await Promise.all([
-          api.get('/hr').catch(() => ({ data: [] }))
+        // Fetch in parallel: HR list, day-data range (attendance metrics), leave requests
+        const [hrRes, dayRangeRes, leaveRes] = await Promise.all([
+          api.get('/hr').catch(() => ({ data: [] })),
+          api.get('/attendance/day-data', { params: { startDate: fromDate, endDate: toDate } }).catch(() => ({ data: [] })),
+          api.get('/leave-requests', { params: { from: fromDate, to: toDate } }).catch(() => ({ data: [] }))
         ]);
+
         const hrList = Array.isArray(hrRes.data) ? hrRes.data : [];
         const hrByStaffId = new Map();
         const hrSortKeyByStaffId = new Map();
@@ -374,96 +387,89 @@ export default function AttendanceMonthlyReportPage() {
           const sid = (h.staffId || h.no || '').toString().trim();
           if (!sid) return;
           hrByStaffId.set(sid, h);
-
           const noNum = Number(h?.no);
-          const sortKey = Number.isFinite(noNum) && noNum > 0 ? noNum : (1_000_000 + idx);
-          hrSortKeyByStaffId.set(sid, sortKey);
+          hrSortKeyByStaffId.set(sid, Number.isFinite(noNum) && noNum > 0 ? noNum : (1_000_000 + idx));
         });
 
-        const months = [];
-        const cur = new Date(from.getFullYear(), from.getMonth(), 1);
-        const endM = new Date(to.getFullYear(), to.getMonth(), 1);
-        while (cur <= endM) {
-          months.push({ year: cur.getFullYear(), month: cur.getMonth() + 1 });
-          cur.setMonth(cur.getMonth() + 1);
-        }
+        const dayRangeRows = Array.isArray(dayRangeRes.data) ? dayRangeRes.data : [];
+        const leaveList = (Array.isArray(leaveRes.data) ? leaveRes.data : [])
+          .filter(lv => (lv.status || '').toLowerCase() === 'approved');
 
-        const monthResults = await Promise.all(
-          months.map(({ year, month }) => api.get('/attendance/monthly-data', { params: { year, month } }).catch(() => ({ data: [] })))
-        );
-        const monthlyRows = monthResults.flatMap((r) => (Array.isArray(r.data) ? r.data : []));
+        // Build leave map: staffId_YYYY-MM-DD → leaveRecord
+        const leaveTypeMap = {}; // staffId → { type: count }
+        const leaveCountMap = {}; // staffId → count
+        leaveList.forEach(lv => {
+          const sid = (lv.staffId || lv.no || lv.employeeId?.staffId || '').toString().trim();
+          if (!sid) return;
+          const lvStart = new Date(lv.startDate || lv.from || lv.fromDate);
+          const lvEnd = new Date(lv.endDate || lv.to || lv.toDate);
+          if (isNaN(lvStart) || isNaN(lvEnd)) return;
+          const type = (lv.type || lv.leaveType || '').toString().trim();
+          leaveCountMap[sid] = (leaveCountMap[sid] || 0) + 1;
+          if (!leaveTypeMap[sid]) leaveTypeMap[sid] = {};
+          leaveTypeMap[sid][type] = (leaveTypeMap[sid][type] || 0) + 1;
+        });
 
+        // Build aggregated attendance map from day-data range
         const agg = {};
-        const workMinutesByStaff = {};
-        monthlyRows.forEach((rec) => {
-          const staffId = (rec.staffId || rec.no || '').toString().trim();
-          if (!staffId) return;
-          if (!agg[staffId]) {
-            const hr = hrByStaffId.get(staffId);
-            agg[staffId] = {
-              staffId,
-              hrSortKey: hrSortKeyByStaffId.get(staffId) ?? 1_000_000_000,
-              isCivilServant: Boolean(
-                hr &&
-                !hr?.isRetiredThenContract &&
-                (
-                  (hr?.civilServantId || '').toString().trim() ||
-                  (hr?.officerId || '').toString().trim() ||
-                  (hr?.dateJoinedGov || '').toString().trim()
-                )
-              ),
-              khmerName: hr?.khmerName || rec.name || hr?.name || '',
-              name: rec.name || hr?.name || '',
-              gender: hr?.gender || '',
-              position: hr?.position || '',
-              department: hr?.Department_Kh || hr?.department || '',
-              dayWorkCount: 0,
-              attendanceCount: 0,
-              absentCount: 0,
-              leaveCount: 0,
-              A: 0,
-              leaveType: '',
-              other: '',
-              totalLeaveComment: '',
-              plech: 0,
-              checkinLateCount: 0,
-              checkoutEarlyCount: 0,
-              checkinLateMinutes: 0,
-              checkoutEarlyMinutes: 0,
-              checkoutOvertimeMinutes: 0,
-              checkoutOvertimeCount: 0,
-              clock: 0,
-              clockCount: 0,
-              workTime: ''
-            };
-            workMinutesByStaff[staffId] = 0;
-          }
+        dayRangeRows.forEach(rec => {
+          const sid = (rec.staffId || '').toString().trim();
+          if (!sid) return;
+          const hr = hrByStaffId.get(sid);
 
-          const target = agg[staffId];
-          target.dayWorkCount += Number(rec.dayWorkCount) || 0;
-          target.attendanceCount += Number(rec.attendanceCount) || 0;
-          target.absentCount += Number(rec.absentCount) || 0;
-          target.leaveCount += Number(rec.leaveCount) || 0;
-          target.A += Number(rec.A) || 0;
-          target.leaveType = mergeText(target.leaveType, rec.leaveType);
-          target.other = mergeText(target.other, rec.other);
-          target.totalLeaveComment = mergeText(target.totalLeaveComment, rec.totalLeaveComment);
-          target.plech += Number(rec.plech ?? rec.Plech) || 0;
-          target.checkinLateCount += Number(rec.checkinLateCount) || 0;
-          target.checkoutEarlyCount += Number(rec.checkoutEarlyCount) || 0;
-          target.checkinLateMinutes += Number(rec.checkinLateMinutes) || 0;
-          target.checkoutEarlyMinutes += Number(rec.checkoutEarlyMinutes) || 0;
-          target.checkoutOvertimeMinutes += Number(rec.checkoutOvertimeMinutes) || 0;
-          target.checkoutOvertimeCount += Number(rec.checkoutOvertimeCount) || 0;
-          target.clock += Number(rec.clock) || 0;
-          target.clockCount += Number(rec.clockCount) || 0;
+          agg[sid] = {
+            staffId: sid,
+            hrSortKey: hrSortKeyByStaffId.get(sid) ?? 1_000_000_000,
+            isCivilServant: Boolean(hr && !hr?.isRetiredThenContract && (
+              (hr?.civilServantId || '').toString().trim() ||
+              (hr?.officerId || '').toString().trim() ||
+              (hr?.dateJoinedGov || '').toString().trim()
+            )),
+            khmerName: rec.name || hr?.khmerName || hr?.name || '',
+            name: rec.name || hr?.khmerName || hr?.name || '',
+            gender: hr?.gender || '',
+            position: hr?.position || '',
+            department: rec.department || hr?.Department_Kh || hr?.department || '',
+            dayWorkCount: 0,
+            attendanceCount: Number(rec.attendanceCount || 0),
+            absentCount: Number(rec.absentCount || 0),
+            leaveCount: Number(rec.leaveCount || 0),
+            A: Number(rec.absentCount || 0), // Mapping backend absentCount to frontend 'A'
+            leaveType: rec.leaveType || '',
+            other: rec.leaveReason || '',
+            totalLeaveComment: '',
+            plech: Number(rec.plech || 0),
+            checkinLateCount: Number(rec.checkinLateCount || 0),
+            checkoutEarlyCount: Number(rec.checkoutEarlyCount || 0),
+            workTime: rec.workTime > 0 ? formatMinutesAsHM(rec.workTime) : ''
+          };
 
-          workMinutesByStaff[staffId] += parseWorkTimeToMinutes(rec.workTime);
+          // dayWorkCount = attendance + leave + absent
+          agg[sid].dayWorkCount = agg[sid].attendanceCount + agg[sid].leaveCount + agg[sid].absentCount;
         });
 
-        Object.keys(agg).forEach((sid) => {
-          const minutes = workMinutesByStaff[sid] || 0;
-          agg[sid].workTime = minutes > 0 ? formatMinutesAsHM(minutes) : (agg[sid].workTime || '');
+        // Include staff who have NO data at all from HR list (purely absent staff)
+        hrList.forEach((h, idx) => {
+          const sid = (h.staffId || h.no || '').toString().trim();
+          if (!sid || agg[sid]) return;
+          agg[sid] = {
+            staffId: sid,
+            hrSortKey: hrSortKeyByStaffId.get(sid) ?? 1_000_000_000,
+            isCivilServant: Boolean(h && !h?.isRetiredThenContract && (
+              (h?.civilServantId || '').toString().trim() ||
+              (h?.officerId || '').toString().trim() ||
+              (h?.dateJoinedGov || '').toString().trim()
+            )),
+            khmerName: h.khmerName || h.name || '',
+            name: h.khmerName || h.name || '',
+            gender: h.gender || '',
+            position: h.position || '',
+            department: h.Department_Kh || h.department || '',
+            dayWorkCount: 0, attendanceCount: 0, absentCount: 0,
+            leaveCount: 0, A: 0, leaveType: '', other: '',
+            totalLeaveComment: '', plech: 0,
+            checkinLateCount: 0, checkoutEarlyCount: 0, workTime: ''
+          };
         });
 
         const data = Object.values(agg);
@@ -479,10 +485,12 @@ export default function AttendanceMonthlyReportPage() {
     return () => { mounted = false; };
   }, [fromDate, toDate, perms.canViewAttendance, perms.canViewEmployees]);
 
+
+
   const derived = useMemo(() => {
     const term = (q || '').toString().trim().toLowerCase();
     const selectedDeptNorm = (selectedDept || '').toString().trim();
-    
+
     const rows = (attendanceData || [])
       .filter(record => {
         // Filter by department/position if selected
@@ -800,6 +808,14 @@ export default function AttendanceMonthlyReportPage() {
       const header = makeEl('div', { marginBottom: '16px', borderBottom: '2px solid #ddd', paddingBottom: '10px' });
       header.appendChild(makeText('h1', 'ព្រះរាជាណាចក្រកម្ពុជា', { margin: '0', fontSize: '20px', fontWeight: '400', textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }));
       header.appendChild(makeText('h1', 'ជាតិ សាសនា ព្រះមហាក្សត្រ', { margin: '0', fontSize: '20px', fontWeight: '400', textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }));
+
+      const imgDiv = makeEl('div', { textAlign: 'center', margin: '2px 0' });
+      const img = w.document.createElement('img');
+      img.src = headerBg;
+      img.style.width = '250px';
+      img.style.height = 'auto';
+      imgDiv.appendChild(img);
+      header.appendChild(imgDiv);
       header.appendChild(makeText('h1', 'ក្រសួងសុខាភិបាល', { margin: '0', fontSize: '18px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
       header.appendChild(makeText('h1', 'មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត', { margin: '0', fontSize: '18px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
       header.appendChild(makeText('h1', 'វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា', { margin: '0', fontSize: '20px', fontWeight: '700', textAlign: 'center' }));
@@ -863,7 +879,7 @@ export default function AttendanceMonthlyReportPage() {
   };
 
   if (loading && !attendanceData.length) {
-    return <div style={{padding:20}}><p>កំពុងផ្ទុក...</p></div>;
+    return <div style={{ padding: 20 }}><p>កំពុងផ្ទុក...</p></div>;
   }
 
   const rowFontSize = Math.max(10, Math.round(rowHeight * 0.46));
@@ -893,6 +909,12 @@ export default function AttendanceMonthlyReportPage() {
   };
 
   const renderCell = (key, row) => {
+    const maybeHideZero = (v) => {
+      if (v === null || typeof v === 'undefined') return '';
+      const n = Number(v);
+      if (Number.isFinite(n) && n === 0) return '';
+      return v;
+    };
     switch (key) {
       case 'index':
         return {
@@ -912,27 +934,27 @@ export default function AttendanceMonthlyReportPage() {
       case 'position':
         return { value: row.position, style: { textAlign: 'left', width: columnMeta.position.width, fontSize: Math.max(9, rowFontSize - 1) } };
       case 'dayWorkCount':
-        return { value: row.dayWorkCount, style: { textAlign: 'center' } };
+        return { value: maybeHideZero(row.dayWorkCount), style: { textAlign: 'center' } };
       case 'attendanceCount':
-        return { value: row.attendanceCount, style: { textAlign: 'center' } };
+        return { value: maybeHideZero(row.attendanceCount), style: { textAlign: 'center' } };
       case 'leaveCount':
-        return { value: row.leaveCount, style: { textAlign: 'center' } };
+        return { value: maybeHideZero(row.leaveCount), style: { textAlign: 'center' } };
       case 'leaveType':
         return { value: row.leaveType || '', style: { textAlign: 'left', fontSize: Math.max(8, rowFontSize - 2) } };
       case 'A':
-        return { value: row.A, style: { textAlign: 'center' } };
+        return { value: maybeHideZero(row.A), style: { textAlign: 'center' } };
       case 'workTime':
         return { value: row.workTime, style: { textAlign: 'center' } };
       case 'lateEarly':
-        return { value: row.lateEarly, style: { textAlign: 'center' } };
+        return { value: maybeHideZero(row.lateEarly), style: { textAlign: 'center' } };
       case 'plech':
-        return { value: row.plech, style: { textAlign: 'center' } };
+        return { value: maybeHideZero(row.plech), style: { textAlign: 'center' } };
       case 'totalAbsent':
-        return { value: row.totalAbsent, style: { textAlign: 'center' } };
+        return { value: maybeHideZero(row.totalAbsent), style: { textAlign: 'center' } };
       case 'percentage':
-        return { value: `${row.percentage}%`, style: { textAlign: 'center' } };
+        return { value: (Number(row.percentage) && Number(row.percentage) > 0) ? `${row.percentage}%` : '', style: { textAlign: 'center' } };
       case 'absentToDeduct':
-        return { value: row.absentToDeduct, style: { textAlign: 'center' } };
+        return { value: maybeHideZero(row.absentToDeduct), style: { textAlign: 'center' } };
       case 'other':
         return { value: row.other || '', style: { textAlign: 'left', fontSize: Math.max(8, rowFontSize - 2) } };
       case 'totalLeaveComment':
@@ -943,32 +965,32 @@ export default function AttendanceMonthlyReportPage() {
   };
 
   return (
-    <div style={{padding:20, fontFamily:'"Khmer OS Siemreap","Noto Sans Khmer",Arial,sans-serif'}}>
+    <div style={{ padding: 20, fontFamily: '"Khmer OS Siemreap","Noto Sans Khmer",Arial,sans-serif' }}>
 
       {/* Controls */}
-      <div style={{display:'flex', gap:12, marginBottom:20, flexWrap:'wrap', alignItems:'center'}}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
         <div>
-          <label style={{marginRight:8}}>ចាប់ពីថ្ងៃ:</label>
+          <label style={{ marginRight: 8 }}>ចាប់ពីថ្ងៃ:</label>
           <input
             type="date"
             value={fromDate}
             onChange={e => setFromDate(e.target.value)}
-            style={{padding:'6px 8px', border:'1px solid #ccc', borderRadius:4, marginRight:8}}
+            style={{ padding: '6px 8px', border: '1px solid #ccc', borderRadius: 4, marginRight: 8 }}
           />
         </div>
         <div>
-          <label style={{marginRight:8}}>ដល់ថ្ងៃ:</label>
+          <label style={{ marginRight: 8 }}>ដល់ថ្ងៃ:</label>
           <input
             type="date"
             value={toDate}
             min={fromDate}
             onChange={e => setToDate(e.target.value)}
-            style={{padding:'6px 8px', border:'1px solid #ccc', borderRadius:4}}
+            style={{ padding: '6px 8px', border: '1px solid #ccc', borderRadius: 4 }}
           />
         </div>
         <div>
-          <label style={{marginRight:8}}>ទី:</label>
-          <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)} style={{padding:'6px 8px', border:'1px solid #ccc', borderRadius:4, minWidth:120, marginRight:8}}>
+          <label style={{ marginRight: 8 }}>ទី:</label>
+          <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)} style={{ padding: '6px 8px', border: '1px solid #ccc', borderRadius: 4, minWidth: 120, marginRight: 8 }}>
             <option value="">-- ទាំងអស់ --</option>
             {departments.map((d, i) => (
               <option key={`${String(d)}-${i}`} value={String(d)}>
@@ -978,8 +1000,8 @@ export default function AttendanceMonthlyReportPage() {
           </select>
         </div>
 
-        <div style={{display:'flex', alignItems:'center', gap:8}}>
-          <label style={{fontSize:12, color:'#111'}}>Row height</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 12, color: '#111' }}>Row height</label>
           <input
             type="range"
             min={10}
@@ -987,61 +1009,61 @@ export default function AttendanceMonthlyReportPage() {
             value={rowHeight}
             onChange={(e) => setRowHeight(Number(e.target.value))}
           />
-          <span style={{fontSize:12, color:'#111', minWidth:40, textAlign:'right', fontWeight:700}}>{rowFontSize}px</span>
+          <span style={{ fontSize: 12, color: '#111', minWidth: 40, textAlign: 'right', fontWeight: 700 }}>{rowFontSize}px</span>
         </div>
 
-        <div style={{position:'relative'}}>
+        <div style={{ position: 'relative' }}>
           <button
             type="button"
             onClick={() => setShowColsMenu(v => !v)}
-            style={{padding:'6px 12px', background:'#f5f5f5', border:'1px solid #ccc', borderRadius:4, cursor:'pointer'}}
+            style={{ padding: '6px 12px', background: '#f5f5f5', border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer' }}
           >Columns</button>
           {showColsMenu && (
-            <div style={{position:'absolute', right:0, top:38, background:'#fff', border:'1px solid #ddd', padding:10, minWidth:220, boxShadow:'0 2px 10px rgba(0,0,0,0.15)', zIndex:100}}>
+            <div style={{ position: 'absolute', right: 0, top: 38, background: '#fff', border: '1px solid #ddd', padding: 10, minWidth: 220, boxShadow: '0 2px 10px rgba(0,0,0,0.15)', zIndex: 100 }}>
               {defaultCols.map((k) => (
-                <label key={k} style={{display:'block', fontSize:12, whiteSpace:'nowrap', marginBottom:6}}>
-                  <input type="checkbox" checked={!!(visibleCols?.[k] ?? true)} onChange={() => toggleCol(k)} style={{marginRight:8}} />
+                <label key={k} style={{ display: 'block', fontSize: 12, whiteSpace: 'nowrap', marginBottom: 6 }}>
+                  <input type="checkbox" checked={!!(visibleCols?.[k] ?? true)} onChange={() => toggleCol(k)} style={{ marginRight: 8 }} />
                   {columnMeta[k]?.label || k}
                 </label>
               ))}
-              <div style={{display:'flex', justifyContent:'space-between', gap:8, marginTop:8}}>
-                <button type="button" onClick={resetColumns} style={{padding:'4px 10px', border:'1px solid #ccc', borderRadius:4, background:'#fff'}}>Reset</button>
-                <button type="button" onClick={resetWidths} style={{padding:'4px 10px', border:'1px solid #ccc', borderRadius:4, background:'#fff'}}>Reset width</button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
+                <button type="button" onClick={resetColumns} style={{ padding: '4px 10px', border: '1px solid #ccc', borderRadius: 4, background: '#fff' }}>Reset</button>
+                <button type="button" onClick={resetWidths} style={{ padding: '4px 10px', border: '1px solid #ccc', borderRadius: 4, background: '#fff' }}>Reset width</button>
               </div>
-              <div style={{textAlign:'right', marginTop:6}}>
-                <button type="button" onClick={() => setShowColsMenu(false)} style={{padding:'4px 10px', border:'1px solid #ccc', borderRadius:4, background:'#f5f5f5'}}>Close</button>
+              <div style={{ textAlign: 'right', marginTop: 6 }}>
+                <button type="button" onClick={() => setShowColsMenu(false)} style={{ padding: '4px 10px', border: '1px solid #ccc', borderRadius: 4, background: '#f5f5f5' }}>Close</button>
               </div>
-              <div style={{marginTop:8, fontSize:11, color:'#666'}}>Tip: អាច drag header ដើម្បីរៀបជួរឈរ</div>
-              <div style={{fontSize:11, color:'#666'}}>Tip: អាចទាញបន្ទាត់ខាងស្តាំ header ដើម្បីកែទំហំ Column</div>
+              <div style={{ marginTop: 8, fontSize: 11, color: '#666' }}>Tip: អាច drag header ដើម្បីរៀបជួរឈរ</div>
+              <div style={{ fontSize: 11, color: '#666' }}>Tip: អាចទាញបន្ទាត់ខាងស្តាំ header ដើម្បីកែទំហំ Column</div>
             </div>
           )}
         </div>
 
-        <div style={{display:'flex', alignItems:'center', gap:8}}>
-          <label style={{fontSize:12, color:'#111'}}>បោះពុម្ព</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 12, color: '#111' }}>បោះពុម្ព</label>
           <select
             value={printOrientation}
             onChange={(e) => setPrintOrientation(e.target.value)}
-            style={{padding:'6px 8px', border:'1px solid #ccc', borderRadius:4}}
+            style={{ padding: '6px 8px', border: '1px solid #ccc', borderRadius: 4 }}
           >
             <option value="portrait">Portrait</option>
             <option value="landscape">Landscape</option>
           </select>
         </div>
-        <div style={{flex:1, minWidth:200}}>
+        <div style={{ flex: 1, minWidth: 200 }}>
           <input
             type="text"
             placeholder="ស្វែងរក (ឈ្មោះ, លេខកាត, តួនាទី, ផ្នែក)"
             value={q}
             onChange={e => setQ(e.target.value)}
-            style={{width:'100%', padding:'6px 8px', border:'1px solid #ccc', borderRadius:4}}
+            style={{ width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: 4 }}
           />
         </div>
-        <button onClick={() => setQ('')} style={{padding:'6px 12px', background:'#f5f5f5', border:'1px solid #ccc', borderRadius:4, cursor:'pointer'}}>សម្អាត់</button>
-        <button onClick={() => navigate(`/attendance-daily-report?date=${fromDate}`)} style={{padding:'6px 12px', background:'#6b21a8', color:'white', border:'none', borderRadius:4, cursor:'pointer', fontWeight:700}}>របាយការណ៍ជាថ្ងៃ</button>
-        <button onClick={handleExportExcel} style={{padding:'6px 12px', background:'#10b981', color:'white', border:'none', borderRadius:4, cursor:'pointer', fontWeight:700}}>នាំចេញ Excel</button>
-        <button onClick={handlePrint} style={{padding:'6px 12px', background:'#3b82f6', color:'white', border:'none', borderRadius:4, cursor:'pointer', fontWeight:700}}>បោះពុម្ព</button>
-        <button onClick={handlePrintByDepartment} style={{padding:'6px 12px', background:'#7c3aed', color:'white', border:'none', borderRadius:4, cursor:'pointer', fontWeight:700}}>
+        <button onClick={() => setQ('')} style={{ padding: '6px 12px', background: '#f5f5f5', border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer' }}>សម្អាត់</button>
+        <button onClick={() => navigate(`/attendance-daily-report?date=${fromDate}`)} style={{ padding: '6px 12px', background: '#6b21a8', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 700 }}>របាយការណ៍ជាថ្ងៃ</button>
+        <button onClick={handleExportExcel} style={{ padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 700 }}>នាំចេញ Excel</button>
+        <button onClick={handlePrint} style={{ padding: '6px 12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 700 }}>បោះពុម្ព</button>
+        <button onClick={handlePrintByDepartment} style={{ padding: '6px 12px', background: '#7c3aed', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 700 }}>
           PDF តាមផ្នែក
         </button>
       </div>
@@ -1061,24 +1083,27 @@ export default function AttendanceMonthlyReportPage() {
         }}
       >
         {/* Header */}
-        <div style={{marginBottom:20, borderBottom:'2px solid #ddd', paddingBottom:10}}>
-          
-          <h1 style={{margin:0, fontSize:18, fontWeight:400, textAlign:'center',fontFamily: 'Khmer OS Muol Light'}}>ព្រះរាជាណាចក្រកម្ពុជា</h1>
-          <h1 style={{margin:0, fontSize:18, fontWeight:400, textAlign:'center',fontFamily: 'Khmer OS Muol Light'}}>ជាតិ សាសនា ព្រះមហាក្សត្រ</h1>
-          <h1 style={{margin:0, fontSize:16, fontWeight:400, textAlign:'left',fontFamily: 'Khmer OS Muol Light'}}>ក្រសួងសុខាភិបាល</h1>
-          <h1 style={{margin:0, fontSize:16, fontWeight:400, textAlign:'left',fontFamily: 'Khmer OS Muol Light'}}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</h1>
-          <h1 style={{margin:0, fontSize:18, fontWeight:700, textAlign:'center'}}>វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា </h1>
-          <p style={{margin:5, textAlign:'center', fontSize:16, color:'#111111'}}>
+        <div style={{ marginBottom: 20, borderBottom: '2px solid #ddd', paddingBottom: 10 }}>
+
+          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 400, textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }}>ព្រះរាជាណាចក្រកម្ពុជា</h1>
+          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 400, textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }}>ជាតិ សាសនា ព្រះមហាក្សត្រ</h1>
+          <div style={{ textAlign: 'center', margin: '2px 0' }}>
+            <img src={headerBg} alt="header" style={{ width: '250px', height: 'auto' }} />
+          </div>
+          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 400, textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }}>ក្រសួងសុខាភិបាល</h1>
+          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 400, textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</h1>
+          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, textAlign: 'center' }}>វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា </h1>
+          <p style={{ margin: 5, textAlign: 'center', fontSize: 16, color: '#111111' }}>
             ចាប់ពី {fmtKhmerLongDate(fromDate)} ដល់ ថ្ងៃទី: {fmtKhmerLongDate(toDate)}
           </p>
         </div>
-        <div style={{marginBottom:10, fontSize:12, color:'#313030'}}>
+        <div style={{ marginBottom: 10, fontSize: 12, color: '#313030' }}>
           សរុប: <strong>{toKhmerDigits(derived.total)}</strong> នាក់ ( ប្រុស: <strong>{toKhmerDigits(derived.male)}</strong> នាក់ — ស្រី: <strong>{toKhmerDigits(derived.female)}</strong> នាក់ )
         </div>
 
-        <table style={{width:'100%', borderCollapse:'collapse', fontSize:12, border:'1px solid #ddd', tableLayout:'fixed'}}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, border: '1px solid #ddd', tableLayout: 'fixed' }}>
           <thead>
-            <tr style={{background:'#f3f4f6'}}>
+            <tr style={{ background: '#f3f4f6' }}>
               {visibleKeys.map((k) => (
                 <th
                   key={k}
@@ -1119,7 +1144,7 @@ export default function AttendanceMonthlyReportPage() {
           </thead>
           <tbody>
             {derived.rows.map((row, idx) => (
-              <tr key={idx} style={{background: idx % 2 === 0 ? '#f9fafb' : '#fff', height: rowHeight}}>
+              <tr key={idx} style={{ background: idx % 2 === 0 ? '#f9fafb' : '#fff', height: rowHeight }}>
                 {visibleKeys.map((k) => {
                   const cell = renderCell(k, row);
                   return (
@@ -1142,18 +1167,18 @@ export default function AttendanceMonthlyReportPage() {
         </table>
 
         {/* Footer */}
-        <div style={{marginTop:20, borderTop:'2px solid #8f8b8b', paddingTop:10, display:'flex', justifyContent:'space-between', fontSize:12}}>
-          <div style={{textAlign:'left'}}>
-            <p style={{margin:0}}>ផលប័ត្រមន្ត្រីឃ្មាំងរដ្ឋ</p>
-            <p style={{margin:0}}>____________________</p>
+        <div style={{ marginTop: 20, borderTop: '2px solid #8f8b8b', paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+          <div style={{ textAlign: 'left' }}>
+            <p style={{ margin: 0 }}>ផលប័ត្រមន្ត្រីឃ្មាំងរដ្ឋ</p>
+            <p style={{ margin: 0 }}>____________________</p>
           </div>
-          <div style={{textAlign:'center'}}>
-            <p style={{margin:0}}>ប្រសាសន៍</p>
-            <p style={{margin:0}}>____________________</p>
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ margin: 0 }}>ប្រសាសន៍</p>
+            <p style={{ margin: 0 }}>____________________</p>
           </div>
-          <div style={{textAlign:'right'}}>
-            <p style={{margin:0}}>សម្ព័ន្ធបុគ្គលិក</p>
-            <p style={{margin:0}}>____________________</p>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ margin: 0 }}>សម្ព័ន្ធបុគ្គលិក</p>
+            <p style={{ margin: 0 }}>____________________</p>
           </div>
         </div>
       </div>

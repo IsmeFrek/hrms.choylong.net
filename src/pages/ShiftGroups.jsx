@@ -4,6 +4,7 @@ import { findShiftColor as utilFindShiftColor } from '../utils/shiftColor';
 import { employeeAPI, shiftGroupAPI, holidaysAPI } from '../services/api';
 import HRAPI from '../services/hrAPI';
 import api from '../services/api';
+import { departmentAPI } from '../services/departmentAPI';
 import { useAuth } from '../context/AuthContext';
 
 // Fallback sample employees (names in Khmer)
@@ -170,6 +171,7 @@ export default function ShiftGroups() {
   const [selectedShiftIdByCategory, setSelectedShiftIdByCategory] = useState({});
   const [shiftPickerCategory, setShiftPickerCategory] = useState('');
   const [replaceDayOffOnly, setReplaceDayOffOnly] = useState(false);
+  const [manualOverrides, setManualOverrides] = useState({});
 
   // Shifts master and saved groups
   const [shiftTemplates, setShiftTemplates] = useState([]);
@@ -198,6 +200,7 @@ export default function ShiftGroups() {
   const [isSaving, setIsSaving] = useState(false);
   const [shiftMasterQuery, setShiftMasterQuery] = useState('');
   const [editingId, setEditingId] = useState('');
+  const [viewHistoryDept, setViewHistoryDept] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [previewDayMode, setPreviewDayMode] = useState('15');
   const [previewMonth, setPreviewMonth] = useState(() => {
@@ -1033,8 +1036,10 @@ export default function ShiftGroups() {
     const flattenedShifts = categories.flatMap(cat => cat.shifts);
     const totalEmployees = flattenedSubgroups.reduce((sum, sg) => sum + ((sg.employees || []).length), 0);
     return {
-      name: `ក្រុម:${globalDept} - ${new Date().toLocaleDateString('km')}`,
+      name: `ក្រុម:${globalDept} - ${previewMonthMeta.month}/${previewMonthMeta.year}`,
       department: globalDept,
+      month: previewMonthMeta.month,
+      year: previewMonthMeta.year,
       categoryOrder: categories.map(cat => cat.id),
       categoryLabels: categories.reduce((acc, cat) => { acc[cat.id] = cat.label; return acc; }, {}),
       categories,
@@ -1042,7 +1047,9 @@ export default function ShiftGroups() {
       shifts: flattenedShifts,
       shiftsMaster: shifts,
       totalEmployees,
+      holidayDates: normalizedHolidayDates || [],
       lastCreatedCategoryId: lastCreatedCategoryId || '',
+      manualOverrides: manualOverrides || {},
       createdBy: 'user',
     };
   }
@@ -1052,13 +1059,21 @@ export default function ShiftGroups() {
     let mounted = true;
     (async () => {
       try {
-        const dres = await employeeAPI.getDepartments();
+        // Use departmentAPI to get full objects (including Department_Id) instead of strings
+        const dres = await departmentAPI.getDepartments();
         const dj = dres?.data; // may be {departments: []} or []
-        const list = (dj?.departments || dj || [])
-          .map(x => x.Department_Kh || x.Department || x.name || x)
-          .filter(Boolean);
+        const rawList = (dj?.departments || dj || []);
+        const list = Array.isArray(rawList) ? rawList
+          .filter(Boolean)
+          .sort((a, b) => {
+            const idA = parseInt(a.Department_Id || 0, 10);
+            const idB = parseInt(b.Department_Id || 0, 10);
+            return idA - idB;
+          }) : [];
         if (mounted && list.length) setDepartmentsList(list);
-      } catch {}
+      } catch (err) {
+        console.error('Failed to load departments via departmentAPI', err);
+      }
       try {
         const r = await HRAPI.getAll();
         const j = r?.data || {};
@@ -1087,6 +1102,16 @@ export default function ShiftGroups() {
           const groups = Array.isArray(sgRes.data) ? sgRes.data : [];
           try { console.debug('ShiftGroups: loaded saved groups', { count: groups.length, sample: groups.slice(0,2).map(g => ({ id: g._id, dept: g.department, shifts: (g.shifts||[]).length })) }); } catch(e){}
           setSavedShiftGroups(groups);
+
+          // Find saved group for current department and load manualOverrides
+          if (globalDept) {
+            const norm = (s) => (s || '').toString().toLowerCase().replace(/[\s\u200B'"`]+/g, '');
+            const nDept = norm(globalDept);
+            const saved = groups.find(g => norm(g?.department) === nDept);
+            if (saved && saved.manualOverrides) {
+              setManualOverrides(saved.manualOverrides);
+            }
+          }
         }
       } catch (e) {
         console.error('Failed to load shift groups', e);
@@ -1159,6 +1184,47 @@ export default function ShiftGroups() {
       // ignore
     }
   }, [globalDept, categoryList, savedShiftGroups, pickedShiftsByCategory]);
+
+  // Auto-fetch data for the specific month/year when globalDept or month/year changes
+  useEffect(() => {
+    if (!globalDept) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const { month, year } = previewMonthMeta;
+        // Try to find a match in the already loaded savedShiftGroups first
+        const match = (savedShiftGroups || []).find(g => {
+          const n = (s) => (s || '').toString().toLowerCase().replace(/[\s\u200B'"`]+/g, '');
+          return n(g.department) === n(globalDept) && g.month === month && g.year === year && g.isActive !== false;
+        });
+
+        if (match) {
+          if (mounted) {
+            hydrateFromSavedGroup(match);
+            setEditingId(match._id || '');
+          }
+          return;
+        }
+
+        // If not found in local state, try API with filters
+        const resp = await api.get('/shift-groups', { params: { department: globalDept, month, year, isActive: 'true' } });
+        const list = Array.isArray(resp.data) ? resp.data : [];
+        if (mounted && list.length > 0) {
+          const latest = list[0];
+          latest && hydrateFromSavedGroup(latest);
+          setEditingId(latest?._id || '');
+        } else {
+          // No record for this specific month: keep current state (might be a copy from previous month) 
+          // but clear editingId so clicking Save creates a new record for this month.
+          if (mounted) setEditingId('');
+        }
+      } catch (err) {
+        console.error('Failed to auto-fetch monthly data', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [globalDept, previewMonthMeta.month, previewMonthMeta.year]);
+
 
   // Auto-select user's department for leadership users
   useEffect(() => {
@@ -1330,178 +1396,148 @@ export default function ShiftGroups() {
   }
 
   function renderDeptTable() {
-    return (
-      <div className="mb-3 overflow-x-auto">
-        <table className="w-full table-fixed border-collapse text-xs">
-          <thead>
-            <tr className="bg-gray-100 text-left text-sm">
-              <th className="p-1 border w-5">#</th>
-              <th className="p-1 border w-48">Name</th>
-              <th className="p-1 border w-36">Start Date</th>
-              <th className="p-1 border w-12">Sub Group</th>
-              <th className="p-1 border w-12">Shift</th>
-              <th className="p-1 border w-12">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(() => {
-              const displayedDepartments = departments.filter(d => {
-                const name = getDeptName(d);
-                return !selectedDept || name === selectedDept;
-              });
-              return displayedDepartments.map((d, di) => {
-                const displayName = getDeptName(d);
-                const normalize = (s) => (s || '').toString().replace(/\u200B/g, '').trim().toLowerCase();
-                const savedForDept = (savedShiftGroups || []).find(sg => normalize(sg.department) === normalize(displayName));
-                const groups = savedForDept ? (savedForDept.subgroups || []).map(s => ({ name: s.name })) : [];
-                const sampleShifts = savedForDept ? (savedForDept.shifts || []).map(s => {
-                  try {
-                    const st = (s && s.start) ? String(s.start).trim() : '';
-                    const en = (s && s.end) ? String(s.end).trim() : '';
-                    if (st || en) {
-                      const lbl = `${st}${(st || en) ? '-' : ''}${en}`.replace(/-$/, '');
-                      return lbl || (s.title || s);
-                    }
-                    const parsed = typeof parseTimeRangeFromTitle === 'function' ? parseTimeRangeFromTitle(s?.title || s?.name || s) : null;
-                    if (parsed && parsed.start && parsed.end) return `${parsed.start}-${parsed.end}`;
-                    return s.title || s;
-                  } catch (e) {
-                    return s?.title || s;
-                  }
-                }) : [];
-                return (
-                  <tr key={di} className={di % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="p-1 align-top border text-xs">{di + 1}</td>
-                    <td className="p-1 align-top border text-xs">{displayName}</td>
-                    <td className="p-1 align-top border text-xs">—</td>
-                    <td className="p-1 align-top border text-xs">
-                      {groups.length === 0 ? (
-                        <div className="text-gray-500">—</div>
-                      ) : (
-                        <ul className="m-0 p-0 list-none">
-                          {groups.map((g, gi) => (
-                            <li key={gi} className="mb-0.5" title={g.name}><span className="inline-block w-2 h-2 bg-gray-800 rounded-full mr-1 align-middle" />{g.name}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </td>
-                    <td className="p-2 align-top border text-xs">
-                      {sampleShifts.length === 0 ? (
-                        <div className="text-gray-500">—</div>
-                      ) : (
-                        <ul className="m-0 p-0 list-none">
-                          {sampleShifts.map((s, si) => (
-                            <li key={si} className="mb-0.5"><span className="inline-block w-2 h-2 bg-gray-800 rounded-full mr-1 align-middle" />{s}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </td>
-                    <td className="p-1 align-top border text-xs">
-                      <div className="flex gap-1">
-                        <button
-                          className="px-2 py-0.5 bg-blue-600 text-white rounded text-xs"
-                          onClick={() => {
-                            setGlobalDept(displayName);
-                            resetAllCategoryData({ resetStructure: true });
-                            setShifts(initialShiftsForDept());
-                            setEditingId('');
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }}
-                        >Open</button>
+    const displayedDepartments = departments.filter(d => {
+      const name = getDeptName(d);
+      return !selectedDept || name === selectedDept;
+    });
 
-                        {/* Edit always visible: load saved group if present, otherwise prepare a new draft */}
-                        <button
-                          className="px-2 py-0.5 bg-yellow-500 text-white rounded text-xs"
-                          onClick={async () => {
-                            // Helper fuzzy matcher for department names (remove spaces/zero-width/quotes)
-                            const norm = (s) => (s || '').toString().toLowerCase().replace(/[\s\u200B'"`]+/g, '');
-                            const nDisplay = norm(displayName);
-                            let target = savedForDept;
-                            if (!target) {
-                              // Try fuzzy find among saved groups
-                              const candidates = (savedShiftGroups || []).filter(g => {
-                                const ng = norm(g?.department);
-                                return ng && (ng === nDisplay || ng.includes(nDisplay) || nDisplay.includes(ng));
-                              });
-                              if (candidates && candidates.length) {
-                                // pick most recent by createdAt
-                                target = candidates.slice().sort((a,b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0];
-                              }
-                              // If still not found, fetch from API by department
-                              if (!target) {
-                                try {
-                                  const resp = await shiftGroupAPI.getShiftGroupsByDepartment(displayName, true);
-                                  const list = Array.isArray(resp?.data) ? resp.data : (resp?.data?.data || []);
-                                  if (Array.isArray(list) && list.length) {
-                                    target = list[0];
-                                  }
-                                } catch (e) {
-                                  console.debug('Edit: getShiftGroupsByDepartment failed', e?.response?.status || e.message);
-                                }
-                              }
-                            }
-                            if (target) {
-                              setGlobalDept(target.department);
-                              hydrateFromSavedGroup(target);
-                              try {
-                                const lastCat = (target.categoryOrder && target.categoryOrder.length) ? target.categoryOrder[target.categoryOrder.length - 1] : (Array.isArray(target.categories) && target.categories.length ? (target.categories[target.categories.length - 1] || {}).id : null);
-                                if (lastCat) setActiveCategoryId(lastCat);
-                              } catch (e) {}
-                              setEditingId(target._id);
-                            } else {
-                              // No saved group: initialize all categories using default config
-                              setGlobalDept(displayName);
-                              resetAllCategoryData({ resetStructure: true });
-                              setEditingId('');
-                            }
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }}
-                        >Edit</button>
+    if (viewHistoryDept) {
+      const normalize = (s) => (s || '').toString().replace(/\u200B/g, '').trim().toLowerCase();
+      const nView = normalize(viewHistoryDept);
+      const history = (savedShiftGroups || []).filter(sg => normalize(sg.department) === nView).sort((a, b) => {
+        if (b.year !== a.year) return (b.year || 0) - (a.year || 0);
+        return (b.month || 0) - (a.month || 0);
+      });
 
-                        {/* Delete always visible but only acts when there is a saved group */}
-                        <button className="px-3 py-1 bg-red-600 text-white rounded text-sm" onClick={async () => {
-                          if (!savedForDept) { alert('មិនមានទិន្នន័យដែលចង់លុបសម្រាប់នាយកដ្ឋាននេះ។'); return; }
-                          if (!confirm('តើអ្នកពិតជាចង់លុបទិន្នន័យនេះមែនទេ?')) return;
-                          try {
-                            await shiftGroupAPI.deleteShiftGroup(savedForDept._id);
-                            try {
-                              const all = await shiftGroupAPI.getShiftGroups();
-                              setSavedShiftGroups(Array.isArray(all.data) ? all.data : (all.data || []));
-                            } catch {
-                              setSavedShiftGroups(prev => prev.filter(sg => sg._id !== savedForDept._id));
-                            }
-                            // If the deleted department is currently loaded into the editor or displayed, clear related UI state
-                            try {
-                              const deletedDept = savedForDept.department;
-                              if ((globalDept || '').toString().trim() === (deletedDept || '').toString().trim()) {
-                                // Clear editor context and seeded groups so the deleted data is not shown
-                                setGlobalDept('');
-                                setEditingId('');
-                                setSubgroupsByCategory(createEmptyCategoryMap(categoryList));
-                                setPickedShiftsByCategory(createEmptyCategoryMap(categoryList));
-                                setSelectedShiftIdByCategory({});
-                                setExpandedCategories({});
-                              }
-                            } catch (e) {
-                              // ignore
-                            }
-                            alert('លុបជោគជ័យ');
-                          } catch (err) {
-                            console.error('Failed to delete', err);
-                            alert('មានបញ្ហាក្នុងការលុប');
-                          }
-                        }}>Delete</button>
-                      </div>
-                    </td>
+      return (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-gray-50 px-4 py-3 border-b flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setViewHistoryDept('')} className="p-1.5 hover:bg-gray-200 rounded-full transition-colors text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+              </button>
+              <h3 className="font-bold text-gray-800">History: {viewHistoryDept}</h3>
+            </div>
+            <button
+              onClick={() => {
+                setGlobalDept(viewHistoryDept);
+                resetAllCategoryData({ resetStructure: true });
+                setShifts(initialShiftsForDept());
+                setEditingId('');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-medium transition-colors shadow-sm"
+            >
+              + Create New Schedule
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600 font-medium border-b">
+                <tr>
+                  <th className="px-4 py-3 text-left">Month/Year</th>
+                  <th className="px-4 py-3 text-left">Saved Date</th>
+                  <th className="px-4 py-3 text-left">Employees</th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {history.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="px-4 py-10 text-center text-gray-500 italic">No history found for this department.</td>
                   </tr>
-                );
-              });
-            })()}
-          </tbody>
-        </table>
+                ) : (
+                  history.map(sg => (
+                    <tr key={sg._id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 font-bold text-blue-700">
+                        {sg.month ? `${KHMER_MONTH_NAMES[sg.month-1]} ` : ''}{sg.year || ''}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">
+                        {sg.updatedAt || sg.createdAt ? (
+                          <div className="flex flex-col">
+                            <span className="font-medium">{new Date(sg.updatedAt || sg.createdAt).toLocaleDateString('km-KH')}</span>
+                            <span className="text-[10px] text-gray-400">{new Date(sg.updatedAt || sg.createdAt).toLocaleTimeString('km-KH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                          </div>
+                        ) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {sg.totalEmployees || 0} នាក់ (staff)
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => {
+                            setGlobalDept(viewHistoryDept);
+                            if (sg.month && sg.year) updatePreviewMonth(sg.year, sg.month);
+                            hydrateFromSavedGroup(sg);
+                            setEditingId(sg._id);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="text-blue-600 hover:text-blue-800 font-medium mr-4"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm('តើអ្នកពិតជាចង់លុបទិន្នន័យនេះមែនទេ?')) return;
+                            try {
+                              await api.delete(`/shift-groups/${sg._id}`, { params: { permanent: 'true' } });
+                              setSavedShiftGroups(prev => prev.filter(p => p._id !== sg._id));
+                            } catch (e) { alert('Failed to delete'); }
+                          }}
+                          className="text-red-600 hover:text-red-800 font-medium"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {displayedDepartments.map((d, di) => {
+          const displayName = getDeptName(d);
+          const normalize = (s) => (s || '').toString().replace(/\u200B/g, '').trim().toLowerCase();
+          const count = (savedShiftGroups || []).filter(sg => normalize(sg.department) === normalize(displayName)).length;
+          
+          return (
+            <div 
+              key={di} 
+              className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
+              onClick={() => setViewHistoryDept(displayName)}
+            >
+              <div className="absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="bg-blue-600 text-white p-1 rounded-bl-lg shadow-sm">
+                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 font-bold text-xl group-hover:bg-blue-600 group-hover:text-white transition-all">
+                  {displayName.charAt(0)}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-gray-800 group-hover:text-blue-600 transition-colors line-clamp-1">{displayName}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`w-2 h-2 rounded-full ${count > 0 ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                    <p className="text-xs text-gray-500">
+                      {count > 0 ? `${count} schedules saved` : 'No history yet'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   }
+
 
   function renderCategoryControls() {
     return (
@@ -2191,10 +2227,33 @@ export default function ShiftGroups() {
         ) : (
           <div>
             {/* Header with Save */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 sticky top-0 bg-white z-[50] py-2 border-b">
               <div className="flex items-center gap-3">
-                <button className="px-3 py-1 border rounded text-sm" onClick={() => { setGlobalDept(''); resetAllCategoryData({ resetStructure: true }); setShifts([]); setEditingId(''); }}>← Back</button>
-                <h1 className="text-lg font-semibold">Edit Shift Group — {globalDept}</h1>
+                <button className="px-3 py-1 border rounded text-sm hover:bg-gray-50" onClick={() => { setGlobalDept(''); resetAllCategoryData({ resetStructure: true }); setShifts([]); setEditingId(''); }}>← Back</button>
+                <div className="flex flex-col">
+                  <h1 className="text-lg font-semibold leading-tight">Edit Shift Group — {globalDept}</h1>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Schedule for:</span>
+                    <select
+                      className="border border-gray-300 rounded px-2 py-0.5 text-sm bg-blue-50 font-bold text-blue-700"
+                      value={previewMonthMeta.month}
+                      onChange={e => updatePreviewMonth(previewMonthMeta.year, e.target.value)}
+                    >
+                      {previewMonthOptions.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="border border-gray-300 rounded px-2 py-0.5 text-sm bg-blue-50 font-bold text-blue-700"
+                      value={previewMonthMeta.year}
+                      onChange={e => updatePreviewMonth(e.target.value, previewMonthMeta.month)}
+                    >
+                      {previewYearOptions.map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm" onClick={async () => {
@@ -2202,6 +2261,7 @@ export default function ShiftGroups() {
                   const snapshots = collectCategorySnapshots();
                   const totalGroups = snapshots.reduce((sum, cat) => sum + cat.subgroups.length, 0);
                   if (totalGroups === 0) { alert('សូមបង្កើតក្រុមយ៉ាងហោចណាស់មួយក្រុម!'); return; }
+                  setIsSaving(true);
                   try {
                     const payload = buildShiftGroupPayload();
                     console.debug('ShiftGroups: saving payload (edit-top):', payload);
@@ -2226,12 +2286,21 @@ export default function ShiftGroups() {
                         alert('រក្សាទុកបាន (offline)');
                       }
                     }
-                    setGlobalDept(''); resetAllCategoryData({ resetStructure: true }); setShifts([]); setEditingId('');
+                    // After success: Close editor but stay in history view for this department
+                    const currentDept = globalDept;
+                    setGlobalDept('');
+                    setViewHistoryDept(currentDept);
+                    resetAllCategoryData({ resetStructure: true });
+                    setShifts([]);
+                    setEditingId('');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                   } catch (err) {
                     console.error('Save failed', err);
                     alert('មានបញ្ហាក្នុងការរក្សាទុក!');
+                  } finally {
+                    setIsSaving(false);
                   }
-                }}>Save</button>
+                }}>{isSaving ? 'កំពុងរក្សាទុក...' : 'រក្សាទុក'}</button>
               </div>
             </div>
             {/* preview will render under the All Employees panel */}
@@ -2268,25 +2337,8 @@ export default function ShiftGroups() {
               {/* Holidays controls + Show Preview button */}
               <div className="mt-6 mb-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <span>ខែ</span>
-                  <select
-                    className="border border-gray-300 rounded px-2 py-1 text-sm"
-                    value={previewMonthMeta.month}
-                    onChange={e => updatePreviewMonth(previewMonthMeta.year, e.target.value)}
-                  >
-                    {previewMonthOptions.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <select
-                    className="border border-gray-300 rounded px-2 py-1 text-sm"
-                    value={previewMonthMeta.year}
-                    onChange={e => updatePreviewMonth(e.target.value, previewMonthMeta.month)}
-                  >
-                    {previewYearOptions.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
+                  <span className="font-medium">Preview Month:</span>
+                  <span className="bg-gray-100 px-2 py-1 rounded font-bold text-gray-700">{KHMER_MONTH_NAMES[previewMonthMeta.month-1]} {previewMonthMeta.year}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <span>ចំនួនថ្ងៃ</span>
@@ -2342,42 +2394,14 @@ export default function ShiftGroups() {
                     holidayDates={normalizedHolidayDates}
                     shifts={shifts}
                     shiftTemplates={shiftTemplates}
+                    manualOverrides={manualOverrides}
+                    setManualOverrides={setManualOverrides}
                   />
                 </div>
               )}
             </div>
 
-            {/* Save at bottom too */}
-            <div className="text-center">
-              <button
-                className={`px-6 py-3 bg-blue-600 text-white rounded text-lg hover:bg-blue-700 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
-                disabled={isSaving}
-                onClick={async () => {
-                  if (!globalDept) { alert('សូមជ្រើសរើសនាយកដ្ឋាន!'); return; }
-                  const snapshots = collectCategorySnapshots();
-                  const totalGroups = snapshots.reduce((sum, cat) => sum + cat.subgroups.length, 0);
-                  if (totalGroups === 0) { alert('សូមបង្កើតក្រុមយ៉ាងហោចណាស់មួយក្រុម!'); return; }
-                  setIsSaving(true);
-                  try {
-                    const payload = buildShiftGroupPayload();
-                    console.debug('ShiftGroups: saving payload (save-bottom):', payload);
-                    const response = await shiftGroupAPI.createShiftGroup(payload);
-                    if (response?.data) {
-                      const savedRecord = response.data.data || response.data;
-                      if (savedRecord) setSavedShiftGroups(prev => [savedRecord, ...(prev || [])]);
-                      const totalShifts = snapshots.reduce((sum, cat) => sum + cat.shifts.length, 0);
-                      alert(`រក្សាទុកជោគជ័យ!\nនាយកដ្ឋាន: ${globalDept}\nចំនួនក្រុមសរុប: ${totalGroups}\nចំនួនម៉ោងសរុប: ${totalShifts}\nចំនួនបុគ្គលិក: ${payload.totalEmployees}`);
-                      setShowGroupDivision(false);
-                    }
-                  } catch (error) {
-                    console.error('Error saving shift group:', error);
-                    alert('មានបញ្ហាក្នុងការរក្សាទុក! សូមព្យាយាមម្តងទៀត។');
-                  } finally { setIsSaving(false); }
-                }}
-              >
-                {isSaving ? 'កំពុងរក្សាទុក...' : 'រក្សាទុក'}
-              </button>
-            </div>
+            <div className="h-10" />
           </div>
         )}
       </div>

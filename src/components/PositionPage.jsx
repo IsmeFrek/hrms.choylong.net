@@ -28,8 +28,8 @@ export default function PositionPage() {
   }, [perms.canViewPositions]);
 
   const fetchPositions = async () => {
-  if (!perms.canViewPositions) return;
-  setLoading(true);
+    if (!perms.canViewPositions) return;
+    setLoading(true);
     try {
       const res = await positionAPI.getPositions();
       let arr = [];
@@ -93,7 +93,7 @@ export default function PositionPage() {
   // Export positions to CSV
   const handleExport = () => {
     const csvRows = [
-      ['Position_Id','Position_Kh','Position_En','Other'],
+      ['Position_Id', 'Position_Kh', 'Position_En', 'Other'],
       ...positions.map(pos => [pos.Position_Id ?? pos.positions_id ?? pos.positions_Id ?? '', pos.Position_Kh ?? pos.positions_Kh ?? '', pos.Position_En ?? pos.positions_En ?? '', pos.Other || pos.other || ''])
     ];
     const csvContent = '\uFEFF' + csvRows.map(row => row.map(val => `"${val || ''}"`).join(',')).join('\n');
@@ -138,8 +138,8 @@ export default function PositionPage() {
       const valB = Number(b.Position_Id ?? b.Position_Id ?? 0) || 0;
       return sortOrder === 'asc' ? valA - valB : valB - valA;
     } else {
-      const valA = (a[sortField] || a[sortField.replace('Position_','positions_')] || '').toString();
-      const valB = (b[sortField] || b[sortField.replace('Position_','positions_')] || '').toString();
+      const valA = (a[sortField] || a[sortField.replace('Position_', 'positions_')] || '').toString();
+      const valB = (b[sortField] || b[sortField.replace('Position_', 'positions_')] || '').toString();
       if (sortOrder === 'asc') return valA.localeCompare(valB, 'km');
       return valB.localeCompare(valA, 'km');
     }
@@ -188,10 +188,10 @@ export default function PositionPage() {
         </select>
         <button onClick={handleExport} className="bg-green-700 text-white px-7 py-1 rounded mr-5">នាំចេញ</button>
         {perms.canEditPositions && (
-        <label className="bg-yellow-700 text-white px-7 py-1 rounded mr-5 cursor-pointer">
-          នាំចូល
-          <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleImport} />
-        </label>
+          <label className="bg-yellow-700 text-white px-7 py-1 rounded mr-5 cursor-pointer">
+            នាំចូល
+            <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleImport} />
+          </label>
         )}
         {perms.canEditPositions && (
           <button onClick={openAddModal} className="bg-indigo-600 text-white px-7 py-1 rounded mr-5">បន្ថែម</button>
@@ -201,52 +201,52 @@ export default function PositionPage() {
         <div>កំពុងទាញ...</div>
       ) : (
         <>
-        <table className="min-w-full border">
-          <thead>
-            <tr className="bg-indigo-50">
-              <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Position_Id')}>លេខសម្គាល់ {sortField==='Position_Id' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Position_Kh')}>ឈ្មោះតួនាទី (ខ្មែរ) {sortField==='Position_Kh' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Position_En')}>ឈ្មោះតួនាទី (អង់គ្លេស) {sortField==='Position_En' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Other')}>ព័ត៌មានផ្សេងៗ {sortField==='Other' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2">សកម្មភាព</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagedPositions.map(pos => (
-              <tr key={pos._id}>
-                <td className="border px-2 py-1">{pos.Position_Id ?? pos.positions_id ?? pos.positions_Id ?? ''}</td>
-                <td className="border px-2 py-1">{pos.Position_Kh ?? pos.positions_Kh ?? ''}</td>
-                <td className="border px-2 py-1">{pos.Position_En ?? pos.positions_En ?? ''}</td>
-                <td className="border px-2 py-1">{pos.Other || pos.other || ''}</td>
-                <td className="border px-2 py-1">
-                  {perms.canEditPositions && (
-                    <>
-                      <button onClick={() => openEditModal(pos)} className="bg-green-600 text-white px-2 py-1 rounded mr-2">កែ</button>
-                      <button onClick={() => handleDelete(pos._id)} className="bg-red-700 text-white px-1 py-1 rounded">លុប</button>
-                    </>
-                  )}
-                </td>
+          <table className="min-w-full border">
+            <thead>
+              <tr className="bg-indigo-50">
+                <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Position_Id')}>លេខសម្គាល់ {sortField === 'Position_Id' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Position_Kh')}>ឈ្មោះតួនាទី (ខ្មែរ) {sortField === 'Position_Kh' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Position_En')}>ឈ្មោះតួនាទី (អង់គ្លេស) {sortField === 'Position_En' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Other')}>ព័ត៌មានផ្សេងៗ {sortField === 'Other' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2">សកម្មភាព</th>
               </tr>
-            ))}
-            {pagedPositions.length === 0 && (
-              <tr><td colSpan={5} className="py-6 text-center text-gray-500">មិនមានតួនាទី</td></tr>
-            )}
-          </tbody>
-        </table>
-        {/* Pagination */}
-        <div className="flex justify-center items-center mt-4 gap-2">
-          <button
-            onClick={() => setPage(page - 1)}
-            disabled={page === 1}
-            className={`px-3 py-1 border rounded ${page === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}
-          >Prev</button>
-          <span className="px-4 py-1 rounded bg-blue-600 text-white font-bold">ទំព័រ {page} / {totalPages}</span>
-          <button
-            onClick={() => setPage(page + 1)}
-            disabled={page === totalPages}
-            className={`px-3 py-1 border rounded ${page === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}
-          >Next</button>
-        </div>
+            </thead>
+            <tbody>
+              {pagedPositions.map(pos => (
+                <tr key={pos._id}>
+                  <td className="border px-2 py-1">{pos.Position_Id ?? pos.positions_id ?? pos.positions_Id ?? ''}</td>
+                  <td className="border px-2 py-1">{pos.Position_Kh ?? pos.positions_Kh ?? ''}</td>
+                  <td className="border px-2 py-1">{pos.Position_En ?? pos.positions_En ?? ''}</td>
+                  <td className="border px-2 py-1">{pos.Other || pos.other || ''}</td>
+                  <td className="border px-2 py-1">
+                    {perms.canEditPositions && (
+                      <>
+                        <button onClick={() => openEditModal(pos)} className="bg-green-600 text-white px-2 py-1 rounded mr-2">កែ</button>
+                        <button onClick={() => handleDelete(pos._id)} className="bg-red-700 text-white px-1 py-1 rounded">លុប</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {pagedPositions.length === 0 && (
+                <tr><td colSpan={5} className="py-6 text-center text-gray-500">មិនមានតួនាទី</td></tr>
+              )}
+            </tbody>
+          </table>
+          {/* Pagination */}
+          <div className="flex justify-center items-center mt-4 gap-2">
+            <button
+              onClick={() => setPage(page - 1)}
+              disabled={page === 1}
+              className={`px-3 py-1 border rounded ${page === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}
+            >Prev</button>
+            <span className="px-4 py-1 rounded bg-blue-600 text-white font-bold">ទំព័រ {page} / {totalPages}</span>
+            <button
+              onClick={() => setPage(page + 1)}
+              disabled={page === totalPages}
+              className={`px-3 py-1 border rounded ${page === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}
+            >Next</button>
+          </div>
         </>
       )}
       {/* Modal Add */}
@@ -263,32 +263,32 @@ export default function PositionPage() {
             <label className="block mb-1 font-medium text-lg text-blue-600">ព័ត៌មានផ្សេងៗ</label>
             <input value={newOther} onChange={e => setNewOther(e.target.value)} className="border-2 border-indigo-300 text-gray-900 text-lg px-3 py-2 mb-2 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-200" />
             <div className="flex justify-end mt-4">
-               <button onClick={handleAdd} className="bg-indigo-600 text-white px-4 py-1 rounded mr-2 hover:bg-indigo-700">រក្សាទុក</button>
-               <button onClick={closeAddModal} className="bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-600">បោះបង់</button>
-             </div>
-           </div>
-         </div>
-       )}
+              <button onClick={handleAdd} className="bg-indigo-600 text-white px-4 py-1 rounded mr-2 hover:bg-indigo-700">រក្សាទុក</button>
+              <button onClick={closeAddModal} className="bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-600">បោះបង់</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Modal Edit */}
       {showEditModal && (
-         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-           <div className="bg-white p-6 rounded shadow-lg min-w-[350px]">
-             <h3 className="text-lg font-bold mb-4 text-indigo-800">កែប្រែតួនាទី</h3>
-             <label className="block mb-1 font-medium text-lg text-blue-600">លេខសម្គាល់</label>
-             <input value={editId} onChange={e => setEditId(e.target.value)} className="border-2 border-indigo-300 text-gray-900 text-lg px-3 py-2 mb-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-200" />
-             <label className="block mb-1 font-medium text-lg text-blue-600">ឈ្មោះតួនាទី (ខ្មែរ)</label>
-             <input value={editKh} onChange={e => setEditKh(e.target.value)} className="border-2 border-indigo-300 text-gray-900 text-lg px-3 py-2 mb-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-200" />
-             <label className="block mb-1 font-medium text-lg text-blue-600">ឈ្មោះតួនាទី (អង់គ្លេស)</label>
-             <input value={editEn} onChange={e => setEditEn(e.target.value)} className="border-2 border-indigo-300 text-gray-900 text-lg px-3 py-2 mb-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-200" />
-             <label className="block mb-1 font-medium text-lg text-blue-600">ព័ត៌មានផ្សេងៗ</label>
-             <input value={editOther} onChange={e => setEditOther(e.target.value)} className="border-2 border-indigo-300 text-gray-900 text-lg px-3 py-2 mb-2 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-200" />
-             <div className="flex justify-end mt-4">
-               <button onClick={handleUpdate} className="bg-indigo-600 text-white px-4 py-1 rounded mr-2 hover:bg-indigo-700">រក្សាទុក</button>
-               <button onClick={closeEditModal} className="bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-600">បោះបង់</button>
-             </div>
-           </div>
-         </div>
-       )}
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow-lg min-w-[350px]">
+            <h3 className="text-lg font-bold mb-4 text-indigo-800">កែប្រែតួនាទី</h3>
+            <label className="block mb-1 font-medium text-lg text-blue-600">លេខសម្គាល់</label>
+            <input value={editId} onChange={e => setEditId(e.target.value)} className="border-2 border-indigo-300 text-gray-900 text-lg px-3 py-2 mb-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+            <label className="block mb-1 font-medium text-lg text-blue-600">ឈ្មោះតួនាទី (ខ្មែរ)</label>
+            <input value={editKh} onChange={e => setEditKh(e.target.value)} className="border-2 border-indigo-300 text-gray-900 text-lg px-3 py-2 mb-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+            <label className="block mb-1 font-medium text-lg text-blue-600">ឈ្មោះតួនាទី (អង់គ្លេស)</label>
+            <input value={editEn} onChange={e => setEditEn(e.target.value)} className="border-2 border-indigo-300 text-gray-900 text-lg px-3 py-2 mb-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+            <label className="block mb-1 font-medium text-lg text-blue-600">ព័ត៌មានផ្សេងៗ</label>
+            <input value={editOther} onChange={e => setEditOther(e.target.value)} className="border-2 border-indigo-300 text-gray-900 text-lg px-3 py-2 mb-2 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+            <div className="flex justify-end mt-4">
+              <button onClick={handleUpdate} className="bg-indigo-600 text-white px-4 py-1 rounded mr-2 hover:bg-indigo-700">រក្សាទុក</button>
+              <button onClick={closeEditModal} className="bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-600">បោះបង់</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

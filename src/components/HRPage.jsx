@@ -1,13 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { MdVisibility, MdDescription, MdPerson, MdEdit, MdDelete, MdAssignmentInd, MdGroup, MdExitToApp, MdCreditCard, MdHistoryEdu, MdSettings, MdClose, MdBusinessCenter, MdDragIndicator } from 'react-icons/md';
 import * as XLSX from 'xlsx';
-import HRAPI from '../services/hrAPI';
 import api from '../services/api';
-import usePermission from '../hooks/usePermission';
+import HRAPI from '../services/hrAPI';
 import { useAuth } from '../context/AuthContext';
-import StaftPage from './StaftPage';
-import { MdVisibility, MdDescription, MdPerson, MdEdit, MdDelete, MdAssignmentInd, MdGroup, MdExitToApp, MdCreditCard } from 'react-icons/md';
+import usePermission from '../hooks/usePermission';
 import HRReportView from './HRReportView';
+import { skillAPI } from '../services/skillAPI';
+import StaffModal from './StaftPage';
 import { hasResignData as _hasResignData, isExplicitlyRemoved as _isExplicitlyRemoved, isPreparedForDeletion as _isPreparedForDeletion, isCountedActive as _isCountedActive } from '../utils/hrFilters';
+import { QRCodeSVG } from 'qrcode.react';
+import { departmentAPI } from '../services/departmentAPI';
 
 // Fix for "Failed to resolve import 'react-icons/md'":
 // You must install react-icons in your project folder.
@@ -35,9 +39,12 @@ import { hasResignData as _hasResignData, isExplicitlyRemoved as _isExplicitlyRe
 // For everything else in this file, no additional packages are needed.
 
 export default function HRPage() {
+  const navigate = useNavigate();
   const perms = usePermission();
   const { user } = useAuth();
   const [hrList, setHRList] = useState([]);
+  const [skills, setSkills] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -50,9 +57,9 @@ export default function HRPage() {
 
   const [viewMode, setViewMode] = useState('active'); // 'active' | 'all' | 'archived'
   const [newHR, setNewHR] = useState({
-  no: '', staffId: '', khmerName: '', name: '', gender: '', dob: '', maritalStatus: '', bloodGroup: '',
-  phone: '', email: '', birthPlace: '', currentPlace: '', officerType: '', position: '', skill: '', Department_Kh: '',
-  joinDate: '', civilServantStartDate: '', nominationStartDate: '', dateJoinedMinistry: '', lastSalaryIncrementDate: '', workOther: '',
+    no: '', staffId: '', khmerName: '', name: '', gender: '', dob: '', maritalStatus: '', bloodGroup: '',
+    phone: '', email: '', birthPlace: '', currentPlace: '', officerType: '', position: '', skill: '', Department_Kh: '', Department_En: '',
+    joinDate: '', civilServantStartDate: '', nominationStartDate: '', dateJoinedMinistry: '', lastSalaryIncrementDate: '', workOther: '',
     degreeLevel: '', degree: '', educationLevel: '',
     officerId: '', cardNumber: '', nid: '', bankAccount: '',
     civilServantId: '', dateJoinedGov: '', yearsInCurrentRank: '', rankExitReason: '', rankExitDuration: '', grade: '',
@@ -86,6 +93,231 @@ export default function HRPage() {
   const [resignReason, setResignReason] = useState('');
   const [resignDocument, setResignDocument] = useState('');
   const [resignDocumentFile, setResignDocumentFile] = useState(null); // <-- new: keep actual File for multipart upload
+
+  // ID Card States
+  const [showIdCard, setShowIdCard] = useState(false);
+  const [hideCardContent, setHideCardContent] = useState(false);
+  const [cardMode, setCardMode] = useState('view'); // 'view' | 'create' | 'edit'
+  const [cardData, setCardData] = useState({});
+  const [qrLogo, setQrLogo] = useState("./Uploads/Logo_KSFH-Short.png");
+  const qrLogoInputRef = useRef(null);
+
+  const handleQrLogoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (re) => {
+        setQrLogo(re.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  const [photoTransform, setPhotoTransform] = useState({ x: 9, y: 119, w: 100, h: 125 });
+  const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
+  const [isResizingPhoto, setIsResizingPhoto] = useState(false);
+  const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+  const [initialTransform, setInitialTransform] = useState({ x: 9, y: 119, w: 100, h: 125 });
+  const [isProcessingSkill, setIsProcessingSkill] = useState(false);
+  const [leadershipPositions, setLeadershipPositions] = useState(['ប្រធានការិយាល័យ', 'អនុប្រធានការិយាល័យ']);
+  const [showThemeSettings, setShowThemeSettings] = useState(false);
+  const [themeSettingsTab, setThemeSettingsTab] = useState('skills'); // 'skills' | 'positions'
+  const [themeSettingsSearch, setThemeSettingsSearch] = useState('');
+
+  const handleToggleTechnicalSkill = async (isTechnical) => {
+    if (!cardData.skill) return;
+    setIsProcessingSkill(true);
+    try {
+      if (isTechnical) {
+        if (!skills.some(s => s.skills_Kh === cardData.skill)) {
+          // Robust ID generation
+          let nextIdNum = 1;
+          if (Array.isArray(skills) && skills.length > 0) {
+            const ids = skills.map(s => Number(s.skills_Id || s.ID_skills || 0)).filter(n => !isNaN(n));
+            if (ids.length > 0) nextIdNum = Math.max(...ids) + 1;
+          }
+          if (nextIdNum <= 0) nextIdNum = Date.now();
+          
+          const nextId = String(nextIdNum);
+          await skillAPI.createSkill({ 
+            ID_skills: nextId,
+            skills_Id: nextId,
+            skills_Kh: cardData.skill, 
+            skills_En: cardData.skill 
+          });
+          const res = await skillAPI.getSkills();
+          setSkills(Array.isArray(res.data) ? res.data : (res || []));
+        }
+      } else {
+        const toDelete = skills.find(s => s.skills_Kh === cardData.skill);
+        if (toDelete) {
+          await skillAPI.deleteSkill(toDelete._id);
+          const res = await skillAPI.getSkills();
+          setSkills(res.data || []);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to update skill master list', err);
+    } finally {
+      setIsProcessingSkill(false);
+    }
+  };
+
+  const handleToggleLeadershipPosition = (isLeadership) => {
+    if (!cardData.position) return;
+    const pos = cardData.position.trim();
+    if (isLeadership) {
+      if (!leadershipPositions.includes(pos)) {
+        setLeadershipPositions([...leadershipPositions, pos]);
+      }
+    } else {
+      setLeadershipPositions(leadershipPositions.filter(p => p !== pos));
+    }
+  };
+
+  const handleResetAllToBlue = async () => {
+    if (!window.confirm('តើអ្នកប្រាកដថាចង់កំណត់គ្រប់ជំនាញ និងតួនាទីឱ្យទៅជាពណ៌ខៀវវិញទាំងអស់មែនទេ?')) return;
+    setIsProcessingSkill(true);
+    try {
+      // 1. Clear skills in DB
+      for (const s of skills) {
+        await skillAPI.deleteSkill(s._id);
+      }
+      const res = await skillAPI.getSkills();
+      setSkills(res.data || []);
+      
+      // 2. Clear leadership positions state
+      setLeadershipPositions([]);
+      
+      alert('បានកំណត់ទាំងអស់ជាពណ៌ខៀវដោយជោគជ័យ!');
+    } catch (err) {
+      console.error('Failed to reset settings', err);
+      alert('មានបញ្ហាក្នុងការកំណត់ឡើងវិញ!');
+    } finally {
+      setIsProcessingSkill(false);
+    }
+  };
+
+  // All ID cards now use the masked background pattern (S, W, P, D)
+  const isMaskedCard = true;
+
+  const getCardMask = () => {
+    const sId = cardData.staffId || '';
+    
+    if (sId.startsWith('S')) {
+      const pos = cardData.position || '';
+      const skill = cardData.skill || '';
+      
+      const isLeadership = leadershipPositions.some(p => pos.includes(p));
+      if (isLeadership) return './Uploads/CardDA.png';
+      
+      const isTechnical = skill && skills.some(s => s.skills_Kh === skill);
+      if (isTechnical) return './Uploads/CardSAA.png';
+      
+      return './Uploads/CardSA.png';
+    }
+    
+    if (sId.startsWith('W')) return './Uploads/CardWA.png';
+    // P and D use CardDA.png as requested. Also use it as default for any other prefix.
+    return './Uploads/CardDA.png';
+  };
+
+  const getCardThemeColor = (type = 'bg') => {
+    const sId = cardData.staffId || '';
+    const pos = cardData.position || '';
+    const skill = cardData.skill || '';
+
+    // S: Special logic
+    if (sId.startsWith('S')) {
+      // 1. Red if position is in leadership list
+      const isLeadership = leadershipPositions.some(p => pos.includes(p));
+      if (isLeadership) return type === 'bg' ? 'bg-red-600' : 'border-red-600';
+      
+      // 2. Green if skill exists in the master skill list
+      const isTechnical = skill && skills.some(s => s.skills_Kh === skill);
+      if (isTechnical) return type === 'bg' ? 'bg-green-600' : 'border-green-600';
+      
+      // 3. Default Blue
+      return type === 'bg' ? 'bg-blue-900' : 'border-blue-900';
+    } 
+    
+    if (sId.startsWith('W')) {
+      return type === 'bg' ? 'bg-purple-800' : 'border-purple-800';
+    } 
+    
+    if (sId.startsWith('D') || sId.startsWith('P')) {
+      return type === 'bg' ? 'bg-red-600' : 'border-red-600';
+    }
+    
+    return type === 'bg' ? 'bg-blue-900' : 'border-blue-900';
+  };
+
+  const getDeptEn = (khName) => {
+    if (!khName) return 'DEPARTMENT NAME';
+    const cleanKh = String(khName).trim();
+    
+    // Hardcoded common translations if not in DB
+    if (cleanKh === 'ថ្នាក់ដឹកនាំ') return 'LEADERSHIP';
+    if (cleanKh === 'រដ្ឋបាល') return 'ADMINISTRATION';
+    if (cleanKh === 'គណនេយ្យ') return 'ACCOUNTING';
+
+    const dept = departments.find(d => {
+      const dKh = String(d['ឈ្មោះផ្នែក (ខ្មែរ)'] || d.Department_Kh || d.nameKh || d.name || '').trim();
+      return dKh === cleanKh;
+    });
+    
+    if (dept) {
+      const dEn = String(dept['ឈ្មោះផ្នែក (អង់គ្លេស)'] || dept.Department_En || dept.nameEn || '').trim();
+      if (dEn) return dEn.toUpperCase();
+    }
+    
+    return cleanKh; // Fallback to Khmer if no English found
+  };
+
+  // Set fixed transform for all employees as requested
+  useEffect(() => {
+    const fixedTransform = { x: 9, y: 119, w: 100, h: 125 };
+    setPhotoTransform(fixedTransform);
+    setInitialTransform(fixedTransform);
+  }, [cardData]);
+
+  const handleSaveCardTransform = async () => {
+    if (!cardData || !cardData._id) return;
+    try {
+      await api.put(`/hr/${cardData._id}/id-card-transform`, { idCardTransform: photoTransform });
+      setHRList(prev => prev.map(h => h._id === cardData._id ? { ...h, idCardTransform: photoTransform } : h));
+      alert('បានរក្សាទុកទីតាំងរូបថតដោយជោគជ័យ!');
+    } catch (error) {
+      console.error('Error saving transform:', error);
+      alert('មានបញ្ហាក្នុងការរក្សាទុកទីតាំងរូបថត: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  // Mouse move handler for photo transform
+  useEffect(() => {
+    const handleGlobalMouseMove = (e) => {
+      if (isDraggingPhoto) {
+        const dx = e.clientX - dragStartPos.x;
+        const dy = e.clientY - dragStartPos.y;
+        setPhotoTransform({ ...photoTransform, x: initialTransform.x + dx, y: initialTransform.y + dy });
+      } else if (isResizingPhoto) {
+        const dx = e.clientX - dragStartPos.x;
+        const dy = e.clientY - dragStartPos.y;
+        setPhotoTransform({ ...photoTransform, w: Math.max(30, initialTransform.w + dx), h: Math.max(30, initialTransform.h + dy) });
+      }
+    };
+    const handleGlobalMouseUp = () => {
+      setIsDraggingPhoto(false);
+      setIsResizingPhoto(false);
+    };
+    if (isDraggingPhoto || isResizingPhoto) {
+      window.addEventListener('mousemove', handleGlobalMouseMove);
+      window.addEventListener('mouseup', handleGlobalMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [isDraggingPhoto, isResizingPhoto, dragStartPos, initialTransform, photoTransform]);
   // Compute max no for inline selection
   const maxNo = React.useMemo(() => {
     const nums = hrList.map(h => Number(h.no)).filter(n => Number.isFinite(n) && n > 0);
@@ -127,7 +359,8 @@ export default function HRPage() {
     officerType: 'ប្រភេទមន្ត្រី',
     position: 'តួនាទី',
     skill: 'ជំនាញ',
-    Department_Kh: 'ផ្នែក',
+    Department_Kh: 'ផ្នែក (ខ្មែរ)',
+    Department_En: 'ឈ្មោះផ្នែក (អង់គ្លេស)',
     joinDate: 'កាលបរិច្ឆេទចូលបម្រើការងារ',
     civilServantRole: 'តួនាទីរាជការ',
     civilServantStartDate: 'ថ្ងៃចូលក្របខ័ណ្ឌ',
@@ -189,25 +422,31 @@ export default function HRPage() {
     return val;
   };
 
+  const parseDateSafe = (v) => {
+    if (!v) return null;
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
   // Simple vs Full templates (arrays of field keys)
-  const TEMPLATE_SIMPLE_KEYS = ['staffId','khmerName','name','gender','dob','position','phone','status','image','other'];
+  const TEMPLATE_SIMPLE_KEYS = ['staffId', 'khmerName', 'name', 'gender', 'dob', 'position', 'phone', 'status', 'image', 'other'];
   const TEMPLATE_FULL_KEYS = [
-    'no','staffId','khmerName','name','gender','dob','bloodGroup','phone','email','birthPlace','currentPlace',
-    'fatherName','fatherDob','fatherOccupation','fatherPhone','fatherNote','motherName','motherDob','motherOccupation','motherPhone','motherNote',
-    'unionName','unionMemberId','unionJoinDate','unionRole','unionPhone','unionNote',
-  'officerType','position','skill','Department_Kh','joinDate','civilServantRole','nominationStartDate','dateJoinedMinistry','lastSalaryIncrementDate','workOther',
-    'degreeLevel','degree','educationLevel','officerId','cardNumber','nid','bankAccount','civilServantId',
-    'yearsInCurrentRank','rankExitReason','rankExitDuration','grade','proposedBy','yearsInRank','totalYearsWorked','asOfDate',
-    'salaryLevel','mentorName','mentorDate','civilServantReason',
-    'creativityScore','responsibilityScore','patriotismScore','leadershipScore','ethicsScore','totalScore',
-    'reason1','reason2','reason3','reason4','reason5','reason6','reason',
-    'status','image','other','salaryPromotionDate','medalType','medalReceivedDate'
+    'no', 'staffId', 'khmerName', 'name', 'gender', 'dob', 'bloodGroup', 'phone', 'email', 'birthPlace', 'currentPlace',
+    'fatherName', 'fatherDob', 'fatherOccupation', 'fatherPhone', 'fatherNote', 'motherName', 'motherDob', 'motherOccupation', 'motherPhone', 'motherNote',
+    'unionName', 'unionMemberId', 'unionJoinDate', 'unionRole', 'unionPhone', 'unionNote',
+    'officerType', 'position', 'skill', 'Department_Kh', 'joinDate', 'civilServantRole', 'nominationStartDate', 'dateJoinedMinistry', 'lastSalaryIncrementDate', 'workOther',
+    'degreeLevel', 'degree', 'educationLevel', 'officerId', 'cardNumber', 'nid', 'bankAccount', 'civilServantId',
+    'yearsInCurrentRank', 'rankExitReason', 'rankExitDuration', 'grade', 'proposedBy', 'yearsInRank', 'totalYearsWorked', 'asOfDate',
+    'salaryLevel', 'mentorName', 'mentorDate', 'civilServantReason',
+    'creativityScore', 'responsibilityScore', 'patriotismScore', 'leadershipScore', 'ethicsScore', 'totalScore',
+    'reason1', 'reason2', 'reason3', 'reason4', 'reason5', 'reason6', 'reason',
+    'status', 'image', 'other', 'salaryPromotionDate', 'medalType', 'medalReceivedDate'
   ];
 
   // Default visible column order (matches the requested serial layout)
   const DEFAULT_VISIBLE_ORDER = [
-    'no','staffId','khmerName','name','gender','dob','bloodGroup','phone','email','birthPlace','currentPlace',
-    'position','Department_Kh','skill','joinDate','nominationStartDate','dateJoinedMinistry','lastSalaryIncrementDate','salaryLevel','salaryPromotionDate','nid','cardNumber','bankAccount'
+    'no', 'staffId', 'khmerName', 'name', 'gender', 'dob', 'bloodGroup', 'phone', 'email', 'birthPlace', 'currentPlace',
+    'position', 'Department_Kh', 'skill', 'joinDate', 'nominationStartDate', 'dateJoinedMinistry', 'lastSalaryIncrementDate', 'salaryLevel', 'salaryPromotionDate', 'nid', 'cardNumber', 'bankAccount'
   ];
 
   // Example/sample values for demonstration
@@ -245,8 +484,8 @@ export default function HRPage() {
         const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' });
         if (!aoa || aoa.length === 0) throw new Error('ឯកសារទទេ');
 
-  // Build header mapping (supports either Khmer labels or English keys)
-  const header = (aoa[0] || []).map(h => String(h).trim());
+        // Build header mapping (supports either Khmer labels or English keys)
+        const header = (aoa[0] || []).map(h => String(h).trim());
         const khToKey = Object.fromEntries(Object.entries(KH_LABELS).map(([k, v]) => [String(v).trim(), k]));
         const headerKeyOrder = header.map(h => {
           if (KH_LABELS[h]) return h; // unlikely: header equals a key that is also a label key
@@ -256,7 +495,7 @@ export default function HRPage() {
         }).map(h => (Object.prototype.hasOwnProperty.call(KH_LABELS, h) ? h : (khToKey[h] || null)));
 
         // Validate required keys exist in mapped header
-        const REQUIRED = ['staffId','khmerName','name'];
+        const REQUIRED = ['staffId', 'khmerName', 'name'];
         const missingRequired = REQUIRED.filter(r => !headerKeyOrder.includes(r));
         if (missingRequired.length) {
           alert(`ទម្រង់ក្បាលតារាងមិនមានជួរឈរចាំបាច់៖ ${missingRequired.join(', ')}\nសូមប្រើគំរូដែលបានទាញយក (Khmer headers).`);
@@ -264,7 +503,7 @@ export default function HRPage() {
           if (fileInputRef.current) fileInputRef.current.value = '';
           return;
         }
-  const rows = aoa.slice(1);
+        const rows = aoa.slice(1);
 
         const creations = [];
         let created = 0;
@@ -278,7 +517,7 @@ export default function HRPage() {
             hrObj[mappedKey] = typeof val === 'string' ? val.trim() : (val ?? '');
           });
           if (REQUIRED.every(k => (hrObj[k] || '').toString().trim().length > 0)) {
-            creations.push(HRAPI.create(hrObj).then(() => { created++; }).catch(() => {}));
+            creations.push(HRAPI.create(hrObj).then(() => { created++; }).catch(() => { }));
           }
         }
 
@@ -349,9 +588,9 @@ export default function HRPage() {
     { key: 'image', label: 'រូបភាព' },
     { key: 'other', label: 'ផ្សេងៗ' },
     { key: 'status', label: 'ស្ថានភាព' }
-    ,{ key: 'resignDate', label: 'ថ្ងៃលាលែង' }
-    ,{ key: 'resignReason', label: 'មូលហេតុលាលែង' }
-    ,{ key: 'resignDocument', label: 'ឯកសារលាលែង' }
+    , { key: 'resignDate', label: 'ថ្ងៃលាលែង' }
+    , { key: 'resignReason', label: 'មូលហេតុលាលែង' }
+    , { key: 'resignDocument', label: 'ឯកសារលាលែង' }
   ];
 
   const computeDefaultVisibleFields = () => {
@@ -411,11 +650,20 @@ export default function HRPage() {
   useEffect(() => {
     if (!perms.canViewHR) return;
     loadVisibleFieldsSetting();
+    // Also fetch skills list for color coding logic
+    skillAPI.getSkills().then(res => {
+      setSkills(Array.isArray(res.data) ? res.data : (res || []));
+    }).catch(() => setSkills([]));
+
+    // Fetch departments for English name lookup
+    departmentAPI.getDepartments().then(res => {
+      setDepartments(Array.isArray(res.data) ? res.data : (res || []));
+    }).catch(() => setDepartments([]));
   }, [perms.canViewHR]);
 
   const fetchHR = async () => {
-  if (!perms.canViewHR) return; // guard
-  setLoading(true);
+    if (!perms.canViewHR) return; // guard
+    setLoading(true);
     try {
       const res = await HRAPI.getAll();
       const rows = Array.isArray(res.data) ? res.data : [];
@@ -442,8 +690,8 @@ export default function HRPage() {
       return Math.max(...nums) + 1;
     })();
     setNewHR({
-  no: nextNo, staffId: '', khmerName: '', name: '', gender: '', dob: '', maritalStatus: '', bloodGroup: '',
-  phone: '', email: '', birthPlace: '', currentPlace: '', officerType: '', position: '', skill: '', Department_Kh: '',
+      no: nextNo, staffId: '', khmerName: '', name: '', gender: '', dob: '', maritalStatus: '', bloodGroup: '',
+      phone: '', email: '', birthPlace: '', currentPlace: '', officerType: '', position: '', skill: '', Department_Kh: '', Department_En: '',
       joinDate: '', dateJoinedMinistry: '', lastSalaryIncrementDate: '', workOther: '',
       degreeLevel: '', degree: '', educationLevel: '',
       officerId: '', cardNumber: '', nid: '', bankAccount: '',
@@ -476,7 +724,7 @@ export default function HRPage() {
     await HRAPI.update(editingId, editHR);
     setShowEditModal(false);
     setEditingId(null);
-  await fetchHR();
+    await fetchHR();
   };
   // Soft-delete: mark status='Deleted' so record can be restored later
   const handleDelete = async (id) => {
@@ -541,7 +789,7 @@ export default function HRPage() {
     reader.onload = () => setResignDocument(reader.result);
     reader.readAsDataURL(file);
   };
-  
+
   const handleResign = async () => {
     if (!perms.canEditHR || !resignId) return;
     if (!resignDate) {
@@ -596,24 +844,24 @@ export default function HRPage() {
           }
         }
       }
-       // Send both variant keys to backend where possible to maximize compatibility
-       await HRAPI.update(resignId, { 
-         status: 'Resigned', 
-         resignDate,
-         resignReason: resignReason.trim(),
-         resignDocument: documentPayload || null,
-         // also include alternative backend naming
-         resignationDate: resignDate,
-         resignationReason: resignReason.trim(),
-         resignationDocument: documentPayload || null
-       });
-       await fetchHR();
-       closeResignModal();
-     } catch (err) {
-       console.error('Failed to set Resigned', err);
-       alert('មិនអាចធ្វើការប្តូរស្ថានភាពបាន - សូមព្យាយាមម្តងទៀត។');
-     }
-   };
+      // Send both variant keys to backend where possible to maximize compatibility
+      await HRAPI.update(resignId, {
+        status: 'Resigned',
+        resignDate,
+        resignReason: resignReason.trim(),
+        resignDocument: documentPayload || null,
+        // also include alternative backend naming
+        resignationDate: resignDate,
+        resignationReason: resignReason.trim(),
+        resignationDocument: documentPayload || null
+      });
+      await fetchHR();
+      closeResignModal();
+    } catch (err) {
+      console.error('Failed to set Resigned', err);
+      alert('មិនអាចធ្វើការប្តូរស្ថានភាពបាន - សូមព្យាយាមម្តងទៀត។');
+    }
+  };
 
   // Inline change of sequence number
   const [noSavingId, setNoSavingId] = useState(null);
@@ -621,58 +869,22 @@ export default function HRPage() {
     if (!perms.canEditHR) return;
     const n = Number(newNo);
     if (!Number.isFinite(n) || n <= 0) return;
+    setNoSavingId(hrId);
     try {
-      await reorderByInserting(hrId, n);
+      await HRAPI.reposition(hrId, n);
+      // Mark as seen immediately so the "Kae" badge doesn't pop up for sequence changes
+      try { localStorage.setItem(`lastSeenLetter_${hrId}`, String(Date.now())); } catch (e) {}
+      await fetchHR();
     } catch (e) {
       const msg = e?.response?.data?.error || e?.message || 'បរាជ័យក្នុងការកែ ល.រ';
       alert(msg);
-      await fetchHR();
-    }
-  };
-
-  // Insert-style reorder: move source row to `newNo` and shift intervening rows
-  const reorderByInserting = async (sourceId, newNo) => {
-    if (!perms.canEditHR) return;
-    const src = hrList.find(h => (h._id || h.id) === sourceId);
-    if (!src) return;
-    const current = Number(src.no) || 0;
-    if (current === newNo) return;
-    // Build updates: if moving up (newNo < current) -> increment numbers in [newNo, current-1]
-    // if moving down (newNo > current) -> decrement numbers in [current+1, newNo]
-    const updates = [];
-    setNoSavingId(sourceId);
-    try {
-      if (newNo < current) {
-        const toIncrease = hrList.filter(h => {
-          const v = Number(h.no) || 0;
-          return v >= newNo && v < current;
-        });
-        // increase those by 1
-        for (const h of toIncrease) {
-          updates.push(HRAPI.update(h._id || h.id, { no: (Number(h.no) || 0) + 1 }));
-        }
-        // move source to newNo
-        updates.push(HRAPI.update(sourceId, { no: newNo }));
-      } else {
-        const toDecrease = hrList.filter(h => {
-          const v = Number(h.no) || 0;
-          return v <= newNo && v > current;
-        });
-        // decrease those by 1
-        for (const h of toDecrease) {
-          updates.push(HRAPI.update(h._id || h.id, { no: (Number(h.no) || 0) - 1 }));
-        }
-        // move source to newNo
-        updates.push(HRAPI.update(sourceId, { no: newNo }));
-      }
-      if (updates.length) await Promise.allSettled(updates);
       await fetchHR();
     } finally {
       setNoSavingId(null);
     }
   };
 
-  // Move the row up (decrease `no`) by swapping with the previous sequence number
+  // Move the row up (decrease `no`)
   const handleMoveUp = async (hrId) => {
     if (!perms.canEditHR) return;
     try {
@@ -680,30 +892,22 @@ export default function HRPage() {
       if (!hr) return;
       const current = Number(hr.no) || 0;
       if (current <= 1) return;
-      const targetNo = current - 1;
-      await reorderByInserting(hrId, targetNo);
+      await handleNoChange(hrId, current - 1);
     } catch (err) {
       console.error('Move up failed', err);
-      alert('មិនអាចផ្លាស់ទីឡើងបាន - សូមព្យាយាមម្តងទៀត។');
-    } finally {
-      setNoSavingId(null);
     }
   };
 
-  // Move the row down (increase `no`) by swapping with the next sequence number
+  // Move the row down (increase `no`)
   const handleMoveDown = async (hrId) => {
     if (!perms.canEditHR) return;
     try {
       const hr = hrList.find(h => (h._id || h.id) === hrId);
       if (!hr) return;
       const current = Number(hr.no) || 0;
-      const targetNo = current + 1;
-      await reorderByInserting(hrId, targetNo);
+      await handleNoChange(hrId, current + 1);
     } catch (err) {
       console.error('Move down failed', err);
-      alert('មិនអាចផ្លាស់ទីចុះបាន - សូមព្យាយាមម្តងទៀត។');
-    } finally {
-      setNoSavingId(null);
     }
   };
 
@@ -712,7 +916,7 @@ export default function HRPage() {
   const [dragOverId, setDragOverId] = useState(null);
 
   const handleDragStart = (e, hrId) => {
-    try { e.dataTransfer.setData('text/plain', hrId || ''); } catch (e) {}
+    try { e.dataTransfer.setData('text/plain', hrId || ''); } catch (e) { }
     setDraggingId(hrId);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -732,16 +936,13 @@ export default function HRPage() {
       return;
     }
     try {
-      const src = hrList.find(h => (h._id || h.id) === sourceId);
       const tgt = hrList.find(h => (h._id || h.id) === targetId);
-      if (!src || !tgt) return;
+      if (!tgt) return;
       const tgtNo = Number(tgt.no) || 0;
-      await reorderByInserting(sourceId, tgtNo);
+      await handleNoChange(sourceId, tgtNo);
     } catch (err) {
-      console.error('Drag drop swap failed', err);
-      alert('មិនអាចផ្លាស់ទីបាន - សូមព្យាយាមម្តងទៀត។');
+      console.error('Drag drop failed', err);
     } finally {
-      setNoSavingId(null);
       setDraggingId(null);
       setDragOverId(null);
     }
@@ -755,25 +956,25 @@ export default function HRPage() {
       const bn = Number.isFinite(Number(b.no)) ? Number(b.no) : Infinity;
       return sortOrder === 'asc' ? an - bn : bn - an;
     }
-    
+
     // Special case: when sorting by Department_Kh, also sort by name within departments
     if (sortField === 'Department_Kh') {
       const deptA = (a.Department_Kh ?? '').toString();
       const deptB = (b.Department_Kh ?? '').toString();
-      const deptCompare = sortOrder === 'asc' 
-        ? deptA.localeCompare(deptB, 'km') 
+      const deptCompare = sortOrder === 'asc'
+        ? deptA.localeCompare(deptB, 'km')
         : deptB.localeCompare(deptA, 'km');
-      
+
       // If departments are the same, sort by name alphabetically
       if (deptCompare === 0) {
         const nameA = (a.khmerName ?? a.name ?? '').toString();
         const nameB = (b.khmerName ?? b.name ?? '').toString();
         return nameA.localeCompare(nameB, 'km');
       }
-      
+
       return deptCompare;
     }
-    
+
     const valA = (a[sortField] ?? '').toString();
     const valB = (b[sortField] ?? '').toString();
     return sortOrder === 'asc'
@@ -866,9 +1067,17 @@ export default function HRPage() {
     // If a record has an explicit dataset removal date, treat it as removed regardless of prepared flag
     const hasExplicitRemoval = _isExplicitlyRemoved(hr);
     const isPrepared = _isPreparedForDeletion(hr) && !hasExplicitRemoval;
-    if (viewMode === 'archived') return (hr.status === 'Resigned' || hr.status === 'Deleted' || (hasResignData(hr) && !isPrepared));
-    // default 'active': exclude only those actually resigned/deleted or with resign data that's NOT prepared
-    return !(hr.status === 'Resigned' || hr.status === 'Deleted' || (hasResignData(hr) && !isPrepared));
+    
+    // Logic: A person is "actually" resigned/gone if their resignation date is today or in the past.
+    // If their resignation date is in the future, they are still considered active for display.
+    const resDate = parseDateSafe(hr.resignDate || hr.resignationDate || hr.dateRemoved);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const isPastResigned = (hr.status === 'Resigned' || hasResignData(hr)) && (!isPrepared) && (resDate && resDate <= today);
+
+    if (viewMode === 'archived') return (hr.status === 'Deleted' || isPastResigned);
+    // default 'active': include if not deleted and not past-resigned
+    return !(hr.status === 'Deleted' || isPastResigned);
   });
   const pagedHR = filteredHR.slice((page - 1) * limit, page * limit);
   const totalPages = Math.ceil(filteredHR.length / limit);
@@ -881,7 +1090,7 @@ export default function HRPage() {
   // Export HRs to CSV
   const handleExport = () => {
     if (!(perms.canPrintHR || perms.canEditHR || perms.canViewHR)) return;
-    const fields = ['staffId','khmerName','name','gender','dob','position','phone','status','image','other'];
+    const fields = ['staffId', 'khmerName', 'name', 'gender', 'dob', 'position', 'phone', 'status', 'image', 'other'];
     const csvRows = [fields];
     hrList.forEach(hr => {
       csvRows.push(fields.map(f => JSON.stringify(hr[f] ?? '')));
@@ -903,7 +1112,7 @@ export default function HRPage() {
     const inst = [
       ['ការណែនាំ'],
       ['- សូមប្រើសន្លឹក "គំរូសាមញ្ញ" ឬ "គំរូពេញលេញ" ដើម្បីបញ្ចូលទិន្នន័យ។'],
-      ['- អក្សរខ្មែរ អាចបញ្ចូលបានដោយផ្ទាល់។ សូមប្រើពុម្ពអក្សរ Khmer OS Siemreap / Noto Sans Khmer នៅក្នុង Excel របស់អ្នក។'],
+      ['- អក្សរខ្មែរ អាចបញ្ចូលបានដោយផ្ទាល់។ សូមប្រើពុម្ពអក្សរKhmer OS Siemreap / Noto Sans Khmer នៅក្នុង Excel របស់អ្នក។'],
       ['- កាលបរិច្ឆេទ អាចបញ្ចូលជា dd/mm/yyyy ឬ yyyy-mm-dd។'],
       ['- ជួរឈរចាំបាច់៖ staffId, គោត្តនាម និងនាម, ឡាតាំង'],
       ['- មានជួរដាតាទូទៅ "សម្គាល់" នៅជួរឈរ "ផ្សេងៗ"។']
@@ -981,17 +1190,17 @@ export default function HRPage() {
       ['unionName', 'unionMemberId', 'unionJoinDate', 'unionRole', 'unionPhone', 'unionNote'].includes(f.key)
     ),
     parents: allFields.filter(f =>
-      ['fatherName','fatherDob','fatherOccupation','fatherPhone','fatherNote','motherName','motherDob','motherOccupation','motherPhone','motherNote'].includes(f.key)
+      ['fatherName', 'fatherDob', 'fatherOccupation', 'fatherPhone', 'fatherNote', 'motherName', 'motherDob', 'motherOccupation', 'motherPhone', 'motherNote'].includes(f.key)
     ),
     children: allFields.filter(f =>
       // placeholder: if child fields exist, include them; otherwise empty
-      ['childName','childDob','childNote'].includes(f.key)
+      ['childName', 'childDob', 'childNote'].includes(f.key)
     ),
     performance: allFields.filter(f =>
       ['creativityScore', 'responsibilityScore', 'patriotismScore', 'leadershipScore', 'ethicsScore', 'totalScore'].includes(f.key)
     ),
     resign: allFields.filter(f =>
-      ['resignDate','resignReason','resignDocument'].includes(f.key)
+      ['resignDate', 'resignReason', 'resignDocument'].includes(f.key)
     ),
     other: allFields.filter(f =>
       ['officerId', 'cardNumber', 'nid', 'bankAccount', 'civilServantId', 'yearsInCurrentRank', 'rankExitReason', 'rankExitDuration', 'grade', 'proposedBy', 'yearsInRank', 'totalYearsWorked', 'asOfDate', 'reason1', 'reason2', 'reason3', 'reason4', 'reason5', 'reason6', 'status', 'image', 'other', 'workOther'].includes(f.key)
@@ -1181,7 +1390,7 @@ export default function HRPage() {
               >
                 <div className="flex items-center justify-between border-b px-3 py-2" style={{ gap: 8 }}>
                   <div className="flex border-b-0" style={{ overflowX: 'auto', whiteSpace: 'nowrap' }}>
-                    {['all','personal','work','education','documents','civilServant','union','parents','children','performance','resign','other'].map(tab => (
+                    {['all', 'personal', 'work', 'education', 'documents', 'civilServant', 'union', 'parents', 'children', 'performance', 'resign', 'other'].map(tab => (
                       <button
                         key={tab}
                         className={`inline-block px-2 py-1 mr-1 text-xs ${colTab === tab ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
@@ -1285,50 +1494,73 @@ export default function HRPage() {
       ) : (
         <table className="min-w-full border" style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", tableLayout: 'fixed', width: '100%' }}>
           <thead>
-            <tr className="bg-purple-100">
-              <th className="border px-1 py-1" style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", width: '40px', minWidth: '40px', maxWidth: '40px', textAlign: 'center' }}>សកម្មភាព<br/>ភេទ</th>
-              <th className="border px-1 py-1" style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", width: '40px', minWidth: '40px', maxWidth: '40px', textAlign: 'center' }}>រូបភាព</th>
-              {allFields.filter(f => visibleFields.includes(f.key) && f.key !== 'officerType').map(f => {
+            <tr className="bg-purple-100" style={{ userSelect: 'text' }}>
+              <th className="border px-1 py-1" style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", width: '40px', minWidth: '40px', maxWidth: '40px', textAlign: 'center', userSelect: 'text' }}>សកម្មភាព<br />ភេទ</th>
+              <th className="border px-1 py-1" style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", width: '40px', minWidth: '40px', maxWidth: '40px', textAlign: 'center', userSelect: 'text' }}>រូបភាព</th>
+              {allFields.filter(f => visibleFields.includes(f.key) && !['officerType', 'dob', 'civilServantId', 'salaryPromotionDate', 'nid', 'bankAccount', 'degree', 'Department_Kh'].includes(f.key)).map(f => {
                 // Set column widths based on field type and content - Fixed widths as requested
-                let width = '80px'; // default width
-                if (f.key === 'no') width = '55px';
-                else if (f.key === 'khmerName') width = '90px';
-                else if (f.key === 'dob') width = '50px';
-                else if (f.key === 'position') width = '170px'; // wider for stacked position/department
+                let width = '100px'; // default width
+                if (f.key === 'no') width = '60px';
+                else if (f.key === 'khmerName') width = '130px';
+                else if (f.key === 'dob') width = '90px';
+                else if (f.key === 'position') width = '180px';
                 else if (f.key === 'skill') width = '150px';
-                else if (f.key === 'joinDate') width = '50px';
-                else if (f.key === 'salaryLevel') width = '60px';
-                else if (f.key === 'officerType') width = '70px';
-                else if (f.key === 'phone') width = '85px';
-                else if (f.key === 'birthPlace') width = '200px'; // wider for stacked locations
-                
-                else if (f.key === 'bloodGroup') width = '50px';
-                else if (f.key === 'email') width = '100px';
-                else if (f.key === 'nid') width = '50px';
-                
+                else if (f.key === 'joinDate') width = '90px';
+                else if (f.key === 'salaryLevel') width = '70px';
+                else if (f.key === 'officerType') width = '90px';
+                else if (f.key === 'phone') width = '100px';
+                else if (f.key === 'birthPlace') width = '220px';
+                else if (f.key === 'bloodGroup') width = '70px';
+                else if (f.key === 'email') width = '150px';
+                else if (f.key === 'nid') width = '110px';
+
                 return (
                   <th
                     key={f.key}
                     className="border px-2 py-1 cursor-pointer"
                     onClick={() => handleSort(f.key)}
-                    style={{ 
-                      fontSize: '12px', 
-                      fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", 
-                      width: width, 
-                      minWidth: width, 
+                    style={{
+                      fontSize: '12px',
+                      fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif",
+                      width: width,
+                      minWidth: width,
                       maxWidth: width,
-                      textAlign: 'center'
+                      textAlign: 'center',
+                      userSelect: 'text'
                     }}
                   >
-                    {f.key === 'skill' ? (
+                    {f.key === 'khmerName' ? (
+                      <div>
+                        <div>{f.label}</div>
+                        <div style={{ fontSize: '11px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", marginTop: '2px', color: '#666' }}>{KH_LABELS.dob || 'ថ្ងៃកំណើត'}</div>
+                      </div>
+                    ) : f.key === 'skill' ? (
                       <div>
                         <div style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}>{KH_LABELS.officerType || 'ប្រភេទមន្ត្រី'}</div>
                         <div style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", marginTop: '2px' }}>{f.label}</div>
+                        <div style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", marginTop: '2px' }}>{KH_LABELS.civilServantId || 'លេខមន្ត្រីរាជការ'}</div>
                       </div>
                     ) : f.key === 'bloodGroup' ? (
                       <div>
                         <div style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}>{KH_LABELS.maritalStatus || 'ស្ថានភាពគ្រួសារ'}</div>
                         <div style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", marginTop: '2px' }}>{f.label}</div>
+                      </div>
+                    ) : f.key === 'position' ? (
+                      <div>
+                        <div>{f.label}</div>
+                        <div style={{ fontSize: '11px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", marginTop: '2px', color: '#666' }}>{KH_LABELS.degree || 'សញ្ញាប័ត្រ'}</div>
+                        <div style={{ fontSize: '11px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", marginTop: '2px', color: '#666' }}>{KH_LABELS.Department_Kh || 'ផ្នែក'}</div>
+                      </div>
+                    ) : f.key === 'phone' ? (
+                      <div>
+                        <div>{f.label}</div>
+                        <div style={{ fontSize: '11px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", marginTop: '2px', color: '#666' }}>{KH_LABELS.nid || 'លេខអត្តសញ្ញាណ'}</div>
+                        <div style={{ fontSize: '11px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", marginTop: '2px', color: '#666' }}>{KH_LABELS.bankAccount || 'លេខគណនីធនាគារ'}</div>
+                      </div>
+                    ) : f.key === 'salaryLevel' ? (
+                      <div>
+                        <div>{f.label}</div>
+                        <div style={{ fontSize: '11px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", marginTop: '2px', color: '#666' }}>{KH_LABELS.salaryPromotionDate || 'ថ្ងៃឡើងកាំប្រាក់'}</div>
                       </div>
                     ) : f.key === 'nominationStartDate' ? (
                       <div>
@@ -1347,22 +1579,32 @@ export default function HRPage() {
             {pagedHR.map(hr => (
               <tr
                 key={hr._id}
-                draggable={perms.canEditHR}
-                onDragStart={e => handleDragStart(e, (hr._id || hr.id))}
                 onDragOver={e => handleDragOverRow(e, (hr._id || hr.id))}
                 onDrop={e => handleDropRow(e, (hr._id || hr.id))}
                 onDragEnd={() => { setDraggingId(null); setDragOverId(null); }}
+                className="hover:bg-blue-50/30 transition-colors"
                 style={{
-                  cursor: perms.canEditHR ? 'grab' : 'default',
                   background: dragOverId === (hr._id || hr.id) ? '#f0f9ff' : undefined,
-                  opacity: draggingId === (hr._id || hr.id) ? 0.7 : 1
+                  opacity: draggingId === (hr._id || hr.id) ? 0.5 : 1,
+                  userSelect: 'text'
                 }}
               >
                 {/* Action icons with gender below */}
                 <td className="border px-2 py-1 text-center" style={{ width: '80px', minWidth: '80px', maxWidth: '80px' }}>
-                  <div>
-                    <ActionIcons
-                      hr={hr}
+                  <div className="flex items-center gap-1 justify-center">
+                    {perms.canEditHR && (
+                      <div
+                        draggable
+                        onDragStart={e => handleDragStart(e, (hr._id || hr.id))}
+                        className="cursor-grab text-gray-400 hover:text-blue-600 transition-colors mr-1"
+                        title="អូសដើម្បីរៀបលំដាប់"
+                      >
+                        <MdDragIndicator className="w-5 h-5" />
+                      </div>
+                    )}
+                    <div className="flex flex-col items-center">
+                      <ActionIcons
+                        hr={hr}
                       openEditModal={() => openEditModal(hr)}
                       handleDelete={() => handleDelete(hr._id)}
                       handleRestore={() => handleRestore(hr._id)}
@@ -1370,9 +1612,32 @@ export default function HRPage() {
                       handleMoveUp={() => handleMoveUp(hr._id)}
                       handleMoveDown={() => handleMoveDown(hr._id)}
                       isSavingNo={noSavingId === (hr._id || hr.id)}
+                      onShowIdCard={() => {
+                        const data = { ...hr };
+                        if (!data.Department_En && data.Department_Kh) {
+                          const lookup = getDeptEn(data.Department_Kh);
+                          if (lookup && lookup !== data.Department_Kh) {
+                            data.Department_En = lookup;
+                          }
+                        }
+                        // Initialize Issue Date and Expiry Date if missing
+                        if (!data.issueDate) {
+                          data.issueDate = new Date().toISOString().split('T')[0];
+                        }
+                        if (!data.expiryDate) {
+                          const d = new Date(data.issueDate);
+                          d.setFullYear(d.getFullYear() + 2);
+                          data.expiryDate = d.toISOString().split('T')[0];
+                        }
+                        setCardData(data);
+                        setCardMode('view');
+                        setShowIdCard(true);
+                      }}
+
                     />
-                    <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '2px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}>
-                      {hr.gender === 'Male' ? 'ប្រុស' : hr.gender === 'Female' ? 'ស្រី' : hr.gender || ''}
+                      <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '2px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}>
+                        {hr.gender === 'Male' ? 'ប្រុស' : hr.gender === 'Female' ? 'ស្រី' : hr.gender || ''}
+                      </div>
                     </div>
                   </div>
                 </td>
@@ -1392,153 +1657,193 @@ export default function HRPage() {
                     </div>
                   )}
                 </td>
-                {allFields.filter(f => visibleFields.includes(f.key) && f.key !== 'officerType').map(f => {
+                {allFields.filter(f => visibleFields.includes(f.key) && !['officerType', 'dob', 'civilServantId', 'salaryPromotionDate', 'nid', 'bankAccount', 'degree', 'Department_Kh'].includes(f.key)).map(f => {
                   // Match cell widths to header widths - Fixed widths as requested
-                  let width = '80px'; // default width
-                  if (f.key === 'no') width = '30px';
-                  else if (f.key === 'khmerName') width = '120px';
+                  let width = '100px'; // default width
+                  if (f.key === 'no') width = '60px';
+                  else if (f.key === 'khmerName') width = '130px';
                   else if (f.key === 'dob') width = '90px';
-                  else if (f.key === 'officerType') width = '80px';
-                  else if (f.key === 'position') width = '150px';
-                  else if (f.key === 'skill') width = '100px';
+                  else if (f.key === 'position') width = '180px';
+                  else if (f.key === 'skill') width = '150px';
                   else if (f.key === 'joinDate') width = '90px';
-                  else if (f.key === 'salaryLevel') width = '60px';
-                  else if (f.key === 'phone') width = '80px';
-                  else if (f.key === 'birthPlace') width = '200px';
-                  
-                  else if (f.key === 'bloodGroup') width = '50px';
-                  else if (f.key === 'email') width = '100px';
-                  else if (f.key === 'nid') width = '120px';
-                  
+                  else if (f.key === 'salaryLevel') width = '70px';
+                  else if (f.key === 'officerType') width = '90px';
+                  else if (f.key === 'phone') width = '100px';
+                  else if (f.key === 'birthPlace') width = '220px';
+                  else if (f.key === 'bloodGroup') width = '70px';
+                  else if (f.key === 'email') width = '150px';
+                  else if (f.key === 'nid') width = '110px';
+
                   return (
-                    <td key={f.key} className="border px-2 py-1" style={{ 
-                      fontSize: '12px', 
-                      fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif", 
-                      width: width, 
-                      minWidth: width, 
-                      maxWidth: width, 
-                      wordWrap: 'break-word', 
+                    <td key={f.key} className="border px-2 py-1" style={{
+                      fontSize: '12px',
+                      fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif",
+                      width: width,
+                      minWidth: width,
+                      maxWidth: width,
+                      wordWrap: 'break-word',
                       overflow: 'hidden',
                       textAlign: f.key === 'no' ? 'center' : 'left'
                     }}>
                       {(() => {
-                      if (f.key === 'no') {
-                        // Display sequence number above staff ID
-                        return (
-                          <div>
-                            <div>{hr.no || ''}</div>
-                            <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '1px' }}>
-                              {hr.staffId || ''}
-                            </div>
-                          </div>
-                        );
-                      }
-                      if (f.key === 'khmerName') {
-                        // Display Khmer name above Latin name
-                        return (
-                          <div>
-                            <div>{hr.khmerName || ''}</div>
-                            <div style={{ fontSize: '10px', color: '#9b5403ff', marginTop: '1px', fontFamily: 'Times New Roman' }}>
-                              {hr.name || ''}
-                            </div>
-                          </div>
-                        );
-                      }
-                      if (f.key === 'birthPlace') {
-                        // Display birthPlace above currentPlace
-                        return (
-                          <div>
-                            <div>{hr.birthPlace || ''}</div>
-                            <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '1px' }}>
-                              {hr.currentPlace || ''}
-                            </div>
-                          </div>
-                        );
-                      }
-                      if (f.key === 'position') {
-                        // Display position above department
-                        return (
-                          <div>
-                            <div>{hr.position || ''}</div>
-                            <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '1px' }}>
-                              {hr.Department_Kh || ''}
-                            </div>
-                          </div>
-                        );
-                      }
-                      if (f.key === 'skill') {
-                        // Display officerType above skill
-                        return (
-                          <div>
-                            <div>{hr.officerType || ''}</div>
-                            <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '1px' }}>
-                              {hr.skill || ''}
-                            </div>
-                          </div>
-                        );
-                      }
-                      if (f.key === 'bloodGroup') {
-                        // Display maritalStatus above bloodGroup
-                        return (
-                          <div>
-                              <div>{toKhmerMaritalStatus(hr.maritalStatus)}</div>
-                            <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '1px' }}>
-                              {hr.bloodGroup || ''}
-                            </div>
-                          </div>
-                        );
-                      }
-                      if (f.key === 'nominationStartDate') {
-                        // Display civilServantStartDate above nominationStartDate (both dates)
-                        return (
-                          <div>
-                            <div>{formatDate(hr.civilServantStartDate) || ''}</div>
-                            <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '1px' }}>
-                              {formatDate(hr.nominationStartDate) || ''}
-                            </div>
-                          </div>
-                        );
-                      }
-                      if (f.key === 'skill') {
-                        // Display officerType above skill
-                        return (
-                          <div>
-                            <div>{hr.officerType || ''}</div>
-                            <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '1px' }}>
-                              {hr.skill || ''}
-                            </div>
-                          </div>
-                        );
-                      }
-                      if (f.key === 'salaryPromotionDate') {
-                        return (
-                          <div>
-                            <div>{formatDate(hr.salaryPromotionDate) || ''}</div>
-                            <div style={{ fontSize: '11px', color: '#9b5403ff', marginTop: '4px' }}>{hr.salaryPromotionBy || ''}</div>
-                          </div>
-                        );
-                      }
-                      if (f.key === 'resignDocument') {
-                        if (!hr.resignDocument) return '';
-                        const doc = hr.resignDocument;
-                        const isData = typeof doc === 'string' && doc.startsWith('data:');
-                        if (isData) {
+                        if (f.key === 'no') {
+                          // Display sequence number above staff ID
                           return (
-                            <button onClick={() => openDataUrl(doc)} type="button" className="text-blue-600 underline text-sm bg-transparent border-0 p-0">មើលឯកសារ</button>
+                            <div>
+                              <input
+                                type="number"
+                                className={`w-full text-center border-0 bg-transparent p-0 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded ${noSavingId === hr._id ? 'opacity-50 pointer-events-none' : ''}`}
+                                defaultValue={hr.no || ''}
+                                key={hr.no}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleNoChange(hr._id, e.target.value);
+                                    e.target.blur();
+                                  }
+                                }}
+                                style={{
+                                  fontSize: 'inherit',
+                                  fontFamily: 'inherit',
+                                  fontWeight: 'inherit',
+                                  color: 'inherit'
+                                }}
+                              />
+                              <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '1px' }}>
+                                {hr.staffId || ''}
+                              </div>
+                            </div>
                           );
                         }
-                        return (
-                          <a href={doc} target="_blank" rel="noreferrer" className="text-blue-600 underline text-sm">មើលឯកសារ</a>
-                        );
-                      }
-                      if (dateKeys.includes(f.key)) return formatDate(hr[f.key]);
-                      if (f.key === 'gender') {
-                        return hr.gender === 'Male' ? 'ប្រុស' : hr.gender === 'Female' ? 'ស្រី' : hr.gender;
-                      }
-                      
-                      return hr[f.key];
-                    })()}
-                  </td>
+                        if (f.key === 'khmerName') {
+                          // Display Khmer name above Latin name
+                          return (
+                            <div>
+                              <div style={{ fontWeight: 'bold' }}>{hr.khmerName || ''}</div>
+                              <div style={{ fontSize: '11px', color: '#1e40af', marginTop: '1px', fontFamily: 'Times New Roman' }}>
+                                {hr.name || '—'}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#b91c1c', marginTop: '1px' }}>
+                                {hr.dob ? new Date(hr.dob).toLocaleDateString('km-KH', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                              </div>
+                            </div>
+                          );
+                        }
+                        if (f.key === 'birthPlace') {
+                          // Display birthPlace above currentPlace
+                          return (
+                            <div>
+                              <div>{hr.birthPlace || ''}</div>
+                              <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '1px' }}>
+                                {hr.currentPlace || ''}
+                              </div>
+                            </div>
+                          );
+                        }
+                        if (f.key === 'position') {
+                          // Display position above department
+                          return (
+                            <div>
+                              <div style={{ fontWeight: 'bold' }}>{hr.position || '—'}</div>
+                              <div style={{ fontSize: '11px', color: '#7c3aed', marginTop: '1px' }}>
+                                {hr.degree || '—'}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#9b5403ff', marginTop: '1px' }}>
+                                {hr.Department_Kh || '—'}
+                              </div>
+                            </div>
+                          );
+                        }
+                        if (f.key === 'skill') {
+                          // Display officerType above skill
+                          return (
+                            <div>
+                              <div>{hr.officerType || '—'}</div>
+                              <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '1px' }}>
+                                {hr.skill || '—'}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#03419bff', marginTop: '1px' }}>
+                                {hr.civilServantId || '—'}
+                              </div>
+                            </div>
+                          );
+                        }
+                        if (f.key === 'bloodGroup') {
+                          // Display maritalStatus above bloodGroup
+                          return (
+                            <div>
+                              <div>{toKhmerMaritalStatus(hr.maritalStatus)}</div>
+                              <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '1px' }}>
+                                {hr.bloodGroup || ''}
+                              </div>
+                            </div>
+                          );
+                        }
+                        if (f.key === 'phone') {
+                          return (
+                            <div>
+                              <div>{hr.phone || '—'}</div>
+                              <div style={{ fontSize: '11px', color: '#1e40af', marginTop: '1px' }}>
+                                {hr.nid || '—'}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#047857', marginTop: '1px' }}>
+                                {hr.bankAccount || '—'}
+                              </div>
+                            </div>
+                          );
+                        }
+                        if (f.key === 'salaryLevel') {
+                          return (
+                            <div>
+                              <div>{hr.salaryLevel || '—'}</div>
+                              <div style={{ fontSize: '11px', color: '#047857', marginTop: '1px' }}>
+                                {hr.salaryPromotionDate ? new Date(hr.salaryPromotionDate).toLocaleDateString('km-KH', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                              </div>
+                              <div style={{ fontSize: '10px', color: '#9b5403ff', marginTop: '1px' }}>
+                                {hr.salaryPromotionBy || '—'}
+                              </div>
+                            </div>
+                          );
+                        }
+                        if (f.key === 'nominationStartDate') {
+                          // Display civilServantStartDate above nominationStartDate (both dates)
+                          return (
+                            <div>
+                              <div>{formatDate(hr.civilServantStartDate) || ''}</div>
+                              <div style={{ fontSize: '12px', color: '#9b5403ff', marginTop: '1px' }}>
+                                {formatDate(hr.nominationStartDate) || ''}
+                              </div>
+                            </div>
+                          );
+                        }
+                        if (f.key === 'salaryPromotionDate') {
+                          return (
+                            <div>
+                              <div>{formatDate(hr.salaryPromotionDate) || ''}</div>
+                              <div style={{ fontSize: '11px', color: '#9b5403ff', marginTop: '4px' }}>{hr.salaryPromotionBy || ''}</div>
+                            </div>
+                          );
+                        }
+                        if (f.key === 'resignDocument') {
+                          if (!hr.resignDocument) return '';
+                          const doc = hr.resignDocument;
+                          const isData = typeof doc === 'string' && doc.startsWith('data:');
+                          if (isData) {
+                            return (
+                              <button onClick={() => openDataUrl(doc)} type="button" className="text-blue-600 underline text-sm bg-transparent border-0 p-0">មើលឯកសារ</button>
+                            );
+                          }
+                          return (
+                            <a href={doc} target="_blank" rel="noreferrer" className="text-blue-600 underline text-sm">មើលឯកសារ</a>
+                          );
+                        }
+                        if (dateKeys.includes(f.key)) return formatDate(hr[f.key]);
+                        if (f.key === 'gender') {
+                          return hr.gender === 'Male' ? 'ប្រុស' : hr.gender === 'Female' ? 'ស្រី' : hr.gender;
+                        }
+
+                        return hr[f.key];
+                      })()}
+                    </td>
                   );
                 })}
               </tr>
@@ -1556,21 +1861,33 @@ export default function HRPage() {
       {/* Pagination */}
       <div className="flex justify-center items-center mt-4 gap-2">
         <button
+          onClick={() => setPage(1)}
+          disabled={page === 1}
+          className={`px-3 py-1 border rounded ${page === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}
+          style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}
+        >ដំបូង</button>
+        <button
           onClick={() => setPage(page - 1)}
           disabled={page === 1}
           className={`px-3 py-1 border rounded ${page === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}
           style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}
-        >Prev</button>
+        >មុន</button>
         <span className="px-4 py-1 rounded bg-blue-600 text-white font-bold" style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}>ទំព័រ {page} / {totalPages}</span>
         <button
           onClick={() => setPage(page + 1)}
           disabled={page === totalPages}
           className={`px-3 py-1 border rounded ${page === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}
           style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}
-        >Next</button>
+        >បន្ទាប់</button>
+        <button
+          onClick={() => setPage(totalPages)}
+          disabled={page === totalPages}
+          className={`px-3 py-1 border rounded ${page === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}
+          style={{ fontSize: '12px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}
+        >ចុងក្រោយ</button>
       </div>
-      {/* Modal Add & Edit moved to StaftPage */}
-      <StaftPage
+      {/* Modal Add & Edit moved to StaffModal */}
+      <StaffModal
         showAddModal={showAddModal}
         showEditModal={showEditModal}
         newHR={newHR}
@@ -1606,30 +1923,30 @@ export default function HRPage() {
             </div>
             <div className="mb-4">
               <label className="block text-sm text-gray-700 mb-1" style={{ fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}>កាលបរិច្ឆេទលាលែង</label>
-              <input 
-                type="date" 
-                value={resignDate} 
-                onChange={e => setResignDate(e.target.value)} 
-                className="w-full border rounded px-2 py-1" 
+              <input
+                type="date"
+                value={resignDate}
+                onChange={e => setResignDate(e.target.value)}
+                className="w-full border rounded px-2 py-1"
                 style={{ fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}
               />
             </div>
             <div className="mb-4">
               <label className="block text-sm text-gray-700 mb-1" style={{ fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}>មូលហេតុ *</label>
-              <textarea 
-                value={resignReason} 
-                onChange={e => setResignReason(e.target.value)} 
-                className="w-full border rounded px-2 py-1 h-20" 
+              <textarea
+                value={resignReason}
+                onChange={e => setResignReason(e.target.value)}
+                className="w-full border rounded px-2 py-1 h-20"
                 placeholder="បញ្ចូលមូលហេតុលាលែងការងារ..."
                 style={{ fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}
               />
             </div>
             <div className="mb-4">
               <label className="block text-sm text-gray-700 mb-1" style={{ fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}>បញ្ចូលឯកសារ</label>
-              <input 
-                type="file" 
-                onChange={handleResignDocumentUpload} 
-                className="w-full border rounded px-2 py-1" 
+              <input
+                type="file"
+                onChange={handleResignDocumentUpload}
+                className="w-full border rounded px-2 py-1"
                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                 style={{ fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}
               />
@@ -1640,15 +1957,15 @@ export default function HRPage() {
               )}
             </div>
             <div className="flex gap-2 justify-end">
-              <button 
-                onClick={closeResignModal} 
+              <button
+                onClick={closeResignModal}
                 className="px-4 py-2 border rounded"
                 style={{ fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}
               >
                 បោះបង់
               </button>
-              <button 
-                onClick={handleResign} 
+              <button
+                onClick={handleResign}
                 className="px-4 py-2 bg-yellow-600 text-white rounded"
                 style={{ fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}
               >
@@ -1658,11 +1975,947 @@ export default function HRPage() {
           </div>
         </div>
       )}
+
+
+      {/* ID Card Management Modal */}
+      {showIdCard && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-5xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                គ្រប់គ្រងកាតសម្គាល់បុគ្គលិក
+                <button
+                  onClick={() => setShowThemeSettings(true)}
+                  className="p-1 hover:bg-gray-100 rounded-full text-gray-500 hover:text-blue-600 transition-colors"
+                  title="ការកំណត់ព័ពណ៌កាត"
+                >
+                  <MdSettings className="w-6 h-6" />
+                </button>
+              </h3>
+              <div className="flex gap-4 items-center">
+                {cardMode === 'view' && (
+                  <button
+                    onClick={() => setHideCardContent(!hideCardContent)}
+                    className={`px-3 py-1 rounded-lg text-sm font-bold transition-all ${hideCardContent ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                    style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                  >
+                    {hideCardContent ? 'បង្ហាញខ្លឹមសារ' : 'លាក់ខ្លឹមសារដើម្បីមើល Background'}
+                  </button>
+                )}
+                <div className="flex gap-2">
+                  {cardMode === 'view' && (
+                    <button
+                      onClick={() => setCardMode('edit')}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
+                      style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                    >
+                      កែប្រែកាត
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => { setShowIdCard(false); setCardMode('view'); }}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Mode Display */}
+            <div className="mb-4">
+              <div className="flex gap-2">
+                <span className={`px-3 py-1 rounded text-sm ${cardMode === 'view' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}>
+                  មើលកាត
+                </span>
+                <span className={`px-3 py-1 rounded text-sm ${cardMode === 'edit' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-600'}`}>
+                  កែប្រែ
+                </span>
+              </div>
+            </div>
+
+            {cardMode === 'view' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Front Side */}
+                <div className="relative">
+                  <h4 className="text-lg font-semibold mb-3 text-center text-blue-600" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                    ផ្ទៃមុខ
+                  </h4>
+                  <div
+                    id="id-card-front"
+                    className="w-full border-2 border-gray-300 rounded-lg overflow-hidden shadow-lg relative"
+                    style={{
+                      aspectRatio: '1.6/1',
+                      backgroundColor: '#ffffff',
+                      backgroundImage: isMaskedCard
+                        ? 'none'
+                        : 'url("./Uploads/IDCADEA.jpg?v=' + Date.now() + '"), linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat',
+                      filter: 'brightness(1) contrast(1)',
+                      '--tw-brightness': 'brightness(1)'
+                    }}
+                  >
+                    {/* Background Mask for D/S/W/P cards - Layered at z-10 */}
+                    {isMaskedCard && (
+                      <div
+                        className="absolute inset-0 z-10 pointer-events-none select-none"
+                        style={{
+                          backgroundImage: `url("${getCardMask()}")`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          backgroundRepeat: 'no-repeat'
+                        }}
+                      />
+                    )}
+                    <div className={`${isMaskedCard ? 'bg-transparent border-b-0' : `bg-white border-b-4 ${getCardThemeColor('border')}`} px-4 py-2 text-center relative z-20 transition-opacity duration-300 pointer-events-none ${hideCardContent ? 'opacity-0' : 'opacity-100'}`}>
+                      <div className="flex items-center justify-between gap-2 pointer-events-none">
+                        {/* MOH Logo on left - Hidden for masked cards */}
+                        <div className={`w-12 h-12 flex items-center justify-center ${isMaskedCard ? 'opacity-0' : 'pointer-events-auto'}`}>
+                          <img
+                            src="./Uploads/MOH_logo.png"
+                            alt="MOH Logo"
+                            className="w-10 h-10 object-contain"
+                          />
+                        </div>
+
+                        {/* Center content */}
+                        <div className="flex-1 pointer-events-auto text-center pr-12">
+                        </div>
+
+                        {/* KSFH Logo on right - Hidden for masked cards */}
+                        <div className={`w-19 h-19 flex items-center justify-center ${isMaskedCard ? 'opacity-0' : 'pointer-events-auto'}`}>
+                          <img
+                            src="./Uploads/Logo_KSFH-Short.png"
+                            alt="KSFH Logo"
+                            className="w-14 h-14 object-contain"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Removed overlay for masked cards to keep it bright */}
+                    {!isMaskedCard && <div className="absolute inset-0 bg-black bg-opacity-10 rounded-lg"></div>}
+
+                    {/* Photo Container moved out to be truly behind the mask for masked cards */}
+                    {isMaskedCard && (
+                      <div
+                        className={`absolute overflow-hidden shadow-md group rounded-full z-5 cursor-move transition-opacity duration-300 pointer-events-auto ${hideCardContent ? 'opacity-0' : 'opacity-100'}`}
+                        style={{
+                          top: photoTransform.y + 'px',
+                          left: photoTransform.x + 'px',
+                          width: photoTransform.w + 'px',
+                          height: photoTransform.h + 'px',
+                          backgroundColor: '#e5e7eb',
+                          border: '2px solid white'
+                        }}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setIsDraggingPhoto(true);
+                          setDragStartPos({ x: e.clientX, y: e.clientY });
+                          setInitialTransform(photoTransform);
+                        }}
+                      >
+                        {cardData.image ? (
+                          <img src={cardData.image} alt="Staff" className="w-full h-full object-cover pointer-events-none" />
+                        ) : (
+                          <div className="w-full h-full bg-gray-300 flex items-center justify-center pointer-events-none">
+                            <span className="text-gray-500 text-xs">រូបភាព</span>
+                          </div>
+                        )}
+
+                        {/* Resize handle in new position */}
+                        {!hideCardContent && (
+                          <div
+                            className="absolute bottom-1 right-1 w-6 h-6 bg-blue-600 rounded-full border-2 border-white cursor-se-resize z-30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center shadow-lg hover:scale-110 active:scale-95"
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              setIsResizingPhoto(true);
+                              setDragStartPos({ x: e.clientX, y: e.clientY });
+                              setInitialTransform(photoTransform);
+                            }}
+                          >
+                            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className={`relative p-4 text-blue-900 z-20 transition-opacity duration-300 pointer-events-none ${hideCardContent ? 'opacity-0' : 'opacity-100'}`} style={{ height: 'calc(100% - 70px)' }}>
+                      <div className="flex gap-4 h-full relative pointer-events-none">
+                        {/* Photo Container for Non-Masked cards */}
+                        {!isMaskedCard && (
+                          <div className="bg-gray-200 border-2 border-white overflow-hidden shadow-md flex-shrink-0 w-20 h-24 rounded pointer-events-auto">
+                            {cardData.image ? (
+                              <img src={cardData.image} alt="Staff" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full bg-gray-300 flex items-center justify-center">
+                                <span className="text-gray-500 text-xs">រូបភាព</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Info Content - Positioned carefully to not block photo dragging on masked cards */}
+                        <div 
+                          className={`flex flex-col pointer-events-auto select-text ${isMaskedCard ? 'absolute' : 'flex-1'} ${ (cardData.Department_Kh?.length > 30 || cardData.skill?.length > 20) ? 'justify-start' : 'justify-center' }`}
+                          style={isMaskedCard ? { 
+                            left: (cardData.Department_Kh?.length > 30 || cardData.skill?.length > 20) ? '100px' : '130px', 
+                            right: '2px', 
+                            top: (cardData.Department_Kh?.length > 30 || cardData.skill?.length > 20) ? '-5px' : '0px',
+                            bottom: '0px'
+                          } : {}}
+                        >
+                          <div className="flex flex-col select-text" style={{ fontFamily: "'Khmer OS MUOL LIGHT', sans-serif", gap: '4px' }}>
+                            <div className="flex select-text leading-[2] py-0.5 items-start">
+                              <span className="text-[14px] flex-shrink-0 select-text whitespace-nowrap" style={{ width: '130px' }}>គោត្តនាម និងនាម</span>
+                              <span className="text-[14px] flex-shrink-0 mr-1 select-text">:</span>
+                              <span className="text-[14px] flex-1 select-text truncate">{cardData.khmerName}</span>
+                            </div>
+
+                            <div className="flex select-text leading-[2] py-0.5 items-start">
+                              <span className="text-[14px] flex-shrink-0 select-text whitespace-nowrap" style={{ width: '130px' }}>មន្រ្តី</span>
+                              <span className="text-[14px] flex-shrink-0 mr-1 select-text">:</span>
+                              <span className="text-[14px] flex-1 select-text truncate">
+                                {cardData.officerType === 'កម្មករកិច្ចសន្យា' ? 'កិច្ចសន្យាមន្ទីរពេទ្យ' : cardData.officerType}
+                              </span>
+                            </div>
+
+                            <div className="flex select-text leading-[2] py-0.5 items-start">
+                              <span className="text-[14px] flex-shrink-0 select-text whitespace-nowrap" style={{ width: '130px' }}>អត្តលេខមន្រ្តី</span>
+                              <span className="text-[14px] flex-shrink-0 mr-1 select-text">:</span>
+                              <span className="text-[16px] flex-1 select-text truncate font-bold" style={{ fontFamily: "'Times New Roman', serif" }}>{cardData.staffId}</span>
+                            </div>
+
+                            <div className="flex select-text leading-[2] py-0.5 items-start">
+                              {/* Automatic toggle: if skill is in master list, show it. Otherwise show position. */}
+                              {skills.some(s => s.skills_Kh === cardData.skill) ? (
+                                <>
+                                  <span className="text-[14px] flex-shrink-0 select-text whitespace-nowrap" style={{ width: '130px' }}>ជំនាញបច្ចេកទេស</span>
+                                  <span className="text-[14px] flex-shrink-0 mr-1 select-text">:</span>
+                                  <span 
+                                    className="flex-1 select-text truncate"
+                                    style={{ 
+                                      fontSize: (cardData.skill?.length > 40) ? '11px' : 
+                                                (cardData.skill?.length > 35) ? '12px' : 
+                                                (cardData.skill?.length > 30) ? '12.5px' : 
+                                                (cardData.skill?.length > 25) ? '13px' : 
+                                                (cardData.skill?.length > 20) ? '13.5px' : '14px' 
+                                    }}
+                                  >
+                                    {cardData.skill}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-[14px] flex-shrink-0 select-text whitespace-nowrap" style={{ width: '130px' }}>តួនាទី</span>
+                                  <span className="text-[14px] flex-shrink-0 mr-1 select-text">:</span>
+                                  <span 
+                                    className="flex-1 select-text truncate"
+                                    style={{ 
+                                      fontSize: (cardData.position?.length > 40) ? '11px' : 
+                                                (cardData.position?.length > 35) ? '12px' : 
+                                                (cardData.position?.length > 30) ? '12.5px' : 
+                                                (cardData.position?.length > 25) ? '13px' : 
+                                                (cardData.position?.length > 20) ? '13.5px' : '14px' 
+                                    }}
+                                  >
+                                    {cardData.position}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+
+                            <div className="flex select-text leading-[2] py-0.5 items-start">
+                              <span className="text-[14px] flex-shrink-0 select-text whitespace-nowrap" style={{ width: '130px' }}>បម្រើការនៅ</span>
+                              <span className="text-[14px] flex-shrink-0 mr-1 select-text">:</span>
+                              <span
+                                className="select-text"
+                                style={{
+                                  fontSize: '14px',
+                                  flex: 1,
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  lineHeight: '2',
+                                  paddingTop: '2px'
+                                }}
+                              >
+                                {cardData.Department_Kh}
+                              </span>
+                            </div>
+                          </div>
+
+
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Back Side */}
+                <div className="relative">
+                  <h4 className="text-lg font-semibold mb-3 text-center text-blue-600" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                    ផ្ទៃក្រោយ
+                  </h4>
+                    <div
+                      id="id-card-back"
+                      className="w-full border-2 border-gray-300 rounded-lg overflow-hidden shadow-lg relative flex flex-col items-center"
+                      style={{
+                        aspectRatio: '1.6/1',
+                        backgroundColor: '#ffffff',
+                        backgroundImage: 'url("./Uploads/CardB.png")',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat'
+                      }}
+                    >
+                      {/* Top colored bar containing Department En - Positioned to match front card's red line */}
+                      <div 
+                        className={`absolute w-full ${getCardThemeColor('bg')} py-1 px-4 text-center z-10 shadow-sm flex items-center justify-center`}
+                        style={{ top: '78px', minHeight: '32px' }}
+                      >
+                        <p 
+                          className="text-white text-[17px] font-bold uppercase tracking-wider" 
+                          style={{ 
+                            fontFamily: "'Times New Roman', serif", 
+                            lineHeight: '1.1',
+                            wordBreak: 'break-word'
+                          }}
+                        >
+                          {cardData.Department_En || getDeptEn(cardData.Department_Kh)}
+                        </p>
+                      </div>
+
+                      <div className="flex-1 w-full relative z-20">
+                        {/* Name centered between QR code and stamp */}
+                        <div className="absolute flex flex-col items-center justify-center" style={{ top: '175px', left: '100px', right: '130px' }}>
+                          <h3 
+                            className="font-bold text-blue-900 tracking-tight uppercase text-center truncate w-full" 
+                            style={{ 
+                              fontFamily: "'Times New Roman', serif",
+                              fontSize: (cardData.name?.length > 20) ? '15px' : (cardData.name?.length > 15) ? '18px' : '21px'
+                            }}
+                          >
+                            {cardData.name || 'FULL NAME'}
+                          </h3>
+                        </div>
+                        
+                        {/* Expiry Date on the left, under QR code */}
+                        <div className="absolute flex flex-col items-center text-center" style={{ left: '1px', top: '150px', width: '130px' }}>
+                          <QRCodeSVG 
+                            value={`${window.location.origin}/v/${cardData.staffId || cardData._id}`}
+                            size={90}
+                            level="H"
+                            imageSettings={{
+                              src: qrLogo,
+                              x: undefined,
+                              y: undefined,
+                              height: 24,
+                              width: 24,
+                              excavate: true,
+                            }}
+                            className="mb-2 bg-white p-1 rounded shadow-sm"
+                          />
+                          {((cardData.officerType || '').includes('កិច្ចសន្យា') && !(cardData.officerType || '').includes('រដ្ឋ')) && (
+                            <>
+                              <p className="text-[10px] text-blue-600 uppercase font-bold tracking-tight mb-0.5" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif", whiteSpace: 'nowrap' }}>
+                                ថ្ងៃផុតកំណត់ / Expiry Date
+                              </p>
+                              <p className="text-[16px] text-red-600 font-bold" style={{ fontFamily: "'Times New Roman', serif" }}>
+                                {cardData.expiryDate ? (() => {
+                                  const d = new Date(cardData.expiryDate);
+                                  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+                                  return `${String(d.getDate()).padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
+                                })() : '31-DEC-2026'}
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                </div>
+              </div>
+            )}
+
+            {(cardMode === 'create' || cardMode === 'edit') && (
+              <div className="space-y-6">
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                  <p className="text-yellow-800" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                    {cardMode === 'create' ? 'បង្កើតកាតសម្គាល់បុគ្គលិកថ្មី' : 'កែប្រែព័ត៌មានកាតសម្គាល់បុគ្គលិក'}
+                  </p>
+                </div>
+
+                {/* Card Data Form */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                      គោត្តនាម និងនាម (ខ្មែរ)
+                    </label>
+                    <input
+                      type="text"
+                      value={cardData.khmerName || ''}
+                      onChange={(e) => setCardData({ ...cardData, khmerName: e.target.value })}
+                      className="w-full border rounded px-3 py-2"
+                      style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                      ឈ្មោះ (ឡាតាំង)
+                    </label>
+                    <input
+                      type="text"
+                      value={cardData.name || ''}
+                      onChange={(e) => setCardData({ ...cardData, name: e.target.value })}
+                      className="w-full border rounded px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                      លេខបុគ្គលិក
+                    </label>
+                    <input
+                      type="text"
+                      value={cardData.staffId || ''}
+                      onChange={(e) => setCardData({ ...cardData, staffId: e.target.value })}
+                      className="w-full border rounded px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                      តួនាទី
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={cardData.position || ''}
+                        onChange={(e) => setCardData({ ...cardData, position: e.target.value })}
+                        className="flex-1 border rounded px-3 py-2"
+                        style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                      ជំនាញ (បច្ចេកទេស)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={cardData.skill || ''}
+                        onChange={(e) => setCardData({ ...cardData, skill: e.target.value })}
+                        className="flex-1 border rounded px-3 py-2"
+                        style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                      ផ្នែកការងារ (ខ្មែរ)
+                    </label>
+                    <input
+                      type="text"
+                      value={cardData.Department_Kh || ''}
+                      onChange={(e) => {
+                        const khVal = e.target.value;
+                        const enVal = getDeptEn(khVal);
+                        setCardData({ 
+                          ...cardData, 
+                          Department_Kh: khVal,
+                          Department_En: enVal !== 'DEPARTMENT NAME' ? enVal : '' 
+                        });
+                      }}
+                      className="w-full border rounded px-3 py-2"
+                      style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                      ផ្នែកការងារ (អង់គ្លេស)
+                    </label>
+                    <input
+                      type="text"
+                      value={cardData.Department_En || ''}
+                      onChange={(e) => setCardData({ ...cardData, Department_En: e.target.value })}
+                      className="w-full border rounded px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                      ថ្ងៃចេញកាត / Issue Date
+                    </label>
+                    <input
+                      type="date"
+                      value={cardData.issueDate ? (cardData.issueDate.includes('T') ? cardData.issueDate.split('T')[0] : cardData.issueDate) : ''}
+                      onChange={(e) => {
+                        const newIssueDate = e.target.value;
+                        let newExpiry = '';
+                        if (newIssueDate) {
+                          const d = new Date(newIssueDate);
+                          d.setFullYear(d.getFullYear() + 2);
+                          newExpiry = d.toISOString().split('T')[0];
+                        }
+                        setCardData({ ...cardData, issueDate: newIssueDate, expiryDate: newExpiry });
+                      }}
+                      className="w-full border rounded px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                      ថ្ងៃផុតកំណត់ (អូតូ២ឆ្នាំ)
+                    </label>
+                    <input
+                      type="date"
+                      value={cardData.expiryDate || ''}
+                      onChange={(e) => setCardData({ ...cardData, expiryDate: e.target.value })}
+                      className="w-full border rounded px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                </div>
+
+                {/* Preview Button */}
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => setCardMode('view')}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
+                    style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                  >
+                    មើលកាតមុនបោះពុម្ព
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 mt-6 justify-center">
+              {cardMode === 'view' && (
+                <div className="flex gap-2">
+                  <input 
+                    type="file" 
+                    ref={qrLogoInputRef} 
+                    onChange={handleQrLogoChange} 
+                    accept="image/*" 
+                    className="hidden" 
+                  />
+                  <button 
+                    onClick={() => qrLogoInputRef.current.click()}
+                    className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2"
+                    style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                  >
+                    <i className="fas fa-image"></i> ប្តូរ Logo
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      const link = `${window.location.origin}/v/${cardData.staffId || cardData._id}`;
+                      navigator.clipboard.writeText(link);
+                      alert(`បានចម្លងតំណភ្ជាប់៖ ${link}`);
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2"
+                    style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                  >
+                    <i className="fas fa-link"></i> ចម្លងតំណភ្ជាប់ (Copy Link)
+                  </button>
+                  <button
+                    onClick={() => {
+                      const printContent = document.getElementById('id-card-front');
+                      if (!printContent) return;
+                      
+                      const w = printContent.offsetWidth;
+                      const h = printContent.offsetHeight;
+                      const targetWidthPx = 86 * 3.7795275591;
+                      const scale = targetWidthPx / w;
+
+                      // Extract all styles
+                      const styles = Array.from(document.styleSheets)
+                        .map(s => { try { return Array.from(s.cssRules).map(r => r.cssText).join(''); } catch(e) { return ''; } })
+                        .join('');
+                      
+                      const iframe = document.createElement('iframe');
+                      iframe.style.position = 'fixed';
+                      iframe.style.right = '0';
+                      iframe.style.bottom = '0';
+                      iframe.style.width = '0';
+                      iframe.style.height = '0';
+                      iframe.style.border = '0';
+                      document.body.appendChild(iframe);
+                      
+                      const baseUrl = window.location.origin;
+                      let contentHtml = printContent.outerHTML;
+                      contentHtml = contentHtml.replace(/url\("\.\//g, `url("${baseUrl}/`);
+                      contentHtml = contentHtml.replace(/src="\.\//g, `src="${baseUrl}/`);
+                      contentHtml = contentHtml.replace(/truncate/g, '');
+
+                      const iDoc = iframe.contentDocument || iframe.contentWindow.document;
+                      iDoc.open();
+                      iDoc.write(`
+                        <html>
+                          <head>
+                            <style>
+                              ${styles}
+                              @page { size: 86mm 54mm; margin: 0; }
+                              html, body { margin: 0; padding: 0; width: 86mm; height: 54mm; overflow: hidden; background: white; }
+                              .print-wrapper { width: 86mm; height: 54mm; position: relative; overflow: hidden; }
+                              #id-card-front { 
+                                transform: scale(${scale}); 
+                                transform-origin: top left; 
+                                border: none !important; 
+                                box-shadow: none !important; 
+                                margin: 0 !important;
+                                width: ${w}px !important;
+                                height: ${h}px !important;
+                                position: absolute;
+                                top: 0;
+                                left: 0;
+                              }
+                              * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                            </style>
+                          </head>
+                          <body>
+                            <div class="print-wrapper">${contentHtml}</div>
+                          </body>
+                        </html>
+                      `);
+                      iDoc.close();
+                      
+                      setTimeout(() => {
+                        try {
+                          iframe.contentWindow.focus();
+                          iframe.contentWindow.print();
+                        } finally {
+                          setTimeout(() => document.body.removeChild(iframe), 500);
+                        }
+                      }, 500);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2"
+                    style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                  >
+                    <i className="fas fa-print"></i> ព្រីនផ្ទៃមុខ (Front)
+                  </button>
+                  <button
+                    onClick={() => {
+                      const printContent = document.getElementById('id-card-back');
+                      if (!printContent) return;
+                      
+                      const w = printContent.offsetWidth;
+                      const h = printContent.offsetHeight;
+                      const targetWidthPx = 86 * 3.7795275591;
+                      const scale = targetWidthPx / w;
+
+                      // Extract all styles
+                      const styles = Array.from(document.styleSheets)
+                        .map(s => { try { return Array.from(s.cssRules).map(r => r.cssText).join(''); } catch(e) { return ''; } })
+                        .join('');
+                      
+                      const iframe = document.createElement('iframe');
+                      iframe.style.position = 'fixed';
+                      iframe.style.right = '0';
+                      iframe.style.bottom = '0';
+                      iframe.style.width = '0';
+                      iframe.style.height = '0';
+                      iframe.style.border = '0';
+                      document.body.appendChild(iframe);
+                      
+                      const baseUrl = window.location.origin;
+                      let contentHtml = printContent.outerHTML;
+                      contentHtml = contentHtml.replace(/url\("\.\//g, `url("${baseUrl}/`);
+                      contentHtml = contentHtml.replace(/src="\.\//g, `src="${baseUrl}/`);
+                      contentHtml = contentHtml.replace(/truncate/g, '');
+
+                      const iDoc = iframe.contentDocument || iframe.contentWindow.document;
+                      iDoc.open();
+                      iDoc.write(`
+                        <html>
+                          <head>
+                            <style>
+                              ${styles}
+                              @page { size: 86mm 54mm; margin: 0; }
+                              html, body { margin: 0; padding: 0; width: 86mm; height: 54mm; overflow: hidden; background: white; }
+                              .print-wrapper { width: 86mm; height: 54mm; position: relative; overflow: hidden; }
+                              #id-card-back { 
+                                transform: scale(${scale}); 
+                                transform-origin: top left; 
+                                border: none !important; 
+                                box-shadow: none !important; 
+                                margin: 0 !important;
+                                width: ${w}px !important;
+                                height: ${h}px !important;
+                                position: absolute;
+                                top: 0;
+                                left: 0;
+                              }
+                              * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                            </style>
+                          </head>
+                          <body>
+                            <div class="print-wrapper">${contentHtml}</div>
+                          </body>
+                        </html>
+                      `);
+                      iDoc.close();
+                      
+                      setTimeout(() => {
+                        try {
+                          iframe.contentWindow.focus();
+                          iframe.contentWindow.print();
+                        } finally {
+                          setTimeout(() => document.body.removeChild(iframe), 500);
+                        }
+                      }, 500);
+                    }}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2"
+                    style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                  >
+                    <i className="fas fa-print"></i> ព្រីនផ្ទៃក្រោយ (Back)
+                  </button>
+                </div>
+              )}
+              {(cardMode === 'create' || cardMode === 'edit') && (
+                <button
+                  onClick={() => {
+                    // Save card data logic here
+                    alert('រក្សាទុកទិន្នន័យកាតបានជោគជ័យ!');
+                    setCardMode('view');
+                  }}
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium"
+                  style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                >
+                  រក្សាទុក
+                </button>
+              )}
+              <button
+                onClick={() => { setShowIdCard(false); setCardMode('view'); }}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium"
+                style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+              >
+                បិទ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Card Theme Settings Modal - Modern UI */}
+      {showThemeSettings && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in duration-300 border border-gray-100">
+            {/* Gradient Header */}
+            <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-600 p-5 flex justify-between items-center relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <MdSettings className="w-24 h-24 text-white" />
+              </div>
+              <div className="relative z-10 flex items-center gap-3">
+                <div className="bg-white bg-opacity-20 p-2 rounded-lg backdrop-blur-md">
+                  <MdSettings className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h4 className="text-white text-xl font-bold leading-tight" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                    ការកំណត់ព័ពណ៌កាត
+                  </h4>
+                  <p className="text-blue-100 text-xs opacity-80" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                    គ្រប់គ្រងការបង្ហាញពណ៌តាម ជំនាញ និង តួនាទី
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowThemeSettings(false)} 
+                className="relative z-10 text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-full transition-all"
+              >
+                <MdClose className="w-6 h-6" />
+              </button>
+            </div>
+            
+            {/* Search and Tabs Container */}
+            <div className="bg-gray-50 border-b p-4">
+              <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+                {/* Modern Tabs */}
+                <div className="flex bg-gray-200 p-1 rounded-xl w-full md:w-auto">
+                  <button
+                    onClick={() => { setThemeSettingsTab('skills'); setThemeSettingsSearch(''); }}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition-all ${themeSettingsTab === 'skills' ? 'bg-white text-blue-600 shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
+                    style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                  >
+                    <MdHistoryEdu className="w-5 h-5" />
+                    <span>ជំនាញបច្ចេកទេស</span>
+                  </button>
+                  <button
+                    onClick={() => { setThemeSettingsTab('positions'); setThemeSettingsSearch(''); }}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition-all ${themeSettingsTab === 'positions' ? 'bg-white text-red-600 shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
+                    style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                  >
+                    <MdBusinessCenter className="w-5 h-5" />
+                    <span>តួនាទីដឹកនាំ</span>
+                  </button>
+                </div>
+
+                {/* Search Input */}
+                <div className="relative w-full md:w-64">
+                  <input
+                    type="text"
+                    placeholder="ស្វែងរកទីនេះ..."
+                    value={themeSettingsSearch}
+                    onChange={(e) => setThemeSettingsSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                    style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                  />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <MdVisibility className="w-5 h-5" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 max-h-[55vh] overflow-y-auto bg-white">
+              {themeSettingsTab === 'skills' ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 bg-green-50 p-3 rounded-lg border border-green-100" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    ជំនាញដែលបានជ្រើសរើសនឹងបង្ហាញកាតពណ៌ <span className="text-green-700 font-bold px-2 py-0.5 bg-green-100 rounded">បៃតង</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {filterOptions.skills
+                      .sort((a, b) => {
+                        const aIsTech = skills.some(s => s.skills_Kh === a);
+                        const bIsTech = skills.some(s => s.skills_Kh === b);
+                        if (aIsTech === bIsTech) return a.localeCompare(b);
+                        return aIsTech ? -1 : 1;
+                      })
+                      .filter(s => s.toLowerCase().includes(themeSettingsSearch.toLowerCase()))
+                      .map(skillName => {
+                        const isTech = skills.some(s => s.skills_Kh === skillName);
+                        return (
+                          <div key={skillName} className={`group flex items-center justify-between p-4 border rounded-2xl transition-all duration-300 ${isTech ? 'bg-green-50 border-green-200 shadow-sm' : 'hover:border-blue-200 hover:bg-blue-50/30'}`}>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isTech ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                                <MdHistoryEdu className="w-6 h-6" />
+                              </div>
+                              <span className={`font-bold ${isTech ? 'text-green-900' : 'text-gray-700'}`} style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>{skillName}</span>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                setIsProcessingSkill(true);
+                                try {
+                                  if (!isTech) {
+                                    let nextIdNum = 1;
+                                    if (Array.isArray(skills) && skills.length > 0) {
+                                      const ids = skills.map(s => Number(s.skills_Id || s.ID_skills || 0)).filter(n => !isNaN(n));
+                                      if (ids.length > 0) nextIdNum = Math.max(...ids) + 1;
+                                    }
+                                    if (nextIdNum <= 0) nextIdNum = Date.now();
+                                    
+                                    const nextId = String(nextIdNum);
+                                    await skillAPI.createSkill({ 
+                                      ID_skills: nextId,
+                                      skills_Id: nextId,
+                                      skills_Kh: skillName, 
+                                      skills_En: skillName 
+                                    });
+                                  } else {
+                                    const toDel = skills.find(s => s.skills_Kh === skillName);
+                                    if (toDel) await skillAPI.deleteSkill(toDel._id);
+                                  }
+                                  const res = await skillAPI.getSkills();
+                                  setSkills(Array.isArray(res.data) ? res.data : (res || []));
+                                } catch (e) { console.error(e); }
+                                finally { setIsProcessingSkill(false); }
+                              }}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all transform active:scale-95 ${isTech ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-white text-gray-400 border border-gray-200 hover:bg-gray-50 hover:text-blue-600'}`}
+                              style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                            >
+                              {isTech ? 'ពណ៌បៃតង' : 'ពណ៌ខៀវ'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 bg-red-50 p-3 rounded-lg border border-red-100" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                    តួនាទីដែលបានជ្រើសរើសនឹងបង្ហាញកាតពណ៌ <span className="text-red-700 font-bold px-2 py-0.5 bg-red-100 rounded">ក្រហម</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {filterOptions.positions
+                      .sort((a, b) => {
+                        const aIsLead = leadershipPositions.includes(a);
+                        const bIsLead = leadershipPositions.includes(b);
+                        if (aIsLead === bIsLead) return a.localeCompare(b);
+                        return aIsLead ? -1 : 1;
+                      })
+                      .filter(p => p.toLowerCase().includes(themeSettingsSearch.toLowerCase()))
+                      .map(posName => {
+                        const isLead = leadershipPositions.includes(posName);
+                        return (
+                          <div key={posName} className={`group flex items-center justify-between p-4 border rounded-2xl transition-all duration-300 ${isLead ? 'bg-red-50 border-red-200 shadow-sm' : 'hover:border-blue-200 hover:bg-blue-50/30'}`}>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isLead ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-400'}`}>
+                                <MdBusinessCenter className="w-6 h-6" />
+                              </div>
+                              <span className={`font-bold ${isLead ? 'text-red-900' : 'text-gray-700'}`} style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>{posName}</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                if (isLead) {
+                                  setLeadershipPositions(leadershipPositions.filter(p => p !== posName));
+                                } else {
+                                  setLeadershipPositions([...leadershipPositions, posName]);
+                                }
+                              }}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all transform active:scale-95 ${isLead ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-white text-gray-400 border border-gray-200 hover:bg-gray-50 hover:text-blue-600'}`}
+                              style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                            >
+                              {isLead ? 'ពណ៌ក្រហម' : 'ពណ៌ខៀវ'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Premium Footer */}
+            <div className="p-5 bg-gray-50 border-t flex flex-col md:flex-row justify-between items-center gap-4">
+              <button
+                onClick={handleResetAllToBlue}
+                disabled={isProcessingSkill}
+                className="text-red-500 hover:text-red-700 font-bold text-sm underline transition-colors"
+                style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+              >
+                {isProcessingSkill ? 'កំពុងដំណើរការ...' : 'កំណត់ទាំងអស់ជាពណ៌ខៀវវិញ'}
+              </button>
+              <div className="flex items-center gap-4">
+                <div className="text-xs text-gray-400" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
+                  * ការផ្លាស់ប្ដូរនឹងត្រូវបានអនុវត្តចំពោះកាតទាំងអស់ជាសកល
+                </div>
+                <button
+                  onClick={() => setShowThemeSettings(false)}
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-10 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-200 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+                  style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
+                >
+                  យល់ព្រម និង រួចរាល់
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function ActionIcons({ hr, openEditModal, handleDelete, handleRestore, openResignModal, handleMoveUp, handleMoveDown, isSavingNo }) {
+function ActionIcons({ hr, openEditModal, handleDelete, handleRestore, openResignModal, handleMoveUp, handleMoveDown, isSavingNo, onShowIdCard }) {
+  const navigate = useNavigate();
   const perms = usePermission();
   // Generate Word (.doc) file from staff info
   function generateWord(hr) {
@@ -1678,7 +2931,7 @@ function ActionIcons({ hr, openEditModal, handleDelete, handleRestore, openResig
       <table style='width:100%;border-collapse:collapse;font-size:16px;margin-bottom:24px;'>${rows}</table>
       <div style='display:flex;justify-content:space-between;margin-top:32px;font-size:12px;color:#888;'>
         <span>បង្កើតដោយ HR System</span>
-        <span>${new Date().toLocaleDateString('km-KH',{year:'numeric',month:'2-digit',day:'2-digit'})}</span>
+        <span>${new Date().toLocaleDateString('km-KH', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span>
       </div>
     </body></html>`;
     const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
@@ -1691,14 +2944,11 @@ function ActionIcons({ hr, openEditModal, handleDelete, handleRestore, openResig
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
+  const iconsRef = React.useRef(null);
   const [showIcons, setShowIcons] = React.useState(false);
   const [isNewBadge, setIsNewBadge] = React.useState(false);
-  const [showReport, setShowReport] = React.useState(false);
   const [showView, setShowView] = React.useState(false);
-  const [showIdCard, setShowIdCard] = React.useState(false);
-  const [cardMode, setCardMode] = React.useState('view'); // 'view' | 'create' | 'edit'
-  const [cardData, setCardData] = React.useState({});
-  const iconsRef = React.useRef(null);
+  const [showReport, setShowReport] = React.useState(false);
   const [reportHR, setReportHR] = React.useState(null);
 
   // Hide action icons when clicking outside
@@ -1732,7 +2982,7 @@ function ActionIcons({ hr, openEditModal, handleDelete, handleRestore, openResig
 
   // Generate a simple MS Word (.doc) file from HR data (HTML inside .doc)
   async function viewAsWord(hrData) {
-    
+
 
     // Helper: convert image URL/Response to data URI (base64). Returns null on failure.
     async function toDataUrl(url) {
@@ -1811,17 +3061,17 @@ function ActionIcons({ hr, openEditModal, handleDelete, handleRestore, openResig
               localStorage.setItem(`lastSeenLetter_${id}`, String(ts));
               setIsNewBadge(false);
             }
-          } catch (e) {}
+          } catch (e) { }
           setShowIcons(v => !v);
         }}
         title="Show Actions"
       >
         {/* Main grid icon */}
         <span className="w-4 h-4 flex items-center justify-center">
-          <svg width="15" height="15" fill="white"><rect x="2" y="2" width="4" height="4"/><rect x="10" y="2" width="4" height="4"/><rect x="2" y="10" width="4" height="4"/><rect x="10" y="10" width="4" height="4"/></svg>
+          <svg width="15" height="15" fill="white"><rect x="2" y="2" width="4" height="4" /><rect x="10" y="2" width="4" height="4" /><rect x="2" y="10" width="4" height="4" /><rect x="10" y="10" width="4" height="4" /></svg>
         </span>
       </button>
-      {isNewBadge && (
+      {isNewBadge && !isSavingNo && (
         <span title="ថ្មី" style={{ position: 'absolute', top: -8, right: -8, display: 'inline-block' }}>
           <span style={{
             display: 'inline-block',
@@ -1858,32 +3108,38 @@ function ActionIcons({ hr, openEditModal, handleDelete, handleRestore, openResig
               </button>
             </div>
           )}
-          <button title="View" onClick={() => setShowView(true)} className="w-6 h-6 flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 text-white">
-            <MdVisibility className="w-4 h-4" />
-          </button>
+          {perms.isAdmin && (
+            <button title="View" onClick={() => setShowView(true)} className="w-6 h-6 flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 text-white">
+              <MdVisibility className="w-4 h-4" />
+            </button>
+          )}
           {perms.canPrintHR && (
-          <button title="Report" onClick={() => { setReportHR(hr); setShowReport(true); }} className="w-6 h-6 flex items-center justify-center rounded bg-orange-500 hover:bg-orange-600 text-white">
-            <MdDescription className="w-4 h-4" />
-          </button>
+            <button title="Report" onClick={() => { setReportHR(hr); setShowReport(true); }} className="w-6 h-6 flex items-center justify-center rounded bg-orange-500 hover:bg-orange-600 text-white">
+              <MdDescription className="w-4 h-4" />
+            </button>
           )}
           {perms.canEditHR && (
-          <button title="Edit" onClick={openEditModal} className="w-6 h-6 flex items-center justify-center rounded bg-green-600 hover:bg-green-700 text-white">
-            <MdEdit className="w-4 h-4" />
-          </button>
+            <button title="Edit" onClick={openEditModal} className="w-6 h-6 flex items-center justify-center rounded bg-green-600 hover:bg-green-700 text-white">
+              <MdEdit className="w-4 h-4" />
+            </button>
           )}
-          <button title="Profile" className="w-6 h-6 flex items-center justify-center rounded bg-gray-500 hover:bg-gray-600 text-white">
-            <MdPerson className="w-4 h-4" />
-          </button>
-          <button title="ID Card" onClick={() => { 
-            setCardData(hr); 
-            setCardMode('view'); 
-            setShowIdCard(true); 
-          }} className="w-6 h-6 flex items-center justify-center rounded bg-purple-600 hover:bg-purple-700 text-white">
-            <MdCreditCard className="w-4 h-4" />
-          </button>
+          {perms.isAdmin && (
+            <button title="ប្រវត្តរូប" onClick={() => navigate(`/staff-biography/${hr._id || hr.id}`)} className="w-6 h-6 flex items-center justify-center rounded bg-teal-600 hover:bg-teal-700 text-white">
+              <MdHistoryEdu className="w-4 h-4" />
+            </button>
+          )}
+          {perms.isAdmin && (
+            <button title="Profile" className="w-6 h-6 flex items-center justify-center rounded bg-gray-500 hover:bg-gray-600 text-white">
+              <MdPerson className="w-4 h-4" />
+            </button>
+          )}
+          {perms.isAdmin && (
+            <button title="ID Card" onClick={onShowIdCard} className="w-6 h-6 flex items-center justify-center rounded bg-purple-600 hover:bg-purple-700 text-white">
+              <MdCreditCard className="w-4 h-4" />
+            </button>
+          )}
           {perms.canEditHR && hr && (hr.status === 'Deleted' || hr.status === 'Resigned') ? (
             <button title="Restore" onClick={handleRestore} className="w-6 h-6 flex items-center justify-center rounded bg-yellow-500 hover:bg-yellow-600 text-white">
-              {/* reuse MdAssignmentInd as a restore-style icon */}
               <MdAssignmentInd className="w-4 h-4" />
             </button>
           ) : (perms.canEditHR && (
@@ -1891,7 +3147,6 @@ function ActionIcons({ hr, openEditModal, handleDelete, handleRestore, openResig
               <MdDelete className="w-4 h-4" />
             </button>
           ))}
-          {/* Show Resign for Active records */}
           {perms.canEditHR && hr && hr.status === 'Active' && (
             <button title="Resign" onClick={openResignModal} className="w-6 h-6 flex items-center justify-center rounded bg-yellow-600 hover:bg-yellow-700 text-white">
               <MdExitToApp className="w-4 h-4" />
@@ -1902,475 +3157,40 @@ function ActionIcons({ hr, openEditModal, handleDelete, handleRestore, openResig
           </button>
         </div>
       )}
-      {/* Modal for staff view (all fields in Khmer) */}
       {showView && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded shadow-lg p-8 min-w-[800px] max-w-[95vw] max-h-[95vh] overflow-auto" style={{fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif", width: '800px'}}>
-            {/* Header */}
-            <div style={{textAlign:'center', marginBottom:'8px'}}>
-              <div style={{fontWeight:'bold', fontSize:'20px'}}>ព្រះរាជាណាចក្រកម្ពុជា</div>
-              <div style={{fontWeight:'bold', fontSize:'16px'}}>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
-              <div style={{borderBottom:'2px solid #222', width:'120px', margin:'8px auto 0'}}></div>
+          <div className="bg-white rounded shadow-lg p-8 min-w-[800px] max-w-[95vw] max-h-[95vh] overflow-auto" style={{ fontFamily: "'Khmer OS Siemreap', Arial, sans-serif", width: '800px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+              <div style={{ fontWeight: 'bold', fontSize: '20px' }}>ព្រះរាជាណាចក្រកម្ពុជា</div>
+              <div style={{ fontWeight: 'bold', fontSize: '16px' }}>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
+              <div style={{ borderBottom: '2px solid #222', width: '120px', margin: '8px auto 0' }}></div>
             </div>
-            <div style={{textAlign:'center', fontWeight:'bold', fontSize:'18px', margin:'16px 0 8px'}}>លិខិតបញ្ជាក់ព័ត៌មានបុគ្គលិក</div>
-            <div style={{textAlign:'center', fontWeight:'bold', fontSize:'16px', marginBottom:'24px'}}>សម្រាប់បុគ្គលិកអង្គភាព/ក្រុមហ៊ុន/ស្ថាប័ន</div>
-            {/* Main info row */}
-            <div style={{display:'flex', flexDirection:'row', alignItems:'flex-start', marginBottom:'16px'}}>
-              {/* Info table */}
-              <div style={{flex:'1 1 0%', paddingRight:'24px'}}>
-                <table style={{width:'100%', borderCollapse:'collapse', fontSize:'15px'}}>
+            <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '18px', margin: '16px 0 8px' }}>លិខិតបញ្ជាក់ព័ត៌មានបុគ្គលិក</div>
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', marginBottom: '16px' }}>
+              <div style={{ flex: '1 1 0%', paddingRight: '24px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '15px' }}>
                   <tbody>
-                    <tr>
-                      <td style={{padding:'4px 0', fontWeight:'bold', width:'120px'}}>ឈ្មោះ</td>
-                      <td style={{padding:'4px 0'}}>៖ {hr.khmerName || ''}</td>
-                      <td style={{padding:'4px 0', fontWeight:'bold', width:'60px'}}>ភេទ</td>
-                      <td style={{padding:'4px 0'}}>៖ {hr.gender === 'Male' ? 'ប្រុស' : hr.gender === 'Female' ? 'ស្រី' : hr.gender || ''}</td>
-                    </tr>
-                    <tr>
-                      <td style={{padding:'4px 0', fontWeight:'bold'}}>ថ្ងៃ ខែ ឆ្នាំ កំណើត</td>
-                      <td style={{padding:'4px 0'}}>៖ {hr.dob || ''}</td>
-                      <td style={{padding:'4px 0', fontWeight:'bold'}}>លេខកាត</td>
-                      <td style={{padding:'4px 0'}}>៖ {hr.staffId || ''}</td>
-                    </tr>
-                    <tr>
-                      <td style={{padding:'4px 0', fontWeight:'bold'}}>ទីកន្លែងកំណើត</td>
-                      <td style={{padding:'4px 0'}}>៖ {hr.birthPlace || ''}</td>
-                      <td style={{padding:'4px 0', fontWeight:'bold'}}>តួនាទី</td>
-                      <td style={{padding:'4px 0'}}>៖ {hr.position || ''}</td>
-                    </tr>
-                    <tr>
-                      <td style={{padding:'4px 0', fontWeight:'bold'}}>ផ្នែក</td>
-                      <td style={{padding:'4px 0'}}>៖ {hr.Department_Kh || ''}</td>
-                      <td style={{padding:'4px 0', fontWeight:'bold'}}>ទូរស័ព្ទ</td>
-                      <td style={{padding:'4px 0'}}>៖ {hr.phone || ''}</td>
-                    </tr>
-                    <tr>
-                      <td style={{padding:'4px 0', fontWeight:'bold'}}>អ៊ីមែល</td>
-                      <td style={{padding:'4px 0'}}>៖ {hr.email || ''}</td>
-                      <td style={{padding:'4px 0', fontWeight:'bold'}}>ស្ថានភាព</td>
-                      <td style={{padding:'4px 0'}}>៖ {hr.status || ''}</td>
-                    </tr>
+                    <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>ឈ្មោះ</td><td>៖ {hr.khmerName}</td></tr>
+                    <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>លេខកាត</td><td>៖ {hr.staffId}</td></tr>
+                    <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>តួនាទី</td><td>៖ {hr.position}</td></tr>
                   </tbody>
                 </table>
               </div>
-              {/* Photo box */}
-              <div style={{width:'140px', height:'160px', border:'1px solid #888', display:'flex', alignItems:'center', justifyContent:'center', marginLeft:'12px', fontSize:'18px', color:'#888', background:'#fafbfc'}}>
-                {hr.image ? (
-                  <img src={hr.image} alt="profile" style={{maxWidth:'100%', maxHeight:'100%', objectFit:'cover'}} />
-                ) : (
-                  <span>dx b</span>
-                )}
+              <div style={{ width: '140px', height: '160px', border: '1px solid #ccc' }}>
+                {hr.image && <img src={hr.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
               </div>
-            </div>
-            {/* Footer/notes */}
-            <div style={{marginTop:'32px', fontSize:'15px', color:'#222', minHeight:'40px'}}>
-              <div>កិច្ចការផ្សេងៗ៖ ...............................................................</div>
-              <div>...............................................................</div>
-            </div>
-            <div style={{marginTop:'32px', fontSize:'13px', color:'#444', textAlign:'left'}}>
-              <div>សូមអនុញ្ញាតឲ្យប្រើប្រាស់ព័ត៌មានខាងលើសម្រាប់បំពេញកិច្ចការផ្សេងៗតាមតម្រូវការរបស់អង្គភាព/ក្រុមហ៊ុន/ស្ថាប័ន។</div>
             </div>
             <div className="flex gap-2 mt-6">
               <button className="bg-blue-600 text-white px-4 py-2 rounded w-full" onClick={() => setShowView(false)}>បិទ</button>
-              <button className="bg-green-600 text-white px-4 py-2 rounded w-full" onClick={() => generateWord(hr)}>បង្កើត Word</button>
             </div>
           </div>
         </div>
       )}
-      {/* Modal for staff report using HRReportView */}
       {showReport && reportHR && (
-  <HRReportView hr={reportHR} onClose={() => { setShowReport(false); setReportHR(null); }} isApprover={perms.canApproveHR} />
+        <HRReportView hr={reportHR} onClose={() => { setShowReport(false); setReportHR(null); }} isApprover={perms.canApproveHR} />
       )}
-      
-      {/* ID Card Management Modal */}
-      {showIdCard && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-5xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-800" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                គ្រប់គ្រងកាតសម្គាល់បុគ្គលិក
-              </h3>
-              <div className="flex gap-2">
-                {cardMode === 'view' && (
-                  <button 
-                    onClick={() => setCardMode('create')}
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm"
-                    style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
-                  >
-                    បង្កើតកាតថ្មី
-                  </button>
-                )}
-                {cardMode === 'view' && (
-                  <button 
-                    onClick={() => setCardMode('edit')}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
-                    style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
-                  >
-                    កែប្រែកាត
-                  </button>
-                )}
-                <button 
-                  onClick={() => { setShowIdCard(false); setCardMode('view'); }} 
-                  className="text-gray-500 hover:text-gray-700 text-2xl"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-            
-            {/* Mode Display */}
-            <div className="mb-4">
-              <div className="flex gap-2">
-                <span className={`px-3 py-1 rounded text-sm ${cardMode === 'view' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}>
-                  មើលកាត
-                </span>
-                <span className={`px-3 py-1 rounded text-sm ${cardMode === 'create' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                  បង្កើតថ្មី
-                </span>
-                <span className={`px-3 py-1 rounded text-sm ${cardMode === 'edit' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-600'}`}>
-                  កែប្រែ
-                </span>
-              </div>
-            </div>
 
-            {cardMode === 'view' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Front Side */}
-                <div className="relative">
-                  <h4 className="text-lg font-semibold mb-3 text-center text-blue-600" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                    ផ្ទៃមុខ
-                  </h4>
-                  <div 
-                    className="w-full border-2 border-gray-300 rounded-lg overflow-hidden shadow-lg relative"
-                    style={{ 
-                      aspectRatio: '1.6/1', 
-                      backgroundColor: '#ffffff',
-                      backgroundImage: 'url("./Uploads/IDCADEA.jpg?v=' + Date.now() + '"), linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      backgroundRepeat: 'no-repeat',
-                      filter: 'brightness(1) contrast(1)',
-                      '--tw-brightness': 'brightness(1)'
-                    }}
-                  >
-                    <div className="bg-white px-4 py-2 text-center border-b-4 border-green-500">
-                      <div className="flex items-center justify-between gap-2">
-                        {/* MOH Logo on left */}
-                        <div className="w-12 h-12 flex items-center justify-center">
-                          <img 
-                            src="./Uploads/MOH_logo.png" 
-                            alt="MOH Logo" 
-                            className="w-10 h-10 object-contain"
-                          />
-                        </div>
-                        
-                        {/* Center content */}
-                        <div className="flex-1">
-                      
-                          <h5 className="text-sm font-NORMAL text-blue-900" style={{ fontFamily: "'Khmer OS MUOL LIGHT', sans-serif", marginTop: '2px', fontSize: '16px' }}>
-                            មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត
-                          </h5>
-                          <p className="text-xs text-blue-900" style={{ fontFamily: "'Khmer OS MUOL LIGHT', sans-serif", marginTop: '2px', fontSize: '15px' }}>
-                            បណ្ណសំគាល់បុគ្គលិក
-                          </p>
-                        </div>
 
-                        {/* KSFH Logo on right */}
-                        <div className="w-19 h-19 flex items-center justify-center">
-                          <img 
-                            src="./Uploads/Logo_KSFH-Short.png" 
-                            alt="KSFH Logo" 
-                            className="w-14 h-14 object-contain"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Overlay for better text readability */}
-                    <div className="absolute inset-0 bg-black bg-opacity-10 rounded-lg"></div>
-                    
-                    <div className="relative p-4 text-white">
-                      <div className="flex gap-4">
-                        <div className="w-20 h-24 bg-gray-200 rounded border-2 border-white overflow-hidden">
-                          {cardData.image ? (
-                            <img src={cardData.image} alt="Staff" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full bg-gray-300 flex items-center justify-center">
-                              <span className="text-gray-500 text-xs">រូបភាព</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex-1 space-y-1">
-                          <div>
-                            <span className="text-xs opacity-80">នាមត្រកូល និង នាម:</span>
-                            <p className="font-semibold" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                              {cardData.khmerName || 'មិនមាន'}
-                            </p>
-                          </div>
-                          <div>
-                            <span className="text-xs opacity-80">បុគ្គលិកលេខ:</span>
-                            <p className="font-bold text-lg text-yellow-300">{cardData.nid || cardData.staffId || '0000000000'}</p>
-                          </div>
-                          <div>
-                            <span className="text-xs opacity-80">បុគ្គលិកលេខកូដ:</span>
-                            <p className="font-semibold">{cardData.staffId || 'D0000'}</p>
-                          </div>
-                          <div>
-                            <span className="text-xs opacity-80">មុខតំណែង:</span>
-                            <p className="font-semibold" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                              {cardData.position || 'មិនបានបញ្ជាក់'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-3 bg-red-600 text-white px-3 py-1 rounded-full text-center">
-                        <span className="text-sm font-bold" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                          ផ្នែកការងារ: {cardData.Department_Kh || 'មិនបានបញ្ជាក់'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Back Side */}
-                <div className="relative">
-                  <h4 className="text-lg font-semibold mb-3 text-center text-blue-600" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                    ផ្ទៃក្រោយ
-                  </h4>
-                  <div 
-                    className="w-full border-2 border-gray-300 rounded-lg overflow-hidden shadow-lg relative"
-                    style={{ 
-                      aspectRatio: '1.6/1',
-                      backgroundColor: '#ffffff',
-                      backgroundImage: 'url(/Uploads/IDCADEB.jpg)',
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      backgroundRepeat: 'no-repeat'
-                    }}
-                  >
-                    {/* Header with logos */}
-                    <div className="bg-white px-9 py-2 text-center border-b-2 border-blue-500">
-                      <div className="flex items-center justify-between">
-                        {/* MOH Logo on left */}
-                        <div className="w-15 h-15 flex items-center justify-center">
-                          <img 
-                            src="./Uploads/MOH_logo.png" 
-                            alt="MOH Logo" 
-                            className="w-14 h-14 object-contain"
-                          />
-                        </div>
-                        
-                       
-
-                        {/* KSFH Logo on right */}
-                        <div className="w-8 h-8 flex items-center justify-center">
-                          <img 
-                            src="./Uploads/Logo_KSFH-Short.png" 
-                            alt="KSFH Logo" 
-                            className="w-6 h-6 object-contain"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Content overlay matching the image design */}
-                    <div className="absolute inset-0 flex flex-col" style={{ top: '60px' }}>
-                      {/* Top spacing */}
-                      <div className="flex-1"></div>
-                      
-                      {/* Main content area */}
-                      <div className="flex items-center justify-between px-4 pb-4">
-                        {/* QR Code on left */}
-                        <div className="w-20 h-20 bg-black flex items-center justify-center">
-                          <div className="w-16 h-16 bg-white flex items-center justify-center text-xs font-bold">
-                            QR
-                          </div>
-                        </div>
-                        
-                        {/* Center content */}
-                        <div className="flex-1 text-center mx-4">
-                          <h3 className="text-xl font-bold text-blue-800 mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                            {cardData.name || cardData.khmerName || 'KIET SOPHEN'}
-                          </h3>
-                        </div>
-                        
-
-                      </div>
-                      
-                      {/* Bottom section */}
-                      <div className="flex justify-between items-end px-4 pb-2">
-                        {/* Expiry date */}
-                        <div className="text-left">
-                          <p className="text-blue-800 font-bold text-sm">EXP: 31-12-2025</p>
-                        </div>
-                        
-                        {/* Department */}
-                        <div className="text-right">
-                          <p className="text-blue-800 font-bold text-sm" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                            {cardData.Department_KH || 'Unknown Department'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {(cardMode === 'create' || cardMode === 'edit') && (
-              <div className="space-y-6">
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-                  <p className="text-yellow-800" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                    {cardMode === 'create' ? 'បង្កើតកាតសម្គាល់បុគ្គលិកថ្មី' : 'កែប្រែព័ត៌មានកាតសម្គាល់បុគ្គលិក'}
-                  </p>
-                </div>
-                
-                {/* Card Data Form */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                      គោត្តនាម និងនាម (ខ្មែរ)
-                    </label>
-                    <input
-                      type="text"
-                      value={cardData.khmerName || ''}
-                      onChange={(e) => setCardData({...cardData, khmerName: e.target.value})}
-                      className="w-full border rounded px-3 py-2"
-                      style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                      ឈ្មោះ (ឡាតាំង)
-                    </label>
-                    <input
-                      type="text"
-                      value={cardData.name || ''}
-                      onChange={(e) => setCardData({...cardData, name: e.target.value})}
-                      className="w-full border rounded px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                      លេខបុគ្គលិក
-                    </label>
-                    <input
-                      type="text"
-                      value={cardData.staffId || ''}
-                      onChange={(e) => setCardData({...cardData, staffId: e.target.value})}
-                      className="w-full border rounded px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                      លេខអត្តសញ្ញាណ
-                    </label>
-                    <input
-                      type="text"
-                      value={cardData.nid || ''}
-                      onChange={(e) => setCardData({...cardData, nid: e.target.value})}
-                      className="w-full border rounded px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                      តួនាទី
-                    </label>
-                    <input
-                      type="text"
-                      value={cardData.position || ''}
-                      onChange={(e) => setCardData({...cardData, position: e.target.value})}
-                      className="w-full border rounded px-3 py-2"
-                      style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                      ផ្នែកការងារ
-                    </label>
-                    <input
-                      type="text"
-                      value={cardData.Department_Kh || ''}
-                      onChange={(e) => setCardData({...cardData, Department_Kh: e.target.value})}
-                      className="w-full border rounded px-3 py-2"
-                      style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                      ទូរស័ព្ទ
-                    </label>
-                    <input
-                      type="text"
-                      value={cardData.phone || ''}
-                      onChange={(e) => setCardData({...cardData, phone: e.target.value})}
-                      className="w-full border rounded px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1" style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}>
-                      អ៊ីមែល
-                    </label>
-                    <input
-                      type="email"
-                      value={cardData.email || ''}
-                      onChange={(e) => setCardData({...cardData, email: e.target.value})}
-                      className="w-full border rounded px-3 py-2"
-                    />
-                  </div>
-                </div>
-                
-                {/* Preview Button */}
-                <div className="flex justify-center">
-                  <button 
-                    onClick={() => setCardMode('view')}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
-                    style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
-                  >
-                    មើលកាតមុនបោះពុម្ព
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {/* Action Buttons */}
-            <div className="flex gap-3 mt-6 justify-center">
-              {cardMode === 'view' && (
-                <button 
-                  onClick={() => window.print()} 
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium"
-                  style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
-                >
-                  បោះពុម្ព
-                </button>
-              )}
-              {(cardMode === 'create' || cardMode === 'edit') && (
-                <button 
-                  onClick={() => {
-                    // Save card data logic here
-                    alert('រក្សាទុកទិន្នន័យកាតបានជោគជ័យ!');
-                    setCardMode('view');
-                  }}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium"
-                  style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
-                >
-                  រក្សាទុក
-                </button>
-              )}
-              <button 
-                onClick={() => { setShowIdCard(false); setCardMode('view'); }} 
-                className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium"
-                style={{ fontFamily: "'Khmer OS Siemreap', sans-serif" }}
-              >
-                បិទ
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -2,9 +2,13 @@ import mongoose from 'mongoose';
 
 const AttendanceSchema = new mongoose.Schema({
   staffId: { type: String, required: true, index: true },
+  staffName: { type: String },
   date: { type: Date, required: true, index: true },
   status: { type: String, enum: ['present','absent','leave','late','remote'], default: 'present' },
   service: { type: String },
+  leaveCount: { type: Number, default: 0 },
+  leaveType: { type: String },
+  leaveReason: { type: String },
   // Stored times: keep both 'inTime/outTime' (legacy) and 'checkIn/checkOut' used by frontend
   inTime: { type: String },
   outTime: { type: String },
@@ -27,6 +31,7 @@ const AttendanceSchema = new mongoose.Schema({
   scheduledGraceMinutes: { type: Number, default: 0 },
   scheduledEndGraceMinutes: { type: Number, default: 0 },
   notes: { type: String },
+  departmentKh: { type: String },
   createdAt: { type: Date, default: () => new Date() },
   updatedAt: { type: Date, default: () => new Date() }
 });
@@ -63,6 +68,7 @@ AttendanceSchema.statics.fieldLabels = {
   scheduledGraceMinutes: 'នាទីអនុស្សរណៈចាប់ផ្តើម',
   scheduledEndGraceMinutes: 'នាទីអនុស្សរណៈបញ្ចប់',
   notes: 'កំណត់សម្គាល់',
+  departmentKh: 'ផ្នែក (ពីក្នុងប្រព័ន្ធ)',
   createdAt: 'បង្កើតនៅ',
   updatedAt: 'ផ្លាស់ប្តូរថ្មី'
 };
@@ -97,5 +103,5 @@ AttendanceSchema.methods.getStatusLabel = function () {
 };
 // --- end additions ---
 
-// Use explicit collection name `addattendances` instead of the default pluralized name
-export default mongoose.model('Attendance', AttendanceSchema, 'addattendances');
+// Use standard collection name `attendances` (standard plural)
+export default mongoose.model('Attendance', AttendanceSchema, 'attendances');

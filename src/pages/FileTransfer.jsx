@@ -1,11 +1,24 @@
+// Helper to display number in table: pad 4 digits, Khmer digits supported, show N/A if empty or not a number
+function displayNumber(value) {
+  if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return 'N/A';
+  if (typeof value === 'string' && value.toUpperCase() === 'N/A') return 'N/A';
+  // Convert Khmer digits to Arabic
+  let v = value.toString().replace(/[០-៩]/g, d => '0123456789'['០១២៣៤៥៦៧៨៩'.indexOf(d)]);
+  // If it's a simple number, pad to 4 digits
+  if (/^\d+$/.test(v)) return v.padStart(4, '0');
+  // Otherwise return as is (e.g. "123/24")
+  return v;
+}
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import usePermission from '../hooks/usePermission';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { FaEdit, FaTrash, FaPaperPlane, FaReply, FaFileAlt } from 'react-icons/fa';
 import { API_BASE } from '../config';
+import ExcelJS from 'exceljs';
 import api from '../services/api';
-import { fetchFileTransfers, createFileTransfer, updateFileTransfer, deleteFileTransfer, getFileTransfer } from '../api/fileTransfer';
+import { fetchFileTransfers, createFileTransfer, updateFileTransfer, deleteFileTransfer, getFileTransfer,
+         fetchFileTransfersOut, createFileTransferOut, updateFileTransferOut, deleteFileTransferOut, getFileTransferOut } from '../api/fileTransfer';
 import { listScans, fetchScan, deleteScan as deleteScanApi, scanNow, listDevices } from '../api/scanner';
 
 const DEFAULT_RECIPIENT_DISPLAY = { state: 'pending', text: 'មិនទាន់មានការផ្ញើមតិ' };
@@ -66,7 +79,7 @@ const getLatestTelegramPreview = (rec) => {
       const last = tgLines[tgLines.length - 1];
       return { preview: last, count: tgLines.length };
     }
-  } catch (e) {}
+  } catch (e) { }
   return { preview: '-', count: 0 };
 };
 
@@ -109,7 +122,8 @@ const getCompletedStageInfo = (rec) => {
     const metaKey = STAGE_NOTE_KEYS[stageKey];
     if (!metaKey) continue;
     const note = meta[metaKey];
-    if (note && String(note).trim()) {
+    const isTicked = meta[`${metaKey}_ticked`];
+    if ((note && String(note).trim()) || isTicked) {
       return { stageKey, label: getStageLabel(rec, stageKey) };
     }
   }
@@ -128,11 +142,12 @@ const getWaitingStageKey = (rec) => {
     const stageToMetaKey = {
       S: 'CourseNote', S1: 'Course1Note', S2: 'Course2Note', SD: 'Course3Note', S3: 'Course3Note', SDR: 'Course4Note', S4: 'Course4Note', S5: 'Course5Note', DIR: 'Course5Note', SDIR: 'Course5Note', S6: 'Course6Note', HO: 'Course6Note'
     };
-    const order = ['S','S1','S2','SD','SDR','S3','S4','S5','S6'];
+    const order = ['S', 'S1', 'S2', 'SD', 'SDR', 'S3', 'S4', 'S5', 'S6'];
     for (const k of order) {
       const metaKey = stageToMetaKey[k];
       const metaVal = (meta && meta[metaKey]) || '';
-      if (String(metaVal || '').trim() === '') {
+      const isRecordTicked = meta && meta[`${metaKey}_ticked`];
+      if (String(metaVal || '').trim() === '' && !isRecordTicked) {
         const raw = normalizedStages[k];
         if (!raw) continue;
         return k;
@@ -185,12 +200,12 @@ const resolveStageSenderByKey = (rec, stageKey, signaturesMap) => {
 const isAllStagesCompleted = (rec) => {
   if (!rec) return false;
   const meta = rec.meta || {};
-  
+
   // Check if all required stages have notes/feedback
   const requiredStages = ['CourseNote', 'Course1Note', 'Course2Note', 'Course3Note', 'Course4Note', 'Course5Note', 'Course6Note'];
   let completedStages = 0;
   let totalAssignedStages = 0;
-  
+
   // Count assigned stages
   const stages = meta && meta.feedbackStages;
   if (stages && typeof stages === 'object') {
@@ -202,15 +217,16 @@ const isAllStagesCompleted = (rec) => {
       }
     });
   }
-  
-  // Count completed stages that have actual feedback content
+
+  // Count completed stages that have actual feedback content or are ticked
   requiredStages.forEach(metaKey => {
     const note = meta[metaKey];
-    if (note && String(note).trim()) {
+    const isTicked = meta[`${metaKey}_ticked`];
+    if ((note && String(note).trim()) || isTicked) {
       completedStages++;
     }
   });
-  
+
   // Document is considered complete if all assigned stages have feedback
   // or if we have at least 3 stages completed (minimum workflow)
   return totalAssignedStages > 0 ? completedStages >= totalAssignedStages : completedStages >= 3;
@@ -242,36 +258,42 @@ const sendCompletionReport = async (rec) => {
 export default function FileTransfer() {
   const { user: authUser } = useAuth();
   const currentCreatorName = authUser ? (authUser.fullName || authUser.name || authUser.email || authUser.username || '') : '';
-    // Department units state
-    const [departmentUnits, setDepartmentUnits] = useState([]);
+  const location = useLocation();
+  const isOutgoingPage = location && location.pathname && location.pathname.includes('/file-transfer-outgoing');
+  // Department units state
+  const [departmentUnits, setDepartmentUnits] = useState([]);
 
-    // Fetch department units from API
-    useEffect(() => {
-      fetch('/api/department-units')
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) setDepartmentUnits(data);
-          else if (Array.isArray(data?.units)) setDepartmentUnits(data.units);
-        })
-        .catch(() => setDepartmentUnits([]));
-    }, []);
+  // Fetch department units from API
+  useEffect(() => {
+    fetch('/api/department-units')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setDepartmentUnits(data);
+        else if (Array.isArray(data?.units)) setDepartmentUnits(data.units);
+      })
+      .catch(() => setDepartmentUnits([]));
+  }, []);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [selectedType, setSelectedType] = useState('ទាំងអស់');
+  const [selectedType, setSelectedType] = useState(() => (isOutgoingPage ? 'លិខិតចេញ' : 'ទាំងអស់'));
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [totalRows, setTotalRows] = useState(0);
-
-  const [showTelegramColumn, setShowTelegramColumn] = useState(() => {
+  const [pageSize, setPageSize] = useState(() => {
     try {
-      const raw = localStorage.getItem('fileTransfer.showTelegramColumn');
-      if (raw === null || raw === undefined) return true;
-      return raw !== '0';
+      const saved = localStorage.getItem('fileTransfer.pageSize');
+      return saved ? parseInt(saved) : 10;
     } catch (e) {
-      return true;
+      return 10;
     }
   });
+  const [totalRows, setTotalRows] = useState(0);
+
+  const [showTelegramColumn, setShowTelegramColumn] = useState(false);
+  const [showSourceColumn, setShowSourceColumn] = useState(true);
+  const [showQtyColumn, setShowQtyColumn] = useState(true);
+  const [showOthersColumn, setShowOthersColumn] = useState(true);
+
+
 
   const [showCreate, setShowCreate] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -291,7 +313,7 @@ export default function FileTransfer() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
   const previewTimeoutRef = useRef(null);
-  
+
   // Statistics state
   const [statusFilter, setStatusFilter] = useState(null); // null, 'completed', 'notCompleted', 'noFeedback'
   const [attachmentsModalOpen, setAttachmentsModalOpen] = useState(false);
@@ -304,10 +326,12 @@ export default function FileTransfer() {
   const [dateTarget, setDateTarget] = useState('entry');
   const videoRef = useRef(null);
   const [scannerFiles, setScannerFiles] = useState([]);
+  const [showSourceSuggestions, setShowSourceSuggestions] = useState(false);
   const [loadingScannerFiles, setLoadingScannerFiles] = useState(false);
   const [triggeringScan, setTriggeringScan] = useState(false);
   const [editingScan, setEditingScan] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+  const [editingRecord, setEditingRecord] = useState(null);
   const esRef = useRef(null);
   const [reviewMenuOpenFor, setReviewMenuOpenFor] = useState(null);
   const navigate = useNavigate();
@@ -331,13 +355,24 @@ export default function FileTransfer() {
   const [linkDates, setLinkDates] = useState(false);
 
   useEffect(() => {
-    try { localStorage.setItem('fileTransfer.showTelegramColumn', showTelegramColumn ? '1' : '0'); } catch (e) {}
+    try { localStorage.setItem('fileTransfer.showTelegramColumn', showTelegramColumn ? '1' : '0'); } catch (e) { }
   }, [showTelegramColumn]);
+
+  // Sync selectedType and reset page when path changes (between All and Outgoing)
+  useEffect(() => {
+    const isOutgoing = location && location.pathname && location.pathname.includes('/file-transfer-outgoing');
+    const defaultType = isOutgoing ? 'លិខិតចេញ' : 'ទាំងអស់';
+    
+    // Only update if it actually differs or path changed
+    setSelectedType(defaultType);
+    setPage(1);
+    setStatusFilter(null); // Reset status filter on navigation
+  }, [location.pathname]);
 
   // Auto-send completion reports when documents are fully completed
   useEffect(() => {
     if (!rows || rows.length === 0) return;
-    
+
     rows.forEach(async (row) => {
       try {
         if (isAllStagesCompleted(row)) {
@@ -346,12 +381,12 @@ export default function FileTransfer() {
           if (!reportSent) {
             console.log('Sending completion report for record:', row._id || row.id);
             const success = await sendCompletionReport(row);
-            
+
             if (success) {
               // Update local state to mark report as sent
-              setRows(prevRows => 
-                prevRows.map(r => 
-                  (r._id || r.id) === (row._id || row.id) 
+              setRows(prevRows =>
+                prevRows.map(r =>
+                  (r._id || r.id) === (row._id || row.id)
                     ? { ...r, meta: { ...r.meta, completionReportSent: true } }
                     : r
                 )
@@ -415,7 +450,7 @@ export default function FileTransfer() {
         const dt = parseToTime(dVal);
         if (!dt) return false;
         if (letterFromT && dt < letterFromT) return false;
-        if (letterToT && dt > (letterToT + 24*60*60*1000 - 1)) return false;
+        if (letterToT && dt > (letterToT + 24 * 60 * 60 * 1000 - 1)) return false;
       }
 
       // entry date filter (r.entryDate or r.entry_date)
@@ -424,7 +459,7 @@ export default function FileTransfer() {
         const et = parseToTime(eVal);
         if (!et) return false;
         if (entryFromT && et < entryFromT) return false;
-        if (entryToT && et > (entryToT + 24*60*60*1000 - 1)) return false;
+        if (entryToT && et > (entryToT + 24 * 60 * 60 * 1000 - 1)) return false;
       }
 
       return true;
@@ -435,11 +470,11 @@ export default function FileTransfer() {
   const filteredRows = useMemo(() => {
     // Apply status filter if active
     if (!statusFilter) return baseFilteredRows;
-    
+
     return baseFilteredRows.filter(row => {
       const wk = getWaitingStageKey(row);
       const completedStage = getCompletedStageInfo(row);
-      
+
       if (statusFilter === 'completed') {
         return !wk && completedStage;
       } else if (statusFilter === 'notCompleted') {
@@ -451,8 +486,16 @@ export default function FileTransfer() {
     });
   }, [baseFilteredRows, statusFilter]);
 
-  const canView = (perms && (perms.canViewFileTransfers || perms.canViewDocuments));
-  const canEdit = (perms && (perms.canEditFileTransfers || perms.canEditDocuments));
+  const canView = perms && (
+    isOutgoingPage
+      ? (perms.canViewFileTransfersOutgoing || perms.canViewDocuments)
+      : (perms.canViewFileTransfers || perms.canViewDocuments)
+  );
+  const canEdit = perms && (
+    isOutgoingPage
+      ? (perms.canEditFileTransfersOutgoing || perms.canEditDocuments)
+      : (perms.canEditFileTransfers || perms.canEditDocuments)
+  );
 
   // granular action permissions (roles may toggle these individually)
   const canDelete = perms && (perms.any ? perms.any('delete:fileTransfers', 'delete:documents', 'edit:fileTransfers') : canEdit);
@@ -483,7 +526,18 @@ export default function FileTransfer() {
     }
   };
 
-  const letterTypes = useMemo(() => (['សរុប', 'ទាំងអស់', 'លិខិតចូល', 'លិខិតចេញ', 'លិខិតចេញផ្ទៃក្នុង', 'លិខិតចូលការិយាល័យរដ្ឋបាល']), []);
+  const letterTypes = useMemo(() => {
+    const base = [
+      { value: 'លិខិតចេញ', label: 'លិខិតចេញ' },
+      { value: 'លិខិតចូល', label: 'លិខិតចូល' },
+      { value: 'លិខិតចេញផ្ទៃក្នុង', label: 'លិខិតចេញផ្ទៃក្នុង' },
+      { value: 'លិខិតចូលAdmin', label: 'លិខិតចូលAdmin' }
+    ];
+    if (isOutgoingPage) {
+      return base.filter(t => t.value === 'លិខិតចេញ' || t.value === 'លិខិតចេញផ្ទៃក្នុង' || t.value === 'លិខិតចូល');
+    }
+    return [{ value: 'ទាំងអស់', label: 'ទាំងអស់' }, ...base];
+  }, [isOutgoingPage]);
 
   useEffect(() => { setPage(1); }, [selectedType, statusFilter]);
 
@@ -492,7 +546,8 @@ export default function FileTransfer() {
     const load = async () => {
       setLoading(true); setError(null);
       try {
-        const data = await fetchFileTransfers(selectedType, page, pageSize);
+        const fetchFn = isOutgoingPage ? fetchFileTransfersOut : fetchFileTransfers;
+        const data = await fetchFn(selectedType, page, pageSize);
         if (!mounted) return;
         const items = Array.isArray(data) ? data : (data.items || []);
         setRows(items);
@@ -503,7 +558,7 @@ export default function FileTransfer() {
     };
     load();
     return () => { mounted = false; };
-  }, [selectedType, page, pageSize]);
+  }, [selectedType, page, pageSize, location.pathname]);
 
   const parseDateToISO = (v) => {
     if (!v) return '';
@@ -516,7 +571,7 @@ export default function FileTransfer() {
     }
     if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
     const d = new Date(v);
-    if (!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
     return v;
   };
 
@@ -570,6 +625,116 @@ export default function FileTransfer() {
     }
   };
 
+  const handleExportExcel = async () => {
+    if (!filteredRows || filteredRows.length === 0) {
+      alert('គ្មានទិន្នន័យដើម្បីទាញយក');
+      return;
+    }
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('FileTransfers');
+
+      // Define columns
+      worksheet.columns = [
+        { header: 'ល.រ', key: 'no', width: 8 },
+        { header: 'ប្រភេទលិខិត', key: 'type', width: 25 },
+        { header: 'លេខលិខិត', key: 'letterNo', width: 25 },
+        { header: 'កាលបរិច្ឆេទលិខិត', key: 'date', width: 20 },
+        { header: 'លេខចូល', key: 'entryNo', width: 15 },
+        { header: 'កាលបរិច្ឆេទចូល', key: 'entryDate', width: 20 },
+        { header: 'ប្រភពឯកសារ', key: 'source', width: 30 },
+        { header: 'ចំនួន', key: 'qty', width: 10 },
+        { header: 'ខ្លឹមសារ', key: 'content', width: 50 },
+        { header: 'ផ្សេងៗ', key: 'others', width: 30 },
+        { header: 'អ្នកទទួលបន្ទុក', key: 'recipient', width: 35 },
+        { header: 'តំណភ្ជាប់', key: 'link', width: 40 }
+      ];
+
+      // Add rows
+      filteredRows.forEach((r, index) => {
+        const idKey = (r && (r._id || r.id)) || `idx-${index}`;
+        const curDisplay = (recipientDisplays && recipientDisplays[idKey]) || DEFAULT_RECIPIENT_DISPLAY;
+        const recipientText = curDisplay.state === 'completed'
+          ? `រួចរាល់ · ${curDisplay.text}`
+          : (curDisplay.state === 'waiting' ? `រង់ចាំ · ${curDisplay.text}` : curDisplay.text);
+
+        worksheet.addRow({
+          no: index + 1,
+          type: r.type || r.title || '-',
+          letterNo: r.letterNo ?? r.letter_no ?? '-',
+          date: r.date ? formatISOToDisplay(r.date) : '-',
+          entryNo: r.entryNo ?? r.entry_no ?? '-',
+          entryDate: r.entryDate ? formatISOToDisplay(r.entryDate) : '-',
+          source: r.source ?? r.origin ?? '-',
+          qty: r.qty ?? r.count ?? '-',
+          content: r.content ?? r.description ?? '-',
+          others: stripTelegramLinesFromOthers(r.others || r.notes) || '-',
+          recipient: recipientText
+        });
+
+        // Add hyperlink if attachments exist
+        const lastRow = worksheet.lastRow;
+        if (r.attachments && r.attachments.length > 0) {
+          const fileName = r.attachments[0];
+          const fileUrl = `${API_BASE.replace('/api', '')}/Uploads/${fileName}`;
+          lastRow.getCell('link').value = {
+            text: 'ចុចទីនេះដើម្បីមើល',
+            hyperlink: fileUrl,
+            tooltip: 'Click to view file'
+          };
+          lastRow.getCell('link').font = { underline: true, color: { argb: 'FF0000FF' } };
+        } else {
+          lastRow.getCell('link').value = '-';
+        }
+      });
+
+      // Apply styling to all cells (font & border)
+      worksheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell) => {
+          cell.font = {
+            name: 'Khmer OS Siemreap',
+            size: 12
+          };
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+          // Alignment for better look
+          cell.alignment = {
+            vertical: 'middle',
+            horizontal: rowNumber === 1 ? 'center' : 'left',
+            wrapText: true
+          };
+          // Header formatting
+          if (rowNumber === 1) {
+            cell.font.bold = true;
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFE0E0E0' }
+            };
+          }
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      const fileName = `FileTransfer_Report_${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}.xlsx`;
+      anchor.download = fileName;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export Excel failed', err);
+      alert('មិនអាចទាញយក Excel បានទេ');
+    }
+  };
+
   const saveRowToMissions = (row) => {
     try {
       const recordId = row?._id ?? row?.id ?? null;
@@ -585,18 +750,18 @@ export default function FileTransfer() {
         if (!v) return '';
         if (v.includes('/')) {
           const parts = v.split('/').map(p => p.trim());
-          if (parts.length === 3) return `${parts[2].padStart(4,'0')}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+          if (parts.length === 3) return `${parts[2].padStart(4, '0')}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
         }
         if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
         const d = new Date(v);
-        if (!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+        if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
         return '';
       };
 
       const letterDate = parseDateToISO(String(row?.date ?? row?.created_at ?? row?.createdAt ?? '').trim());
       const sourceDoc = String(row?.source ?? row?.origin ?? '').trim();
       let referenceDoc = '';
-      try { const list = (Array.isArray(row?.attachments) && row.attachments.length) ? row.attachments.map(String) : (row?.attachments || ''); referenceDoc = Array.isArray(list) ? list.join('\n') : String(list || ''); } catch {}
+      try { const list = (Array.isArray(row?.attachments) && row.attachments.length) ? row.attachments.map(String) : (row?.attachments || ''); referenceDoc = Array.isArray(list) ? list.join('\n') : String(list || ''); } catch { }
       const content = String(row?.content ?? row?.description ?? '').trim();
       const others = stripTelegramLinesFromOthers(row?.others ?? row?.notes ?? '');
 
@@ -624,7 +789,7 @@ export default function FileTransfer() {
 
       saveMissionsToStorage([newMission, ...cur]);
       // Notify other parts of the app that missions changed
-      try { window.dispatchEvent(new Event('missions-updated')); } catch (e) {}
+      try { window.dispatchEvent(new Event('missions-updated')); } catch (e) { }
 
       // Open missions page in Word/modal mode with prefill so user can edit details
       try {
@@ -670,10 +835,10 @@ export default function FileTransfer() {
         if (!v) return '';
         if (v.includes('/')) {
           const parts = v.split('/').map(p => p.trim());
-          if (parts.length === 3) return `${parts[2].padStart(4,'0')}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+          if (parts.length === 3) return `${parts[2].padStart(4, '0')}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
         }
         if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-        try { const d = new Date(v); if (!isNaN(d.getTime())) return d.toISOString().slice(0,10); } catch(e) {}
+        try { const d = new Date(v); if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10); } catch (e) { }
         return '';
       };
       const letterDate = parseDateToISO_local(String(rec?.date ?? rec?.created_at ?? rec?.createdAt ?? '').trim());
@@ -703,7 +868,7 @@ export default function FileTransfer() {
       };
 
       saveMissionsToStorage([newMission, ...cur]);
-      try { window.dispatchEvent(new Event('missions-updated')); } catch (e) {}
+      try { window.dispatchEvent(new Event('missions-updated')); } catch (e) { }
 
       try {
         if (typeof navigate === 'function') {
@@ -722,7 +887,7 @@ export default function FileTransfer() {
             },
           });
         }
-      } catch (e) {}
+      } catch (e) { }
 
       window.alert('បានរក្សាទុកទៅ Missions');
     } catch (e) {
@@ -779,7 +944,25 @@ export default function FileTransfer() {
 
   const formatISOToDisplay = (iso) => {
     if (!iso) return '';
-    try { const d = new Date(iso); if (isNaN(d.getTime())) return iso; return d.toLocaleDateString('en-GB'); } catch (e) { return iso; }
+    // Accepts ISO, dd/mm/yyyy, dd/mm/yyyy hh:mm, dd-mm-yyyy, etc.
+    // Always returns dd/mm/yyyy
+    let d, m, y;
+    // dd/mm/yyyy or dd/mm/yyyy ...
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(iso)) {
+      [d, m, y] = iso.split(/[\/\s:]/);
+      return `${d}/${m}/${y}`;
+    }
+    // yyyy-mm-dd or yyyy-mm-dd ...
+    if (/^\d{4}-\d{2}-\d{2}/.test(iso)) {
+      [y, m, d] = iso.split(/[-T\s:]/);
+      return `${d}/${m}/${y}`;
+    }
+    // fallback: try Date
+    try {
+      const dt = new Date(iso);
+      if (isNaN(dt.getTime())) return iso;
+      return dt.toLocaleDateString('en-GB');
+    } catch (e) { return iso; }
   };
 
   const getEntryTimeValue = (row) => row.entryTime || row.entry_time || '';
@@ -794,7 +977,7 @@ export default function FileTransfer() {
       if (!isNaN(d.getTime())) {
         return d.toLocaleTimeString('km-KH', { hour: '2-digit', minute: '2-digit' });
       }
-    } catch (e) {}
+    } catch (e) { }
     return '';
   };
   const getCreatorDisplay = (row) => row.creatorName || row.owner || row.handler || row.current_handler || row.byName || row.sender || '';
@@ -825,14 +1008,15 @@ export default function FileTransfer() {
       const stageToMetaKey = {
         S1: 'Course1Note', S2: 'Course2Note', SD: 'Course3Note', S3: 'Course3Note', SDR: 'Course4Note', S4: 'Course4Note', S5: 'Course5Note', DIR: 'Course5Note', SDIR: 'Course5Note', S6: 'Course6Note', HO: 'Course6Note'
       };
-      const order = ['S1','S2','SD','SDR','S3','S4','S5','S6'];
+      const order = ['S1', 'S2', 'SD', 'SDR', 'S3', 'S4', 'S5', 'S6'];
       // Enforce linear progression: return the earliest stage (by order) whose Course note is empty.
       // If that stage has an assigned sender, return their name (resolved via signaturesMap when possible),
       // otherwise return null so the UI shows '-' until a sender is assigned.
       for (const k of order) {
         const metaKey = stageToMetaKey[k];
         const metaVal = (meta && meta[metaKey]) || '';
-        if (String(metaVal || '').trim() === '') {
+        const isTicked = meta && meta[`${metaKey}_ticked`];
+        if (String(metaVal || '').trim() === '' && !isTicked) {
           const raw = normalizedStages[k];
           // if no sender assigned for this stage, try per-record role label then continue
           if (!raw) {
@@ -840,7 +1024,7 @@ export default function FileTransfer() {
               const roleMap = meta && meta.feedbackStageRoles;
               const roleLabel = roleMap && (roleMap[k.toLowerCase()] || roleMap[k] || roleMap[String(k).toUpperCase()]);
               if (roleLabel) return roleLabel;
-            } catch (e) {}
+            } catch (e) { }
             continue;
           }
           if (typeof raw === 'object') {
@@ -878,7 +1062,7 @@ export default function FileTransfer() {
       if (stages && typeof stages === 'object') {
         Object.keys(stages).forEach(k => { if (k) normalizedStages[String(k).toUpperCase()] = stages[k]; });
       }
-      const order = ['S','S1','S2','SD','SDR','S3','S4','S5','S6'];
+      const order = ['S', 'S1', 'S2', 'SD', 'SDR', 'S3', 'S4', 'S5', 'S6'];
       for (const k of order) {
         const raw = normalizedStages[k];
         if (!raw) continue;
@@ -923,25 +1107,154 @@ export default function FileTransfer() {
     return () => { mounted = false; };
   }, []);
 
-  const handleFormChange = (key, value) => setForm(f => ({ ...f, [key]: value }));
+  const handleFormChange = (key, value) => {
+    if (key === 'entryDate') {
+      // Convert dd/mm/yyyy to yyyy-mm-dd if needed
+      let v = value;
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(v)) {
+        const [d, m, y] = v.split('/');
+        v = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      }
+      setForm(f => ({ ...f, [key]: v }));
+    } else {
+      setForm(f => ({ ...f, [key]: value }));
+    }
+  };
 
-  const openCreate = () => { setEditingId(null); setForm({ type: '', letterNo: '', source: '', date: '', entryNo: '', entryDate: '', entryTime: '', creatorName: currentCreatorName, qty: '', attachments: '', attachmentsFiles: [], content: '', others: '' }); setShowCreate(true); };
+  const openCreate = () => {
+    setEditingId(null);
+    setEditingRecord(null);
+    setForm({
+      type: '',
+      letterNo: '',
+      source: '',
+      date: '',
+      entryNo: '',
+      entryDate: '',
+      entryTime: '',
+      creatorName: currentCreatorName,
+      qty: '',
+      attachments: '',
+      attachmentsFiles: [],
+      content: '',
+      others: ''
+    });
+    setShowCreate(true);
+  };
 
   const openEdit = async (id) => {
     if (!canEdit) { alert('អ្នកមិនមានសិទ្ធិកែសម្រួល'); return; }
     try {
       setLoading(true);
-      const data = await getFileTransfer(id);
+      const getFn = isOutgoingPage ? getFileTransferOut : getFileTransfer;
+      const data = await getFn(id);
+      console.log('edit data', data);
       if (data) {
         setEditingId(id);
+        // Handle date/time parsing
+        let dateStr = data.date || data.created_at || '';
+        let entryDate = data.entryDate ?? data.entry_date ?? data.EntryDate ?? '';
+        let entryTime = data.entryTime ?? data.entry_time ?? data.EntryTime ?? '';
+        let date = '';
+        // If dateStr is in dd/mm/yyyy hh:mm[:ss] [AM|PM] format, split it
+        if (dateStr && /\d{2}\/\d{2}\/\d{4}/.test(dateStr)) {
+          const [d, m, yAndTime] = dateStr.split('/');
+          let y = '', time = '';
+          if (yAndTime.includes(' ')) {
+            [y, ...time] = yAndTime.split(' ');
+            time = time.join(' ');
+          } else {
+            y = yAndTime;
+          }
+          date = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+          if (!entryTime && time) entryTime = time;
+        } else if (dateStr && /\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+          date = dateStr.slice(0, 10);
+        } else if (dateStr && dateStr.includes('T')) {
+          // ISO with time
+          date = dateStr.slice(0, 10);
+        } else {
+          date = dateStr;
+        }
+        // entryDate: always convert to yyyy-mm-dd for input type="date"
+        if (entryDate && /\d{2}\/\d{2}\/\d{4}/.test(entryDate)) {
+          let d = '', m = '', y = '', t = '';
+          if (entryDate.includes(' ')) {
+            // dd/mm/yyyy hh:mm[:ss] [AM|PM]
+            const [datePart, ...timeParts] = entryDate.split(' ');
+            [d, m, y] = datePart.split('/');
+            t = timeParts.join(' ');
+          } else {
+            [d, m, y] = entryDate.split('/');
+          }
+          entryDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+          if (!entryTime && t) entryTime = t;
+        } else if (entryDate && /\d{2}-\d{2}-\d{4}/.test(entryDate)) {
+          // dd-mm-yyyy to yyyy-mm-dd
+          const [d, m, y] = entryDate.split('-');
+          entryDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        } else if (entryDate && /\d{4}-\d{2}-\d{2}/.test(entryDate)) {
+          entryDate = entryDate.slice(0, 10);
+        } else if (entryDate && entryDate.includes('T')) {
+          // ISO with time
+          entryDate = entryDate.slice(0, 10);
+        } else if (entryDate) {
+          // fallback: try Date
+          const dt = new Date(entryDate);
+          if (!isNaN(dt.getTime())) entryDate = dt.toISOString().slice(0, 10);
+        }
+        // entryDate: always convert to yyyy-mm-dd for input type="date"
+        if (entryDate && /\d{2}\/\d{2}\/\d{4}/.test(entryDate)) {
+          let d = '', m = '', y = '', t = '';
+          if (entryDate.includes(' ')) {
+            // dd/mm/yyyy hh:mm[:ss] [AM|PM]
+            const [datePart, ...timeParts] = entryDate.split(' ');
+            [d, m, y] = datePart.split('/');
+            t = timeParts.join(' ');
+          } else {
+            [d, m, y] = entryDate.split('/');
+          }
+          entryDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+          if (!entryTime && t) entryTime = t;
+        } else if (entryDate && /\d{2}-\d{2}-\d{4}/.test(entryDate)) {
+          // dd-mm-yyyy to yyyy-mm-dd
+          const [d, m, y] = entryDate.split('-');
+          entryDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        } else if (entryDate && /\d{4}-\d{2}-\d{2}/.test(entryDate)) {
+          // already correct
+        } else if (entryDate) {
+          // fallback: try Date
+          const dt = new Date(entryDate);
+          if (!isNaN(dt.getTime())) entryDate = dt.toISOString().slice(0, 10);
+        }
+        // entryTime: support 12-hour format with AM/PM
+        if (entryTime) {
+          let timeStr = entryTime.trim();
+          // If contains AM/PM, convert to 24-hour
+          const ampmMatch = timeStr.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)/i);
+          if (ampmMatch) {
+            let hour = parseInt(ampmMatch[1], 10);
+            const minute = ampmMatch[2];
+            const ampm = ampmMatch[3].toUpperCase();
+            if (ampm === 'PM' && hour < 12) hour += 12;
+            if (ampm === 'AM' && hour === 12) hour = 0;
+            entryTime = `${hour.toString().padStart(2, '0')}:${minute}`;
+          } else if (timeStr.length > 5) {
+            entryTime = timeStr.slice(0, 5);
+          } else {
+            entryTime = timeStr;
+          }
+        }
+        console.log('setForm entryDate', entryDate, 'entryTime', entryTime, 'date', date);
+        setEditingRecord(data);
         setForm({
           type: data.type || data.title || '',
-          letterNo: data.letterNo ?? data.letter_no ?? '',
+          letterNo: data.letterNo ?? data.letter_no ?? data.LetterNo ?? '',
           source: data.source ?? data.origin ?? '',
-          date: data.date || data.created_at || '',
+          date,
           entryNo: data.entryNo ?? data.entry_no ?? '',
-          entryDate: data.entryDate ?? data.entry_date ?? '',
-            entryTime: data.entryTime ?? data.entry_time ?? '',
+          entryDate,
+          entryTime,
           creatorName: data.creatorName ?? data.creator_name ?? data.owner ?? currentCreatorName,
           qty: data.qty ?? data.count ?? '',
           attachments: Array.isArray(data.attachments) ? data.attachments.join(',') : (data.attachments || ''),
@@ -958,25 +1271,41 @@ export default function FileTransfer() {
   const handleCreate = async (e) => {
     if (!canEdit) { alert('អ្នកមិនមានសិទ្ធិកែសម្រួល'); return; }
     e && e.preventDefault && e.preventDefault();
-    // Validate required fields (all except 'others')
-    const required = ['type','letterNo','source','date','entryNo','entryDate','entryTime','qty','content'];
+    setFormErrors({});
+    const required = isOutgoingPage 
+      ? ['type', 'letterNo', 'source', 'date', 'qty', 'content'] 
+      : ['type', 'source', 'date', 'entryNo', 'entryDate', 'entryTime', 'qty', 'content'];
     const errors = {};
     required.forEach(k => {
       const v = form[k];
-      if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '') ) {
+      if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) {
         errors[k] = 'សូមបំពេញវាលនេះ';
       }
     });
+
     if (Object.keys(errors).length) {
       setFormErrors(errors);
       alert('សូមបំពេញគ្រប់វាលដែលមានសញ្ញាក្រហម មុនពេលបញ្ចូល');
       return;
     }
-    setFormErrors({});
+
     try {
       setLoading(true);
       const payload = { ...form };
-      if (payload.attachments && typeof payload.attachments === 'string') payload.attachments = payload.attachments.split(',').map(s => s.trim()).filter(Boolean);
+      // Convert attachments string to array for backend
+      if (typeof payload.attachments === 'string') {
+        payload.attachments = payload.attachments.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      // Ensure attachments is always an array
+      if (!Array.isArray(payload.attachments)) payload.attachments = [];
+
+      // Clean up empty strings to avoid backend validation issues
+      ['letterNo', 'entryNo', 'qty', 'source', 'content', 'others', 'date', 'entryDate', 'entryTime'].forEach(key => {
+        if (typeof payload[key] === 'string' && !payload[key].trim()) {
+          payload[key] = ''; // or null, but usually empty string is safer if not strictly validated
+        }
+      });
+
       if (payload.attachmentsFiles && payload.attachmentsFiles.length > 0) {
         const toDataUrl = (file) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(file); });
         try {
@@ -985,20 +1314,44 @@ export default function FileTransfer() {
         } catch (err) { console.warn(err); }
         delete payload.attachmentsFiles;
       }
-      if (editingId) { await updateFileTransfer(editingId, payload); setEditingId(null); }
-      else { await createFileTransfer(payload); setPage(1); }
+
+      if (editingId) {
+        const fullPayload = { ...editingRecord, ...payload };
+        delete fullPayload.reference;
+        const updateFn = isOutgoingPage ? updateFileTransferOut : updateFileTransfer;
+        await updateFn(editingId, fullPayload);
+        setEditingId(null);
+        setEditingRecord(null);
+      } else {
+        delete payload.reference;
+        const createFn = isOutgoingPage ? createFileTransferOut : createFileTransfer;
+        await createFn(payload);
+        setPage(1);
+      }
       setShowCreate(false);
-      const data = await fetchFileTransfers(selectedType, page, pageSize);
+      const fetchFn = isOutgoingPage ? fetchFileTransfersOut : fetchFileTransfers;
+      const data = await fetchFn(selectedType, page, pageSize);
       setRows(Array.isArray(data) ? data : (data.items || []));
       setTotalRows((data && typeof data.total === 'number') ? data.total : (data && typeof data.count === 'number') ? data.count : (Array.isArray(data) ? data.length : (data.items || []).length));
-    } catch (err) { console.error(err); alert('មានបញ្ហា​នៅពេលបង្កើត'); }
+    } catch (err) {
+      console.error(err);
+      alert('មានបញ្ហា​នៅពេលបង្កើត ឬ រក្សាទុក៖ ' + (err.response?.data?.message || err.message || ''));
+    }
     finally { setLoading(false); }
   };
 
   const handleDelete = async (id) => {
     if (!canEdit) { alert('អ្នកមិនមានសិទ្ធិលុប'); return; }
     if (!confirm('តើអ្នកប្រាកដជាចង់លុបឯកសារនេះ?')) return;
-    try { setLoading(true); await deleteFileTransfer(id); const data = await fetchFileTransfers(selectedType, page, pageSize); setRows(Array.isArray(data) ? data : (data.items || [])); setTotalRows((data && typeof data.total === 'number') ? data.total : (data && typeof data.count === 'number') ? data.count : (Array.isArray(data) ? data.length : (data.items || []).length)); }
+    try {
+      setLoading(true);
+      const deleteFn = isOutgoingPage ? deleteFileTransferOut : deleteFileTransfer;
+      await deleteFn(id);
+      const fetchFn = isOutgoingPage ? fetchFileTransfersOut : fetchFileTransfers;
+      const data = await fetchFn(selectedType, page, pageSize);
+      setRows(Array.isArray(data) ? data : (data.items || []));
+      setTotalRows((data && typeof data.total === 'number') ? data.total : (data && typeof data.count === 'number') ? data.count : (Array.isArray(data) ? data.length : (data.items || []).length));
+    }
     catch (err) { console.error(err); alert('មិនអាចលុបបាន'); }
     finally { setLoading(false); }
   };
@@ -1008,20 +1361,20 @@ export default function FileTransfer() {
     let completed = 0;
     let notCompleted = 0;
     let noFeedback = 0;
-    
+
     const typeBreakdown = {};
     const responsibleBreakdown = {};
-    
+
     (filteredRows || []).forEach(row => {
       const type = row.type || row.title || row.letter_type || 'មិនកំណត់';
-      
+
       // Use the same logic as recipientDisplays to determine status
       const wk = getWaitingStageKey(row);
       const completedStage = getCompletedStageInfo(row);
-      
+
       let status = 'noFeedback';
       let responsible = 'មិនកំណត់';
-      
+
       if (wk) {
         // Document is waiting for feedback (មិនទាន់រួច)
         status = 'notCompleted';
@@ -1044,7 +1397,7 @@ export default function FileTransfer() {
         status = 'noFeedback';
         responsible = row.handler || row.current_handler || row.owner || row.creatorName || 'មិនកំណត់';
       }
-      
+
       // Initialize breakdowns
       if (!typeBreakdown[type]) {
         typeBreakdown[type] = { completed: 0, notCompleted: 0, noFeedback: 0, total: 0 };
@@ -1052,7 +1405,7 @@ export default function FileTransfer() {
       if (!responsibleBreakdown[responsible]) {
         responsibleBreakdown[responsible] = { completed: 0, notCompleted: 0, noFeedback: 0, total: 0 };
       }
-      
+
       // Count status
       if (status === 'completed') {
         completed++;
@@ -1061,14 +1414,14 @@ export default function FileTransfer() {
       } else {
         noFeedback++;
       }
-      
+
       // Update breakdowns
       typeBreakdown[type][status]++;
       typeBreakdown[type].total++;
       responsibleBreakdown[responsible][status]++;
       responsibleBreakdown[responsible].total++;
     });
-    
+
     return {
       summary: {
         រួចរាល់: completed,
@@ -1133,8 +1486,8 @@ export default function FileTransfer() {
     if (!raw) return '';
     let s = typeof raw === 'string' ? raw : (raw.name || raw.url || '');
     // try decoding up to two times to handle double-encoding
-    try { const d1 = decodeURIComponent(s); if (d1 && d1 !== s) s = d1; } catch (e) {}
-    try { const d2 = decodeURIComponent(s); if (d2 && d2 !== s) s = d2; } catch (e) {}
+    try { const d1 = decodeURIComponent(s); if (d1 && d1 !== s) s = d1; } catch (e) { }
+    try { const d2 = decodeURIComponent(s); if (d2 && d2 !== s) s = d2; } catch (e) { }
     return s;
   };
 
@@ -1156,7 +1509,7 @@ export default function FileTransfer() {
       if (API_BASE.includes('localhost') && host && host !== 'localhost' && host !== '127.0.0.1') {
         return API_BASE.replace('localhost', host).replace(/\/$/, '');
       }
-    } catch (e) {}
+    } catch (e) { }
     return API_BASE.replace(/\/$/, '');
   };
 
@@ -1167,13 +1520,13 @@ export default function FileTransfer() {
     setPreviewFailed(false);
     setPreviewOpen(true);
     // set a timeout to fallback for PDFs (in case iframe doesn't render)
-    try { if (previewTimeoutRef.current) { clearTimeout(previewTimeoutRef.current); previewTimeoutRef.current = null; } } catch(e){}
+    try { if (previewTimeoutRef.current) { clearTimeout(previewTimeoutRef.current); previewTimeoutRef.current = null; } } catch (e) { }
     previewTimeoutRef.current = setTimeout(() => {
       // if still loading after timeout, mark failed; for PDFs we'll open in a new tab
       setPreviewLoading(false);
       setPreviewFailed(true);
       if (isPdfFile({ name: url })) {
-        try { window.open(url, '_blank'); } catch (e) {}
+        try { window.open(url, '_blank'); } catch (e) { }
         // close modal since we opened in a new tab
         setPreviewOpen(false);
       }
@@ -1186,7 +1539,7 @@ export default function FileTransfer() {
     setPreviewType('');
     setPreviewLoading(false);
     setPreviewFailed(false);
-    try { if (previewTimeoutRef.current) { clearTimeout(previewTimeoutRef.current); previewTimeoutRef.current = null; } } catch(e) {}
+    try { if (previewTimeoutRef.current) { clearTimeout(previewTimeoutRef.current); previewTimeoutRef.current = null; } } catch (e) { }
   };
 
   // Resolve an attachment name to a reachable URL by trying scanner route then /Uploads
@@ -1319,7 +1672,7 @@ export default function FileTransfer() {
         return (
           <div key={key} className="w-20 h-20 border rounded overflow-hidden relative">
             <img src={src} alt={f.name} className="w-full h-full object-cover" />
-            <button type="button" onClick={() => { const next = (form.attachmentsFiles || []).slice(); next.splice(i,1); handleFormChange('attachmentsFiles', next); }} className="absolute top-0 right-0 bg-white/80 text-red-600 text-xs px-1">x</button>
+            <button type="button" onClick={() => { const next = (form.attachmentsFiles || []).slice(); next.splice(i, 1); handleFormChange('attachmentsFiles', next); }} className="absolute top-0 right-0 bg-white/80 text-red-600 text-xs px-1">x</button>
           </div>
         );
       }
@@ -1329,7 +1682,7 @@ export default function FileTransfer() {
           <div key={key} className="w-20 h-20 border rounded overflow-hidden relative p-2 bg-white flex flex-col items-center justify-center text-xs text-gray-700">
             <div className="text-red-600 font-bold">PDF</div>
             <a href={url} target="_blank" rel="noreferrer" className="text-[10px] truncate mt-1">{f.name}</a>
-            <button type="button" onClick={() => { const next = (form.attachmentsFiles || []).slice(); next.splice(i,1); handleFormChange('attachmentsFiles', next); }} className="absolute top-0 right-0 bg-white/80 text-red-600 text-xs px-1">x</button>
+            <button type="button" onClick={() => { const next = (form.attachmentsFiles || []).slice(); next.splice(i, 1); handleFormChange('attachmentsFiles', next); }} className="absolute top-0 right-0 bg-white/80 text-red-600 text-xs px-1">x</button>
           </div>
         );
       }
@@ -1337,7 +1690,7 @@ export default function FileTransfer() {
       return (
         <div key={key} className="w-20 h-20 border rounded overflow-hidden relative p-2 bg-white flex items-center justify-center text-xs text-gray-700">
           <div className="text-sm">{f.name}</div>
-          <button type="button" onClick={() => { const next = (form.attachmentsFiles || []).slice(); next.splice(i,1); handleFormChange('attachmentsFiles', next); }} className="absolute top-0 right-0 bg-white/80 text-red-600 text-xs px-1">x</button>
+          <button type="button" onClick={() => { const next = (form.attachmentsFiles || []).slice(); next.splice(i, 1); handleFormChange('attachmentsFiles', next); }} className="absolute top-0 right-0 bg-white/80 text-red-600 text-xs px-1">x</button>
         </div>
       );
     }
@@ -1349,7 +1702,7 @@ export default function FileTransfer() {
           <div key={key} className="w-20 h-20 border rounded overflow-hidden relative p-2 bg-white flex flex-col items-center justify-center text-xs text-gray-700">
             <div className="text-red-600 font-bold">PDF</div>
             <a href={f.url} target="_blank" rel="noreferrer" className="text-[10px] truncate mt-1">{f.name || f.url}</a>
-            <button type="button" onClick={() => { const next = (form.attachmentsFiles || []).slice(); next.splice(i,1); handleFormChange('attachmentsFiles', next); }} className="absolute top-0 right-0 bg-white/80 text-red-600 text-xs px-1">x</button>
+            <button type="button" onClick={() => { const next = (form.attachmentsFiles || []).slice(); next.splice(i, 1); handleFormChange('attachmentsFiles', next); }} className="absolute top-0 right-0 bg-white/80 text-red-600 text-xs px-1">x</button>
           </div>
         );
       }
@@ -1357,7 +1710,7 @@ export default function FileTransfer() {
       return (
         <div key={key} className="w-20 h-20 border rounded overflow-hidden relative">
           <img src={f.url} alt={f.name} className="w-full h-full object-cover" />
-          <button type="button" onClick={() => { const next = (form.attachmentsFiles || []).slice(); next.splice(i,1); handleFormChange('attachmentsFiles', next); }} className="absolute top-0 right-0 bg-white/80 text-red-600 text-xs px-1">x</button>
+          <button type="button" onClick={() => { const next = (form.attachmentsFiles || []).slice(); next.splice(i, 1); handleFormChange('attachmentsFiles', next); }} className="absolute top-0 right-0 bg-white/80 text-red-600 text-xs px-1">x</button>
         </div>
       );
     }
@@ -1493,7 +1846,7 @@ export default function FileTransfer() {
           } else if (fname.startsWith('/Uploads/') || fname.includes('/Uploads/')) {
             const idx = fname.indexOf('/Uploads/'); if (idx >= 0) fname = fname.slice(idx + '/Uploads/'.length);
           }
-          await fetch(`/kshf_hospital_app/scanner/file/${encodeURIComponent(fname)}`, { method: 'DELETE' }).catch(() => {});
+          await fetch(`/kshf_hospital_app/scanner/file/${encodeURIComponent(fname)}`, { method: 'DELETE' }).catch(() => { });
         } catch (e) { /* ignore per-file errors */ }
       }
 
@@ -1547,9 +1900,9 @@ export default function FileTransfer() {
       return;
     }
     try {
-      try { localStorage.setItem('scannerName', chosen); } catch (e) {}
+      try { localStorage.setItem('scannerName', chosen); } catch (e) { }
       setScannerName(chosen);
-    } catch (_) {}
+    } catch (_) { }
     try {
       setTriggeringScan(true);
       const res = await scanNow({ scannerName: chosen, format: 'jpg' });
@@ -1603,7 +1956,7 @@ export default function FileTransfer() {
     if (!showCreate) {
       // ensure closed
       if (esRef.current) {
-        try { esRef.current.close(); } catch(e) {}
+        try { esRef.current.close(); } catch (e) { }
         esRef.current = null;
       }
       return;
@@ -1629,7 +1982,7 @@ export default function FileTransfer() {
       };
       es.onerror = (err) => {
         // if connection fails, close and allow manual reload
-        try { es.close(); } catch (e) {}
+        try { es.close(); } catch (e) { }
         esRef.current = null;
       };
     } catch (err) {
@@ -1638,7 +1991,7 @@ export default function FileTransfer() {
 
     return () => {
       if (esRef.current) {
-        try { esRef.current.close(); } catch(e) {}
+        try { esRef.current.close(); } catch (e) { }
         esRef.current = null;
       }
     };
@@ -1646,9 +1999,19 @@ export default function FileTransfer() {
 
   const typeCounts = useMemo(() => {
     const map = {};
-    baseFilteredRows.forEach((r) => { const t = (r.type || r.title || r.letter_type || r.category || '').toString(); if (!t) return; map[t] = (map[t] || 0) + 1; });
+    baseFilteredRows.forEach((r) => {
+      const t = (r.type || r.title || r.letter_type || r.category || '').toString();
+      if (!t) return;
+      map[t] = (map[t] || 0) + 1;
+    });
     const result = {};
-    letterTypes.forEach((lt) => { if (lt === 'សរុប' || lt === 'ទាំងអស់') result[lt] = baseFilteredRows.length; else result[lt] = map[lt] || 0; });
+    letterTypes.forEach((lt) => {
+      if (lt.value === 'សរុប' || lt.value === 'ទាំងអស់') {
+        result[lt.value] = baseFilteredRows.length;
+      } else {
+        result[lt.value] = map[lt.value] || 0;
+      }
+    });
     return result;
   }, [baseFilteredRows, letterTypes]);
 
@@ -1698,49 +2061,57 @@ export default function FileTransfer() {
 
   // Determine which rows to actually display in the table depending on client/server filtering
   const displayedRows = useMemo(() => {
-    // Sort by numeric entry number (`entryNo` / `entry_no`) ascending.
-    // If entry number is missing or not numeric, push it to the end.
-    const parseEntryNo = (r) => {
-      if (!r) return Infinity;
-      const raw = r.entryNo ?? r.entry_no ?? '';
-      if (raw === null || raw === undefined) return Infinity;
-      const s = String(raw).trim();
-      if (!s) return Infinity;
-      // extract digits from the entry string (handles leading zeros)
-      const digits = s.replace(/[^0-9]/g, '');
-      if (!digits) return Infinity;
-      const n = parseInt(digits, 10);
-      return Number.isFinite(n) ? n : Infinity;
+    // Parse entryDate to timestamp — handles dd/mm/yyyy, ISO yyyy-mm-dd, and with time
+    const parseEntryDate = (r) => {
+      if (!r) return 0;
+      const raw = String(r.entryDate ?? r.entry_date ?? '').trim();
+      if (!raw) return 0;
+      try {
+        // dd/mm/yyyy [time] → convert to ISO first
+        const ddmmyyyy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (ddmmyyyy) {
+          const d = new Date(`${ddmmyyyy[3]}-${ddmmyyyy[2].padStart(2, '0')}-${ddmmyyyy[1].padStart(2, '0')}`);
+          if (!isNaN(d.getTime())) return d.getTime();
+        }
+        // dd-mm-yyyy
+        const ddmmyyyy2 = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
+        if (ddmmyyyy2) {
+          const d = new Date(`${ddmmyyyy2[3]}-${ddmmyyyy2[2].padStart(2, '0')}-${ddmmyyyy2[1].padStart(2, '0')}`);
+          if (!isNaN(d.getTime())) return d.getTime();
+        }
+        // yyyy-mm-dd or ISO
+        const d = new Date(raw);
+        if (!isNaN(d.getTime())) return d.getTime();
+      } catch { }
+      return 0;
     };
 
-    // sort numeric entry number descending (largest first)
-    const sortByEntryNoDesc = (a, b) => {
-      const na = parseEntryNo(a);
-      const nb = parseEntryNo(b);
-      if (na === nb) return 0;
-      return nb - na;
-    };
+    // Sort by entryDate descending only (newest first)
+    const sortDesc = (a, b) => parseEntryDate(b) - parseEntryDate(a);
 
     if (useClientFiltering) {
       const copy = (filteredRows || []).slice();
-      copy.sort(sortByEntryNoDesc);
+      copy.sort(sortDesc);
       const start = (page - 1) * pageSize;
       const end = page * pageSize;
       return copy.slice(start, end);
     }
 
-    // server-driven rows (already paged) - but sort client-side by entry number so ordering matches UI
-    return (rows || []).slice().sort(sortByEntryNoDesc);
+    // server-driven rows (already paged) - sort client-side
+    return (rows || []).slice().sort(sortDesc);
   }, [useClientFiltering, filteredRows, rows, page, pageSize]);
 
   // ...existing code... (removed stats array for summary boxes)
+
+  const pageTitle = isOutgoingPage ? 'ឯកសារចេញ' : 'ផ្ទេរឯកសារ';
+  const pageSubtitle = isOutgoingPage ? 'បញ្ជីឯកសារចេញ និងស្ថានភាព' : 'បញ្ជីឯកសារ និងស្ថានភាព';
 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h4 className="text-[18px] font-semibold">ផ្ទេរឯកសារ</h4>
-          <p className="text-sm text-gray-500">បញ្ជីឯកសារ និងស្ថានភាព</p>
+          <h4 className="text-[18px] font-semibold">{pageTitle}</h4>
+          <p className="text-sm text-gray-500">{pageSubtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -1756,6 +2127,18 @@ export default function FileTransfer() {
               onChange={(e) => setShowTelegramColumn(e.target.checked)}
             />
             បង្ហាញសារពី Telegram
+          </label>
+          <label className="text-sm flex items-center gap-2 select-none whitespace-nowrap">
+            <input type="checkbox" checked={showSourceColumn} onChange={(e) => setShowSourceColumn(e.target.checked)} />
+            ប្រភព
+          </label>
+          <label className="text-sm flex items-center gap-2 select-none whitespace-nowrap">
+            <input type="checkbox" checked={showQtyColumn} onChange={(e) => setShowQtyColumn(e.target.checked)} />
+            ចំនួន
+          </label>
+          <label className="text-sm flex items-center gap-2 select-none whitespace-nowrap">
+            <input type="checkbox" checked={showOthersColumn} onChange={(e) => setShowOthersColumn(e.target.checked)} />
+            ផ្សេងៗ
           </label>
           <div className="flex items-center gap-2">
             <div className="text-xs text-gray-600">:</div>
@@ -1775,9 +2158,10 @@ export default function FileTransfer() {
           </div>
           <button type="button" onClick={clearAll} className="ml-2 bg-red-400 text-sm px-3 py-2 rounded">សម្អាត</button>
           <select className="border rounded px-3 py-2 text-sm" value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
-            {letterTypes.map(t => <option key={t} value={t}>{t}</option>)}
+            {letterTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
-          <button onClick={openCreate} className="bg-blue-600 text-white px-4 py-2 rounded text-sm">ឯកសារ ថ្មី</button>
+          <button onClick={handleExportExcel} className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700">ទាញយក Excel</button>
+          <button onClick={openCreate} className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">ឯកសារ ថ្មី</button>
         </div>
       </div>
 
@@ -1785,98 +2169,237 @@ export default function FileTransfer() {
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <form onSubmit={handleCreate} className="bg-white rounded shadow p-6 w-full max-w-2xl">
-            <h2 className="text-lg font-semibold mb-4">{editingId ? 'កែប្រែឯកសារ' : 'បង្កើតឯកសារ'}</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">{editingId ? 'កែប្រែឯកសារ' : 'បង្កើតឯកសារ'}</h2>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
+                  {editingId ? 'រក្សាទុក' : 'បញ្ចូល'}
+                </button>
+                <button type="button" onClick={() => setShowCreate(false)} className="px-3 py-2 border rounded">បិទ</button>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              <select className="border px-3 py-2 col-span-2" value={form.type} onChange={(e) => handleFormChange('type', e.target.value)}>
-                <option value="">-- ប្រភេទលិខិត (ជ្រើស) --</option>
-                {letterTypes.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              {formErrors.type && <div className="col-span-2 text-red-600 text-sm">{formErrors.type}</div>}
-              {/* Row: លេខលិខិត + កាលបរិច្ឆេទលិខិត */}
-              <input className="border px-3 py-2" placeholder="លេខលិខិត" value={form.letterNo} onChange={(e) => handleFormChange('letterNo', e.target.value)} />
-              {formErrors.letterNo && <div className="text-red-600 text-sm">{formErrors.letterNo}</div>}
-              <div className="relative">
-                <input ref={dateInputRef} type="date" className="border px-3 py-2 w-full" value={form.date || ''} onChange={(e) => handleFormChange('date', parseDateToISO(e.target.value))} />
-                {!form.date && (<div className="pointer-events-none absolute left-3 top-0 bottom-0 flex items-center text-gray-400 select-none">dd/mm/yyyy</div>)}
-                <button type="button" aria-label="Open date picker" onClick={() => { const el = dateInputRef.current; if (!el) return; if (typeof el.showPicker === 'function') { try { el.showPicker(); } catch (e) { el.focus(); } } else { el.focus(); } }} className="absolute right-2 top-1/2 -translate-y-1/2 bg-transparent border rounded px-2 py-1 text-gray-600 hover:bg-gray-100">📅</button>
+              <div className="col-span-1">
+                <label className="block text-sm font-bold text-blue-700 mb-1">ប្រភេទលិខិត <span className="text-red-500">*</span></label>
+                <select className="border px-3 py-2 w-full" value={form.type} onChange={(e) => handleFormChange('type', e.target.value)}>
+                  <option value="">-- ជ្រើសរើស --</option>
+                  {letterTypes.filter(t => t.value !== 'ទាំងអស់').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+                {formErrors.type && <div className="text-red-600 text-xs mt-1">{formErrors.type}</div>}
               </div>
-              {/* Row: លេខចូល + កាលបរិច្ឆេទចូល */}
-              <input className="border px-3 py-2" placeholder="លេខចូល" value={form.entryNo} onChange={(e) => handleFormChange('entryNo', e.target.value)} />
-              {formErrors.entryNo && <div className="text-red-600 text-sm">{formErrors.entryNo}</div>}
-              <div className="relative">
-                <input type="date" className="border px-3 py-2 w-full" value={form.entryDate || ''} onChange={(e) => handleFormChange('entryDate', parseDateToISO(e.target.value))} />
-                {!form.entryDate && (<div className="pointer-events-none absolute left-3 top-0 bottom-0 flex items-center text-gray-400 select-none">dd/mm/yyyy</div>)}
-                {formErrors.entryDate && <div className="text-red-600 text-sm">{formErrors.entryDate}</div>}
-              </div>
-              <div className="relative">
-                <input type="time" className="border px-3 py-2 w-full" value={form.entryTime || ''} onChange={(e) => handleFormChange('entryTime', e.target.value)} />
-                {formErrors.entryTime && <div className="text-red-600 text-sm">{formErrors.entryTime}</div>}
-              </div>
-              <div className="flex flex-col gap-1">
-            
-                <input type="text" className="border px-3 py-2 w-full bg-gray-50 text-sm" value={form.creatorName || currentCreatorName} readOnly />
-              </div>
-              {/* Row: ប្រភពឯកសារ (creatable/autocomplete) + ចំនួន */}
-              <div className="relative">
+              <div className="col-span-1">
+                <label className="block text-sm font-bold text-blue-700 mb-1">ចំនួន <span className="text-red-500">*</span></label>
                 <input
                   className="border px-3 py-2 w-full"
-                  list="department-units-list"
-                  placeholder="-- ជ្រើសរើស ឬ បញ្ចូលប្រភពឯកសារ --"
-                  value={form.source}
-                  onChange={async (e) => {
-                    const val = e.target.value;
-                    handleFormChange('source', val);
-                  }}
-                  onBlur={async (e) => {
-                    const val = e.target.value.trim();
-                    if (!val) return;
-                    // If not in departmentUnits, add it
-                    if (!departmentUnits.some(u => u.name === val)) {
-                      try {
-                        const res = await fetch('/api/department-units', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ name: val })
-                        });
-                        if (res.ok) {
-                          // Refresh department units
-                          fetch('/api/department-units')
-                            .then(res => res.json())
-                            .then(data => {
-                              if (Array.isArray(data)) setDepartmentUnits(data);
-                              else if (Array.isArray(data?.units)) setDepartmentUnits(data.units);
-                            });
-                        }
-                      } catch {}
-                    }
+                  placeholder="ចំនួន"
+                  type="text"
+                  value={form.qty || ''}
+                  onChange={e => {
+                    let v = e.target.value.replace(/[០-៩]/g, d => '0123456789'['០១២៣៤៥៦៧៨៩'.indexOf(d)]);
+                    v = v.replace(/[^0-9]/g, '');
+                    handleFormChange('qty', v);
                   }}
                 />
-                {formErrors.source && <div className="text-red-600 text-sm">{formErrors.source}</div>}
-                <datalist id="department-units-list">
-                  {departmentUnits.map((item, idx) => (
-                    <option key={item._id || item.id || idx} value={item.name}>{item.name}{item.description ? ` - ${item.description}` : ''}</option>
-                  ))}
-                </datalist>
+                {formErrors.qty && <div className="text-red-600 text-xs mt-1">{formErrors.qty}</div>}
               </div>
-              <input className="border px-3 py-2" placeholder="ចំនួន" type="number" value={form.qty} onChange={(e) => handleFormChange('qty', Number(e.target.value))} />
-              {formErrors.qty && <div className="text-red-600 text-sm">{formErrors.qty}</div>}
+              <div>
+                <label className="block text-sm font-bold text-blue-700 mb-1">លេខលិខិត {isOutgoingPage && <span className="text-red-500">*</span>}</label>
+                <input
+                  className="border px-3 py-2 w-full"
+                  placeholder="លេខលិខិត"
+                  value={form.letterNo || ''}
+                  onChange={e => {
+                    let v = e.target.value.replace(/[០-៩]/g, d => '0123456789'['០១២៣៤៥៦៧៨៩'.indexOf(d)]);
+                    handleFormChange('letterNo', v);
+                  }}
+                />
+                {formErrors.letterNo && <div className="text-red-600 text-xs mt-1">{formErrors.letterNo}</div>}
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-blue-700 mb-1">កាលបរិច្ឆេទលិខិត <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <input ref={dateInputRef} type="date" className="border px-3 py-2 w-full" value={form.date || ''} onChange={(e) => handleFormChange('date', parseDateToISO(e.target.value))} />
+                  {!form.date && (<div className="pointer-events-none absolute left-3 top-0 bottom-0 flex items-center text-gray-400 select-none text-sm">dd/mm/yyyy</div>)}
+                  <button type="button" aria-label="Open date picker" onClick={() => { const el = dateInputRef.current; if (!el) return; if (typeof el.showPicker === 'function') { try { el.showPicker(); } catch (e) { el.focus(); } } else { el.focus(); } }} className="absolute right-2 top-1/2 -translate-y-1/2 bg-transparent border rounded px-1.5 py-0.5 text-gray-500 hover:bg-gray-100 italic text-xs">📅</button>
+                </div>
+                {formErrors.date && <div className="text-red-600 text-xs mt-1">{formErrors.date}</div>}
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-blue-700 mb-1">លេខចូល {!isOutgoingPage && <span className="text-red-500">*</span>}</label>
+                <input
+                  className="border px-3 py-2 w-full"
+                  placeholder="លេខចូល"
+                  value={form.entryNo || ''}
+                  onChange={e => {
+                    let v = e.target.value.replace(/[០-៩]/g, d => '0123456789'['០១២៣៤៥៦៧៨៩'.indexOf(d)]);
+                    handleFormChange('entryNo', v);
+                  }}
+                />
+                {formErrors.entryNo && <div className="text-red-600 text-xs mt-1">{formErrors.entryNo}</div>}
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-blue-700 mb-1">កាលបរិច្ឆេទចូល {!isOutgoingPage && <span className="text-red-500">*</span>}</label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    className="border px-3 py-2 w-full"
+                    value={form.entryDate || ''}
+                    onChange={e => handleFormChange('entryDate', parseDateToISO(e.target.value))}
+                  />
+                  {!form.entryDate && (<div className="pointer-events-none absolute left-3 top-0 bottom-0 flex items-center text-gray-400 select-none text-sm">yyyy-mm-dd</div>)}
+                </div>
+                {formErrors.entryDate && <div className="text-red-600 text-xs mt-1">{formErrors.entryDate}</div>}
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-blue-700 mb-1">ម៉ោងចូល {!isOutgoingPage && <span className="text-red-500">*</span>}</label>
+                <div className="relative">
+                  <input type="time" className="border px-3 py-2 w-full" value={form.entryTime || ''} onChange={(e) => handleFormChange('entryTime', e.target.value)} />
+                </div>
+                {formErrors.entryTime && <div className="text-red-600 text-xs mt-1">{formErrors.entryTime}</div>}
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-blue-700 mb-1">អ្នកបញ្ចូល</label>
+                <input type="text" className="border px-3 py-2 w-full bg-gray-50 text-sm" value={form.creatorName || currentCreatorName} readOnly />
+              </div>
+              <div 
+                className="col-span-2 relative"
+                onMouseLeave={() => setShowSourceSuggestions(false)}
+              >
+                <label className="block text-sm font-bold text-blue-700 mb-1">ប្រភពឯកសារ <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <textarea
+                    className="border px-3 py-2 w-full"
+                    rows={2}
+                    placeholder="-- ជ្រើសរើស ឬ បញ្ចូលប្រភព --"
+                    value={form.source}
+                    onFocus={() => setShowSourceSuggestions(true)}
+                    onChange={(e) => handleFormChange('source', e.target.value)}
+                    onBlur={async (e) => {
+                      // Hide suggestions
+                      setTimeout(() => setShowSourceSuggestions(false), 200);
+                      
+                      // Handle auto-creating department units
+                      const val = e.target.value.trim();
+                      if (!val) return;
+                      if (!departmentUnits.some(u => u.name === val)) {
+                        try {
+                          const res = await fetch('/api/department-units', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: val })
+                          });
+                          if (res.ok) {
+                            fetch('/api/department-units')
+                              .then(res => res.json())
+                              .then(data => {
+                                if (Array.isArray(data)) setDepartmentUnits(data);
+                                else if (Array.isArray(data?.units)) setDepartmentUnits(data.units);
+                              });
+                          }
+                        } catch { }
+                      }
+                    }}
+                  />
+                  {showSourceSuggestions && (
+                    <div className="absolute z-20 w-full bg-white border shadow-lg max-h-48 overflow-y-auto mt-1 rounded">
+                      {departmentUnits
+                        .filter(u => !form.source || (u.name && u.name.toLowerCase().includes(form.source.toLowerCase())))
+                        .map((item, idx) => (
+                          <div
+                            key={item._id || item.id || idx}
+                            className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-0"
+                            onClick={() => {
+                              handleFormChange('source', item.name);
+                              setShowSourceSuggestions(false);
+                            }}
+                          >
+                            {item.name} {item.description ? <span className="text-gray-400 text-xs">- {item.description}</span> : ''}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                  {formErrors.source && <div className="text-red-600 text-xs mt-1">{formErrors.source}</div>}
+                </div>
+              </div>
               {/* Row: Attachments (col-span-2) */}
               <div className="col-span-2">
-                <label className="block text-sm text-gray-700 mb-1">ឯកសារយោង (រូបភាព/PDF)</label>
+                <label className="block text-sm font-bold text-blue-700 mb-1">ឯកសារយោង (រូបភាព/PDF)</label>
                 <div className="flex items-center gap-4">
                   <input type="file" multiple onChange={async (e) => {
                     const files = Array.from(e.target.files || []);
                     if (!files.length) return;
+                    // Removed hard requirements for file uploads per user request
+                    // Prepare data for naming: type(Eng), letterNo, entryNo, entryDate(DDMMYYYY)
+                    const typeMap = {
+                      'លិខិតចូល': 'IN',
+                      'លិខិតចេញ': 'OUT',
+                      'លិខិតចេញផ្ទៃក្នុង': 'INT',
+                      'លិខិតចូលការិយាល័យរដ្ឋបាល': 'ADM'
+                    };
+                    const typeEng = typeMap[form.type] || 'DOC';
+                    const lNo = (form.letterNo || 'NA').trim().replace(/[\/\s]/g, '-');
+
+                    const entryNoRaw = (form.entryNo || '').trim().replace(/[០-៩]/g, d => '0123456789'['០១២៣៤៥៦៧៨៩'.indexOf(d)]);
+                    let entryNo = entryNoRaw.replace(/[^\d]/g, '') || '0000';
+                    entryNo = entryNo.padStart(4, '0');
+
+                    let dateForNaming = isOutgoingPage ? form.date : form.entryDate;
+                    let dateStr = '00000000';
+                    if (dateForNaming) {
+                      const d = new Date(dateForNaming);
+                      if (!isNaN(d.getTime())) {
+                        const dd = String(d.getDate()).padStart(2, '0');
+                        const mm = String(d.getMonth() + 1).padStart(2, '0');
+                        const yyyy = d.getFullYear();
+                        dateStr = `${dd}${mm}${yyyy}`;
+                      }
+                    }
+
+                    const namePrefix = `${typeEng}_${lNo}_${entryNo}_${dateStr}`;
+
+                    // Determine starting sequence number
+                    const existingArray = (form.attachments && typeof form.attachments === 'string')
+                      ? form.attachments.split(',').map(s => s.trim()).filter(Boolean)
+                      : (Array.isArray(form.attachments) ? form.attachments : []);
+
+                    let maxSeq = 0;
+                    const seqRegex = new RegExp(`${namePrefix}_(\\d{2})\\.`);
+                    existingArray.forEach(url => {
+                      const filename = url.split('/').pop();
+                      const match = filename.match(seqRegex);
+                      if (match) {
+                        const val = parseInt(match[1], 10);
+                        if (val > maxSeq) maxSeq = val;
+                      }
+                    });
+
                     setUploadingFiles(true);
                     try {
                       const uploaded = [];
-                      for (const f of files) {
+                      for (let i = 0; i < files.length; i++) {
+                        const f = files[i];
                         try {
+                          const seqNum = (maxSeq + i + 1).toString().padStart(2, '0');
+                          let ext = '';
+                          if (f.name && f.name.lastIndexOf('.') !== -1) {
+                            ext = f.name.slice(f.name.lastIndexOf('.'));
+                          }
+                          const newName = `${namePrefix}_${seqNum}${ext}`;
+                          console.log('DEBUG upload:', { entryNo, newName });
+                          let fileToUpload = f;
+                          try {
+                            fileToUpload = new File([f], newName, { type: f.type });
+                          } catch (e) {
+                            // fallback: use original file object
+                          }
                           const fd = new FormData();
-                          fd.append('file', f, f.name);
+                          fd.append('file', fileToUpload, newName);
                           const res = await fetch('/api/upload', { method: 'POST', body: fd });
                           if (!res.ok) {
-                            console.warn('Upload failed for', f.name);
+                            console.warn('Upload failed for', newName);
                             continue;
                           }
                           const data = await res.json().catch(() => null);
@@ -1884,7 +2407,7 @@ export default function FileTransfer() {
                         } catch (err) { console.warn('Upload error', err); }
                       }
                       // merge into attachments (keep only URLs)
-                      const existing = (form.attachments && typeof form.attachments === 'string') ? form.attachments.split(',').map(s=>s.trim()).filter(Boolean) : (Array.isArray(form.attachments) ? form.attachments.slice() : []);
+                      const existing = (form.attachments && typeof form.attachments === 'string') ? form.attachments.split(',').map(s => s.trim()).filter(Boolean) : (Array.isArray(form.attachments) ? form.attachments.slice() : []);
                       const final = existing.filter(a => a && (a.startsWith('/') || a.startsWith('http'))).concat(uploaded);
                       handleFormChange('attachments', final.join(','));
                       // clear attachmentsFiles since we've uploaded them to server
@@ -1941,27 +2464,21 @@ export default function FileTransfer() {
                   {(form.attachmentsFiles || []).map((f, i) => renderAttachmentPreview(f, i))}
                 </div>
               </div>
-              {/* Row: ខ្លឹមសារ (col-span-2) */}
-              <div className="col-span-2"><textarea className="border w-full p-2 h-36" placeholder="ខ្លឹមសារ" value={form.content} onChange={(e) => handleFormChange('content', e.target.value)} /></div>
-              {formErrors.content && <div className="col-span-2 text-red-600 text-sm">{formErrors.content}</div>}
+              <div className="col-span-2">
+                <label className="block text-sm font-bold text-blue-700 mb-1">ខ្លឹមសារ <span className="text-red-500">*</span></label>
+                <textarea className="border w-full p-2 h-36" placeholder="ខ្លឹមសារ (Content)" value={form.content} onChange={(e) => handleFormChange('content', e.target.value)} />
+                {formErrors.content && <div className="text-red-600 text-xs mt-1">{formErrors.content}</div>}
+              </div>
+
               {/* Row: ផ្សេងៗ (col-span-2) */}
-              <div className="col-span-2"><input className="border px-3 py-2 w-full" placeholder="ផ្សេងៗ" value={form.others} onChange={(e) => handleFormChange('others', e.target.value)} /></div>
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              {
-                // compute simple validity: all required fields (except 'others') must be present
-              }
-              {(() => {
-                const required = ['type','letterNo','source','date','entryNo','entryDate','entryTime','qty','content'];
-                const ok = required.every(k => {
-                  const v = form[k];
-                  return !(v === null || v === undefined || (typeof v === 'string' && v.trim() === ''));
-                });
-                return (
-                  <button type="submit" disabled={!ok} className={`px-4 py-2 bg-blue-600 text-white rounded ${!ok ? 'opacity-50 cursor-not-allowed' : ''}`}>បញ្ចូល</button>
-                );
-              })()}
-              <button type="button" onClick={() => setShowCreate(false)} className="px-3 py-2 border rounded">បិទ</button>
+              <div className="col-span-2">
+                <input
+                  className="border px-3 py-2 w-full"
+                  placeholder="ផ្សេងៗ (Others)"
+                  value={form.others}
+                  onChange={(e) => handleFormChange('others', e.target.value)}
+                />
+              </div>
             </div>
           </form>
         </div>
@@ -2002,72 +2519,72 @@ export default function FileTransfer() {
           <div className="bg-white p-4 rounded shadow-lg w-full max-w-md">
             <div className="flex justify-between items-center mb-2">
               <h3 className="font-semibold">Scan (Camera)</h3>
-              <button onClick={() => { try { const s = videoRef.current?.srcObject; if (s) { s.getTracks().forEach(t => t.stop()); } } catch (e) {} setShowScanner(false); }} className="text-sm px-2">បិទ</button>
+              <button onClick={() => { try { const s = videoRef.current?.srcObject; if (s) { s.getTracks().forEach(t => t.stop()); } } catch (e) { } setShowScanner(false); }} className="text-sm px-2">បិទ</button>
             </div>
             <div className="w-full h-64 bg-black flex items-center justify-center"><video ref={videoRef} className="w-full h-full object-cover" /></div>
             <div className="mt-3 flex justify-end gap-2">
-                    <button onClick={async () => {
-                      const video = videoRef.current; if (!video) return;
-                      const canvas = document.createElement('canvas'); canvas.width = video.videoWidth || 1280; canvas.height = video.videoHeight || 720; const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                      canvas.toBlob((blob) => {
-                        if (!blob) return;
-                        const file = new File([blob], `scan-${Date.now()}.jpg`, { type: blob.type });
-                        const nextFiles = (form.attachmentsFiles || []).concat(file);
-                        handleFormChange('attachmentsFiles', nextFiles);
-                        const names = (form.attachments || '').split(',').map(s => s.trim()).filter(Boolean).concat(file.name);
-                        handleFormChange('attachments', names.join(','));
-                        try { const s = videoRef.current?.srcObject; if (s) { s.getTracks().forEach(t => t.stop()); } } catch (e) {}
-                        setShowScanner(false);
-                      }, 'image/jpeg', 0.9);
-                    }} className="px-4 py-2 bg-blue-600 text-white rounded">Capture</button>
-              <button onClick={() => { try { const s = videoRef.current?.srcObject; if (s) { s.getTracks().forEach(t => t.stop()); } } catch (e) {} setShowScanner(false); }} className="px-3 py-2 border rounded">Cancel</button>
+              <button onClick={async () => {
+                const video = videoRef.current; if (!video) return;
+                const canvas = document.createElement('canvas'); canvas.width = video.videoWidth || 1280; canvas.height = video.videoHeight || 720; const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob((blob) => {
+                  if (!blob) return;
+                  const file = new File([blob], `scan-${Date.now()}.jpg`, { type: blob.type });
+                  const nextFiles = (form.attachmentsFiles || []).concat(file);
+                  handleFormChange('attachmentsFiles', nextFiles);
+                  const names = (form.attachments || '').split(',').map(s => s.trim()).filter(Boolean).concat(file.name);
+                  handleFormChange('attachments', names.join(','));
+                  try { const s = videoRef.current?.srcObject; if (s) { s.getTracks().forEach(t => t.stop()); } } catch (e) { }
+                  setShowScanner(false);
+                }, 'image/jpeg', 0.9);
+              }} className="px-4 py-2 bg-blue-600 text-white rounded">Capture</button>
+              <button onClick={() => { try { const s = videoRef.current?.srcObject; if (s) { s.getTracks().forEach(t => t.stop()); } } catch (e) { } setShowScanner(false); }} className="px-3 py-2 border rounded">Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-            {/* Scanner Devices modal */}
-            {showScannerDevicesModal && (
-              <div style={{ position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
-                <div style={{ background: '#fff', padding: 16, borderRadius: 8, width: '100%', maxWidth: 420, boxShadow: '0 6px 40px rgba(0,0,0,0.3)' }}>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold">ជ្រើសម៉ាស៊ីនស្កែន (Scanner)</h3>
-                    <button onClick={() => setShowScannerDevicesModal(false)} className="text-sm px-2">បិទ</button>
-                  </div>
-                  <div className="space-y-3">
-                    {loadingDevices ? (
-                      <div>កំពងโหลดម៉ាស៊ីន...</div>
-                    ) : (
-                      <div>
-                        {devices && devices.length > 0 ? (
-                          <div>
-                            <label className="text-sm block mb-1">ម៉ាស៊ីនដែលរកឃើញ</label>
-                            <select className="w-full border rounded px-2 py-2" value={scannerNameInput} onChange={e => setScannerNameInput(e.target.value)}>
-                              <option value="">-- ជ្រើស --</option>
-                              {devices.map((d, i) => {
-                                const name = (typeof d === 'string') ? d : (d.name || d.device || JSON.stringify(d));
-                                return <option key={i} value={name}>{name}</option>;
-                              })}
-                            </select>
-                            <div className="text-xs text-gray-500 mt-1">ឬ បញ្ចូលឈ្មោះម៉ាស៊ីនដោយដៃ</div>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-600">មិនមានម៉ាស៊ីនដែល.backend រួចរាល់ — អ្នកអាចបញ្ចូលឈ្មោះដោយដៃ</div>
-                        )}
-                        <div>
-                          <label className="text-sm block mt-2">ឈ្មោះម៉ាស៊ីន (manual)</label>
-                          <input className="w-full border rounded px-2 py-2" value={scannerNameInput} onChange={e => setScannerNameInput(e.target.value)} placeholder="ឈ្មោះម៉ាស៊ីន (ឧ. HP Scan)" />
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex justify-end gap-2 mt-3">
-                      <button onClick={() => setShowScannerDevicesModal(false)} className="px-3 py-1 border rounded">Cancel</button>
-                      <button onClick={confirmAndTriggerScan} className="px-3 py-1 bg-blue-600 text-white rounded">Scan</button>
+      {/* Scanner Devices modal */}
+      {showScannerDevicesModal && (
+        <div style={{ position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
+          <div style={{ background: '#fff', padding: 16, borderRadius: 8, width: '100%', maxWidth: 420, boxShadow: '0 6px 40px rgba(0,0,0,0.3)' }}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold">ជ្រើសម៉ាស៊ីនស្កែន (Scanner)</h3>
+              <button onClick={() => setShowScannerDevicesModal(false)} className="text-sm px-2">បិទ</button>
+            </div>
+            <div className="space-y-3">
+              {loadingDevices ? (
+                <div>កំពងโหลดម៉ាស៊ីន...</div>
+              ) : (
+                <div>
+                  {devices && devices.length > 0 ? (
+                    <div>
+                      <label className="text-sm block mb-1">ម៉ាស៊ីនដែលរកឃើញ</label>
+                      <select className="w-full border rounded px-2 py-2" value={scannerNameInput} onChange={e => setScannerNameInput(e.target.value)}>
+                        <option value="">-- ជ្រើស --</option>
+                        {devices.map((d, i) => {
+                          const name = (typeof d === 'string') ? d : (d.name || d.device || JSON.stringify(d));
+                          return <option key={i} value={name}>{name}</option>;
+                        })}
+                      </select>
+                      <div className="text-xs text-gray-500 mt-1">ឬ បញ្ចូលឈ្មោះម៉ាស៊ីនដោយដៃ</div>
                     </div>
+                  ) : (
+                    <div className="text-sm text-gray-600">មិនមានម៉ាស៊ីនដែល.backend រួចរាល់ — អ្នកអាចបញ្ចូលឈ្មោះដោយដៃ</div>
+                  )}
+                  <div>
+                    <label className="text-sm block mt-2">ឈ្មោះម៉ាស៊ីន (manual)</label>
+                    <input className="w-full border rounded px-2 py-2" value={scannerNameInput} onChange={e => setScannerNameInput(e.target.value)} placeholder="ឈ្មោះម៉ាស៊ីន (ឧ. HP Scan)" />
                   </div>
                 </div>
+              )}
+              <div className="flex justify-end gap-2 mt-3">
+                <button onClick={() => setShowScannerDevicesModal(false)} className="px-3 py-1 border rounded">Cancel</button>
+                <button onClick={confirmAndTriggerScan} className="px-3 py-1 bg-blue-600 text-white rounded">Scan</button>
               </div>
-            )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Attachments modal (list + previews) */}
       {attachmentsModalOpen && (
@@ -2077,8 +2594,9 @@ export default function FileTransfer() {
               <h3 className="font-semibold">ឯកសារ</h3>
               <button onClick={closeAttachmentsModal} className="text-sm px-2">បិទ</button>
             </div>
+            <div className="mb-2 text-xs text-gray-600">ឯកសារដែលបញ្ចូលថ្មីបង្អស់នឹងបង្ហាញនៅខាងស្ដាំ (រូបឬឯកសារថ្មីស្ថិតនៅខាងស្ដាំ)</div>
             <div className="grid grid-cols-3 gap-3">
-              {attachmentsModalList && attachmentsModalList.length > 0 ? attachmentsModalList.map((a, i) => {
+              {attachmentsModalList && attachmentsModalList.length > 0 ? attachmentsModalList.slice().reverse().map((a, i) => {
                 // compute default href (handles encoded values and /Uploads/ path)
                 const clientBase = getClientApiBase();
                 const pathOrUrl = buildHrefFromAttachment(a);
@@ -2094,7 +2612,7 @@ export default function FileTransfer() {
                     )}
                     <div className="flex gap-2 items-center">
                       <button type="button" onClick={() => openInNewTabByName(a)} className="text-blue-600 text-xs">មើល</button>
-                      <button type="button" onClick={() => saveAttachmentToMissions(a)} className="text-indigo-600 text-xs">រក្សាទុកជា Missions</button>
+                      <button type="button" onClick={() => handleDeleteAttachment(a)} className="text-red-600 text-xs">លុប</button>
                     </div>
                   </div>
                 );
@@ -2128,70 +2646,67 @@ export default function FileTransfer() {
 
       <div className="flex items-center justify-between gap-4 mb-4">
         <div className="flex flex-wrap gap-2 max-w-[100%]">
-          {letterTypes.filter(t => t !== 'សរុប').map((t) => {
-            const active = selectedType === t;
-            const count = typeCounts[t] ?? 0;
+          {letterTypes.filter(t => t.value !== 'សរុប').map((t) => {
+            const active = selectedType === t.value;
+            const count = typeCounts[t.value] ?? 0;
             return (
-              <button key={t} onClick={() => setSelectedType(t)} className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm border transition-colors whitespace-nowrap ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>
-                <span>{t}</span>
+              <button
+                key={t.value}
+                onClick={() => setSelectedType(t.value)}
+                className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm border transition-colors whitespace-nowrap ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+              >
+                <span>{t.label}</span>
                 <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${active ? 'bg-blue-700 text-white' : 'bg-gray-100 text-gray-700'}`}>{count}</span>
               </button>
             );
           })}
         </div>
-        
+
         {/* Responsible Status Filter Buttons */}
         <div className="flex flex-wrap gap-2 max-w-[100%]">
           <span className="text-sm text-gray-600 self-center mr-2">អ្នកទទួលបន្ទុក:</span>
-          <button 
-            onClick={() => setStatusFilter(null)} 
-            className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm border transition-colors whitespace-nowrap ${
-              !statusFilter ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
+          <button
+            onClick={() => setStatusFilter(null)}
+            className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm border transition-colors whitespace-nowrap ${!statusFilter ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
           >
             <span>ទាំងអស់</span>
-            <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
-              !statusFilter ? 'bg-blue-700 text-white' : 'bg-gray-100 text-gray-700'
-            }`}>{localStats.summary?.សរុប || 0}</span>
+            <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${!statusFilter ? 'bg-blue-700 text-white' : 'bg-gray-100 text-gray-700'
+              }`}>{localStats.summary?.សរុប || 0}</span>
           </button>
-          
-          <button 
-            onClick={() => setStatusFilter(statusFilter === 'completed' ? null : 'completed')} 
-            className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm border transition-colors whitespace-nowrap ${
-              statusFilter === 'completed' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
+
+          <button
+            onClick={() => setStatusFilter(statusFilter === 'completed' ? null : 'completed')}
+            className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm border transition-colors whitespace-nowrap ${statusFilter === 'completed' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
           >
             <span>រួចរាល់</span>
-            <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
-              statusFilter === 'completed' ? 'bg-green-700 text-white' : 'bg-gray-100 text-gray-700'
-            }`}>{localStats.summary?.រួចរាល់ || 0}</span>
+            <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${statusFilter === 'completed' ? 'bg-green-700 text-white' : 'bg-gray-100 text-gray-700'
+              }`}>{localStats.summary?.រួចរាល់ || 0}</span>
           </button>
-          
-          <button 
-            onClick={() => setStatusFilter(statusFilter === 'notCompleted' ? null : 'notCompleted')} 
-            className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm border transition-colors whitespace-nowrap ${
-              statusFilter === 'notCompleted' ? 'bg-yellow-600 text-white border-yellow-600' : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
+
+          <button
+            onClick={() => setStatusFilter(statusFilter === 'notCompleted' ? null : 'notCompleted')}
+            className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm border transition-colors whitespace-nowrap ${statusFilter === 'notCompleted' ? 'bg-yellow-600 text-white border-yellow-600' : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
           >
             <span>មិនទាន់រួច</span>
-            <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
-              statusFilter === 'notCompleted' ? 'bg-yellow-700 text-white' : 'bg-gray-100 text-gray-700'
-            }`}>{localStats.summary?.មិនទាន់រួច || 0}</span>
+            <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${statusFilter === 'notCompleted' ? 'bg-yellow-700 text-white' : 'bg-gray-100 text-gray-700'
+              }`}>{localStats.summary?.មិនទាន់រួច || 0}</span>
           </button>
-          
-          <button 
-            onClick={() => setStatusFilter(statusFilter === 'noFeedback' ? null : 'noFeedback')} 
-            className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm border transition-colors whitespace-nowrap ${
-              statusFilter === 'noFeedback' ? 'bg-gray-600 text-white border-gray-600' : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
+
+          <button
+            onClick={() => setStatusFilter(statusFilter === 'noFeedback' ? null : 'noFeedback')}
+            className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm border transition-colors whitespace-nowrap ${statusFilter === 'noFeedback' ? 'bg-gray-600 text-white border-gray-600' : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
           >
             <span>មិនមានផ្ញើមតិ</span>
-            <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
-              statusFilter === 'noFeedback' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'
-            }`}>{localStats.summary?.មិនមានផ្ញើមតិ || 0}</span>
+            <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${statusFilter === 'noFeedback' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'
+              }`}>{localStats.summary?.មិនមានផ្ញើមតិ || 0}</span>
           </button>
         </div>
-        
+
         <div className="flex items-center">
           <label className="mr-2 text-sm">បង្ហាញ:</label>
           <select
@@ -2210,26 +2725,46 @@ export default function FileTransfer() {
       {/* ...moved page size dropdown inline with letter type filter... */}
       <div className="bg-white border rounded">
         <div className="overflow-x-auto">
-          <style>{`.filetransfer-table tbody tr:nth-child(odd) td { background: #e0e4e1; } .filetransfer-table tbody tr:nth-child(even) td { background: #f8fafc; } .filetransfer-table tbody tr:hover td { background: #a2c0e6; }`}</style>
-          <table className="min-w-full w-full table-auto filetransfer-table">
-            <thead style={{ backgroundColor: 'rgb(79, 204, 241)' }}>
+          <style>{`
+            .filetransfer-table { border-collapse: collapse; font-size: 12px; }
+            .filetransfer-table thead th { background: linear-gradient(135deg, #2d9cdb 0%, #56ccf2 100%); color: #fff; font-weight: 600; padding: 8px 6px; border: 1px solid #7dd3fc; text-align: center; letter-spacing: 0.02em; white-space: normal; line-height: 1.3; }
+            .filetransfer-table tbody td { padding: 5px 6px; border: 1px solid #d1d5db; vertical-align: middle; line-height: 1.4; }
+            .filetransfer-table tbody tr:nth-child(odd) td { background: #f0f7ff; }
+            .filetransfer-table tbody tr:nth-child(even) td { background: #ffffff; }
+            .filetransfer-table tbody tr:hover td { background: #bde4f5 !important; transition: background 0.15s; }
+            .filetransfer-table tbody tr td:first-child { text-align: center; color: #6b7280; font-weight: 500; }
+          `}</style>
+          <style>{`
+            .filetransfer-table tbody td > div,
+            .filetransfer-table tbody td > span {
+              display: -webkit-box !important;
+              -webkit-line-clamp: 2 !important;
+              -webkit-box-orient: vertical !important;
+              overflow: hidden !important;
+              white-space: normal !important;
+            }
+            .filetransfer-table tbody td {
+              max-height: 52px;
+              overflow: hidden;
+            }
+          `}</style>
+          <table className="table-fixed filetransfer-table" style={{ width: '100%', minWidth: 1050 }}>
+            <thead>
               <tr>
-                <th className="border px-3 py-2 text-xs font-semibold text-gray-800 w-8">ល.រ</th>
-                <th className="border px-3 py-2 text-xs font-semibold">ប្រភេទលិខិត</th>
-                <th className="border px-3 py-2 text-xs font-semibold text-gray-800">លេខលិខិត</th>
-                <th className="border px-3 py-2 text-xs font-semibold text-gray-800">កាលបរិច្ឆេទលិខិត</th>
-                <th className="border px-3 py-2 text-xs font-semibold text-gray-800">លេខចូល</th>
-                <th className="border px-3 py-2 text-xs font-semibold text-gray-800">កាលបរិច្ឆេទចូល</th>
-                <th className="border px-3 py-2 text-xs font-semibold text-gray-800">ប្រភពឯកសារ</th>
-                <th className="border px-3 py-2 text-xs font-semibold text-gray-800 w-12">ចំនួន</th>
-                <th className="border px-3 py-2 text-xs font-semibold text-gray-800">ឯកសារយោង</th>
-                <th className="border px-3 py-2 text-xs font-semibold text-gray-800 w-1/3">ខ្លឹមសារ</th>
-                <th className="border px-3 py-2 text-xs font-semibold text-gray-800">ផ្សេងៗ</th>
-                {showTelegramColumn && (
-                  <th className="border px-3 py-2 text-xs font-semibold text-gray-800">សារពី Telegram</th>
-                )}
-                <th className="border px-3 py-2 text-xs font-semibold text-gray-800">អ្នកទទួលបន្ទុក</th>
-                <th className="border px-3 py-2 text-xs font-semibold text-gray-800 ">សកម្មភាព</th>
+                <th style={{ width: 28 }}>ល.រ</th>
+                <th style={{ width: 72 }}>ប្រភេទ</th>
+                <th style={{ width: 42 }}>លេខ<br />លិខិត</th>
+                <th style={{ width: 80 }}>កាលបរិច្ឆេទ<br />លិខិត</th>
+                <th style={{ width: 36 }}>លេខ<br />ចូល</th>
+                <th style={{ width: 72 }}>កាលបរិច្ឆេទ<br />ចូល</th>
+                {showSourceColumn && <th style={{ width: 300 }}>ប្រភព</th>}
+                {showQtyColumn && <th style={{ width: 35 }}>ចំ<br />នួន</th>}
+                <th style={{ width: 44 }}>ឯកសារ<br />យោង</th>
+                <th style={{ width: 'auto', minWidth: 150 }}>ខ្លឹមសារ</th>
+                {showOthersColumn && <th style={{ width: 90 }}>ផ្សេងៗ</th>}
+                {showTelegramColumn && <th style={{ width: 120 }}>Telegram</th>}
+                <th style={{ width: 90 }}>អ្នកទទួល<br />បន្ទុក</th>
+                <th style={{ width: 70 }}>សកម្មភាព</th>
               </tr>
             </thead>
             <tbody>
@@ -2256,170 +2791,159 @@ export default function FileTransfer() {
                 const creator = getCreatorDisplay(r);
                 return (
                   <tr key={r._id ?? r.id ?? idx} className="hover:bg-gray-50">
-                  <td className="border px-3 py-2 text-xs">{startDisplay + idx}</td>
-                  <td className="border px-3 py-2 text-xs">{r.type || r.title}</td>
-                  <td className="border px-3 py-2 text-xs">{r.letterNo ?? r.letter_no ?? '-'}</td>
-                  <td className="border px-3 py-2 text-xs">{r.date ? formatISOToDisplay(r.date) : (r.created_at ? formatISOToDisplay(r.created_at) : '-')}</td>
-                  <td className="border px-3 py-2 text-xs">{r.entryNo ?? r.entry_no ?? '-'}</td>
-                  <td className="border px-3 py-2 text-xs">
-                    <div>{r.entryDate ? formatISOToDisplay(r.entryDate) : (r.entry_date ? formatISOToDisplay(r.entry_date) : '-')}</div>
-                    {entryTimeDisplay && (<div className="text-[10px] text-gray-500">ម៉ោង: {entryTimeDisplay}</div>)}
-                    {creator && (<div className="text-[10px] text-gray-500">: {creator}</div>)}
-                  </td>
-                  <td className="border px-3 py-2 text-xs">{r.source ?? r.origin ?? '-'}</td>
-                  <td className="border px-3 py-2 text-xs">{r.qty ?? r.count ?? '-'}</td>
-                  <td className="border px-3 py-2 text-xs text-blue-600">
-                    {(() => {
-                      const list = normalizeAttachments(r);
-                      if (!list || list.length === 0) return '-';
-                      return (
-                        <div className="flex items-center gap-2">
-                          <div className="text-sm text-gray-700">{list.length} ឯកសារ</div>
-                          <button type="button" onClick={() => handleViewAttachments(list, r._id ?? r.id ?? null)} className="text-blue-600 underline text-xs">មើល</button>
-                        </div>
-                      );
-                    })()}
-                  </td>
-                  <td className="border px-3 py-2 text-xs break-words whitespace-normal max-w-[60ch]">{r.content ?? r.description ?? '-'}</td>
-                  <td className="border px-3 py-2 text-xs whitespace-pre-wrap break-words max-w-[40ch]">
-                    {(() => {
-                      const cleaned = stripTelegramLinesFromOthers(r.others || r.notes);
-                      return cleaned || '-';
-                    })()}
-                  </td>
-
-                  {showTelegramColumn && (
+                    <td className="border px-1 py-2 text-xs">{startDisplay + idx}</td>
+                    <td className="border px-1 py-2 text-xs truncate" title={r.type || r.title}>{r.type || r.title}</td>
+                    <td className="border px-1 py-2 text-xs">{displayNumber(r.letterNo ?? r.letter_no)}</td>
+                    <td className="border px-1 py-2 text-xs">{r.date ? formatISOToDisplay(r.date) : (r.created_at ? formatISOToDisplay(r.created_at) : '-')}</td>
+                    <td className="border px-1 py-2 text-xs">{displayNumber(r.entryNo ?? r.entry_no)}</td>
                     <td className="border px-3 py-2 text-xs">
+                      <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        <span>{r.entryDate ? formatISOToDisplay(r.entryDate) : (r.entry_date ? formatISOToDisplay(r.entry_date) : '-')}</span>
+                        {entryTimeDisplay && <span className="text-[10px] text-gray-500"> {entryTimeDisplay}</span>}
+                        {creator && <span className="text-[10px] text-gray-500"> · {creator}</span>}
+                      </div>
+                    </td>
+                    {showSourceColumn && <td className="border px-3 py-2 text-xs" title={r.source ?? r.origin ?? ''}><div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.source ?? r.origin ?? '-'}</div></td>}
+                    {showQtyColumn && <td className="border px-1 py-2 text-xs">{r.qty ?? r.count ?? '-'}</td>}
+                    <td className="border px-1 py-2 text-xs text-blue-600">
                       {(() => {
-                        const { preview, count } = getLatestTelegramPreview(r);
-                        const has = preview && preview !== '-';
+                        const list = normalizeAttachments(r);
+                        if (!list || list.length === 0) return '-';
                         return (
-                          <div className="max-h-24 overflow-auto whitespace-pre-wrap break-words max-w-[50ch]">
-                            <div>{preview}</div>
-                            {has && count > 1 && (
-                              <div className="text-[10px] text-gray-500 mt-1">(+{count - 1} សារផ្សេងទៀត)</div>
-                            )}
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm text-gray-700">{list.length} </div>
+                            <button type="button" onClick={() => handleViewAttachments(list, r._id ?? r.id ?? null)} className="text-blue-600 underline text-xs">មើល</button>
                           </div>
                         );
                       })()}
                     </td>
-                  )}
+                    <td className="border px-2 py-2 text-xs break-words whitespace-normal max-w-[60ch]" title={r.content ?? r.description ?? ''}><div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.content ?? r.description ?? '-'}</div></td>
+                    {showOthersColumn && (
+                      <td className="border px-3 py-2 text-xs break-words max-w-[40ch]" title={stripTelegramLinesFromOthers(r.others || r.notes) || ''}>
+                        <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', whiteSpace: 'pre-wrap' }}>
+                          {stripTelegramLinesFromOthers(r.others || r.notes) || '-'}
+                        </div>
+                      </td>
+                    )}
 
-                  {/* Removed 'ស្ថានភាព' cell */}
-                  <td className="border px-3 py-2 text-xs">
-                    {(() => {
-                      try {
-                        const idKey = (r && (r._id || r.id)) || (`idx-${startDisplay + idx}`);
-                        const rawCurDisplay = (recipientDisplays && recipientDisplays[idKey]) || null;
-                        const curDisplay = rawCurDisplay || DEFAULT_RECIPIENT_DISPLAY;
-                        // if same as previous row (by id), suppress duplicate display (but don't suppress placeholder)
-                        if (idx > 0) {
-                          const prev = filteredRows[idx - 1];
-                          const prevKey = (prev && (prev._id || prev.id)) || (`idx-${startDisplay + idx - 1}`);
-                          const prevRawDisplay = (recipientDisplays && recipientDisplays[prevKey]) || null;
-                          const prevDisplay = prevRawDisplay || DEFAULT_RECIPIENT_DISPLAY;
-                          if (curDisplay.state !== 'pending' && prevDisplay.state === curDisplay.state && prevDisplay.text === curDisplay.text) return null;
-                        }
-                        if (curDisplay.state === 'completed') {
-                          const label = curDisplay.text ? `រួចរាល់ · ${curDisplay.text}` : 'រួចរាល់';
-                          return (<span style={{ background: '#3eeb9aff', color: '#0a0000ff', padding: '4px 8px', borderRadius: 6, display: 'inline-block' }}>{label}</span>);
-                        }
-                        if (curDisplay.state === 'pending') {
-                          return (<span className="text-sm px-2 py-0.5 bg-gray-300 text-gray-900 rounded">{curDisplay.text}</span>);
-                        }
-                        if (curDisplay.state === 'waiting') {
-                          const displayText = curDisplay.text || 'រង់ចាំការផ្ញើមតិ';
-                          return (<span style={{ background: '#f3d967ff', color: '#490202ff', padding: '4px 8px', borderRadius: 6, display: 'inline-block' }}>{displayText}</span>);
-                        }
-                        // fallback: compute live (in case recipientDisplays isn't ready)
-                        const wk = getWaitingStageKey(r);
-                        let display = null;
-                        if (wk) {
-                          const byKey = resolveStageSenderByKey(r, wk, signaturesMap);
-                          if (byKey) display = String(byKey).replace(/\s*\([^)]+\)\s*$/, '').trim();
-                          if (!display) {
-                            const waiting = getWaitingStageSender(r);
-                            if (waiting) display = String(waiting).replace(/\s*\([^)]+\)\s*$/, '').trim();
-                          }
-                        }
-                        if (display) {
-                          return (<span style={{ background: '#f3d967ff', color: '#490202ff', padding: '4px 8px', borderRadius: 6, display: 'inline-block' }}>{display}</span>);
-                        }
-                      } catch (e) {}
-                      return (<span className="text-sm text-gray-900">មិនទាន់មានការផ្ញើមតិ</span>);
-                    })()}
-                  </td>
-                  <td className="border px-0 py-1 text-xs sticky right- bg-white z-3">
-                    <div className="relative inline-block">
-                      <div className="flex items-center gap-0">
+                    {showTelegramColumn && (
+                      <td className="border px-3 py-2 text-xs">
                         {(() => {
-                          // Show action buttons selectively based on granular permissions.
-                          // Primary actions appear on the top row: edit, mission, delete
-                          // Secondary actions appear below: send, reply, reply2
-                          const primary = [];
-                          const secondary = [];
-                          const iconBtnStyle = { width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', padding: 0 };
-                          const iconSmall = { width: 15, height: 15 };
-
-                          if (canEdit) {
-                            primary.push(
-                              <button key="edit" onClick={() => openEdit(r._id ?? r.id)} title="កែប្រែ" style={{ ...iconBtnStyle, color: '#2563eb' }}>
-                                <FaEdit style={iconSmall} />
-                              </button>
-                            );
-                          }
-
-                          if (canEdit) {
-                            primary.push(
-                              <button key="mission" onClick={() => openMissionFromRow(r)} title="លិខិតបញ្ជាបេសកកម្ម" style={{ ...iconBtnStyle, color: '#374151' }}>
-                                <FaFileAlt style={iconSmall} />
-                              </button>
-                            );
-                          }
-
-                          if (canDelete) {
-                            primary.push(
-                              <button key="delete" onClick={() => handleDelete(r._id ?? r.id)} title="លុប" style={{ ...iconBtnStyle, color: '#dc2626' }}>
-                                <FaTrash style={iconSmall} />
-                              </button>
-                            );
-                          }
-
-                          if (canSendReview) {
-                            secondary.push(
-                              <button key="send" onClick={() => navigate && navigate('/send-feedback?recordId=' + encodeURIComponent(r._id ?? r.id))} title="ផ្ញើមតិ" style={{ ...iconBtnStyle, color: '#16a34a' }}>
-                                <FaPaperPlane style={iconSmall} />
-                              </button>
-                            );
-                          }
-
-                          if (canReply) {
-                            secondary.push(
-                              <button key="reply" onClick={() => navigate && navigate('/replay-file?recordId=' + encodeURIComponent(r._id ?? r.id))} title="ឆ្លើយតប" style={{ ...iconBtnStyle, color: '#4f46e5' }}>
-                                <FaReply style={iconSmall} />
-                              </button>
-                            );
-                            secondary.push(
-                              <button key="reply2" onClick={() => navigate && navigate('/replay-file2?recordId=' + encodeURIComponent(r._id ?? r.id))} title="ឆ្លើយតបបន្ទាប់" style={{ ...iconBtnStyle, color: '#d97706' }}>
-                                <FaReply style={iconSmall} />
-                              </button>
-                            );
-                          }
-
-                          if (primary.length === 0 && secondary.length === 0) return (<span className="text-sm text-gray-500">មិនមានសិទ្ធិ</span>);
-
+                          const { preview, count } = getLatestTelegramPreview(r);
+                          const has = preview && preview !== '-';
                           return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              <div style={{ display: 'flex', gap: 6 }}>{primary}</div>
-                              {secondary.length > 0 ? (<div style={{ display: 'flex', gap: 6 }}>{secondary}</div>) : null}
+                            <div className="break-words max-w-[50ch]" title={preview}>
+                              <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', whiteSpace: 'pre-wrap' }}>{preview}</div>
+                              {has && count > 1 && (
+                                <div className="text-[10px] text-gray-500 mt-1">(+{count - 1} សារផ្សេងទៀត)</div>
+                              )}
                             </div>
                           );
                         })()}
+                      </td>
+                    )}
+
+                    {/* Removed 'ស្ថានភាព' cell */}
+                    <td className="border px-1 py-2 text-[10px]" title={recipientDisplays[r._id ?? r.id]?.text || ''}>
+                      {(() => {
+                        try {
+                          const idKey = (r && (r._id || r.id)) || (`idx-${startDisplay + idx}`);
+                          const rawCurDisplay = (recipientDisplays && recipientDisplays[idKey]) || null;
+                          const curDisplay = rawCurDisplay || DEFAULT_RECIPIENT_DISPLAY;
+                          // Show recipient for every row to avoid user confusion about missing data
+                          if (curDisplay.state === 'completed') {
+                            const label = curDisplay.text ? `រួចរាល់ · ${curDisplay.text}` : 'រួចរាល់';
+                            return (<span style={{ background: '#3eeb9aff', color: '#0a0000ff', padding: '3px 6px', borderRadius: 6, display: 'inline-block', wordBreak: 'break-word', whiteSpace: 'normal', lineHeight: 1.4 }}>{label}</span>);
+                          }
+                          if (curDisplay.state === 'pending') {
+                            return (<span className="text-[10px] px-2 py-0.5 bg-gray-300 text-gray-900 rounded">{curDisplay.text}</span>);
+                          }
+                          if (curDisplay.state === 'waiting') {
+                            const displayText = curDisplay.text || 'រង់ចាំការផ្ញើមតិ';
+                            return (<span style={{ background: '#f3d967ff', color: '#490202ff', padding: '3px 6px', borderRadius: 6, display: 'inline-block', wordBreak: 'break-word', whiteSpace: 'normal', lineHeight: 1.4 }}>{displayText}</span>);
+                          }
+                          // fallback: compute live (in case recipientDisplays isn't ready)
+                          const wk = getWaitingStageKey(r);
+                          let display = null;
+                          if (wk) {
+                            const byKey = resolveStageSenderByKey(r, wk, signaturesMap);
+                            if (byKey) display = String(byKey).replace(/\s*\([^)]+\)\s*$/, '').trim();
+                            if (!display) {
+                              const waiting = getWaitingStageSender(r);
+                              if (waiting) display = String(waiting).replace(/\s*\([^)]+\)\s*$/, '').trim();
+                            }
+                          }
+                          if (display) {
+                            return (<span style={{ background: '#f3d967ff', color: '#490202ff', padding: '3px 6px', borderRadius: 6, display: 'inline-block', wordBreak: 'break-word', whiteSpace: 'normal', lineHeight: 1.4 }}>{display}</span>);
+                          }
+                        } catch (e) { }
+                        return (<span className="text-[10px] text-gray-900">មិនទាន់មានការផ្ញើមតិ</span>);
+                      })()}
+                    </td>
+                    <td className="border px-0 py-1 text-xs">
+                      <div className="relative inline-block">
+                        <div className="flex items-center gap-0">
+                          {(() => {
+                            // Show action buttons selectively based on granular permissions.
+                            // Primary actions appear on the top row: edit, mission, delete
+                            // Secondary actions appear below: send, reply, reply2
+                            const primary = [];
+                            const secondary = [];
+                            const iconBtnStyle = { width: 17, height: 17, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', padding: 0 };
+                            const iconSmall = { width: 12, height: 12 };
+
+                            if (canEdit) {
+                              primary.push(
+                                <button key="edit" onClick={() => openEdit(r._id ?? r.id)} title="កែប្រែ" style={{ ...iconBtnStyle, color: '#2563eb' }}>
+                                  <FaEdit style={iconSmall} />
+                                </button>
+                              );
+                            }
+
+
+                            if (canDelete) {
+                              primary.push(
+                                <button key="delete" onClick={() => handleDelete(r._id ?? r.id)} title="លុប" style={{ ...iconBtnStyle, color: '#dc2626' }}>
+                                  <FaTrash style={iconSmall} />
+                                </button>
+                              );
+                            }
+
+                            if (canSendReview && !isOutgoingPage) {
+                              secondary.push(
+                                <button key="send" onClick={() => navigate && navigate('/send-feedback?recordId=' + encodeURIComponent(r._id ?? r.id))} title="ផ្ញើមតិ" style={{ ...iconBtnStyle, color: '#16a34a' }}>
+                                  <FaPaperPlane style={iconSmall} />
+                                </button>
+                              );
+                            }
+
+                            if (canReply && !isOutgoingPage) {
+                              secondary.push(
+                                <button key="reply" onClick={() => navigate && navigate('/replay-file?recordId=' + encodeURIComponent(r._id ?? r.id))} title="ឆ្លើយតប" style={{ ...iconBtnStyle, color: '#4f46e5' }}>
+                                  <FaReply style={iconSmall} />
+                                </button>
+                              );
+                              secondary.push(
+                                <button key="reply2" onClick={() => navigate && navigate('/replay-file2?recordId=' + encodeURIComponent(r._id ?? r.id))} title="ឆ្លើយតបបន្ទាប់" style={{ ...iconBtnStyle, color: '#d97706' }}>
+                                  <FaReply style={iconSmall} />
+                                </button>
+                              );
+                            }
+
+                            if (primary.length === 0 && secondary.length === 0) return (<span className="text-sm text-gray-500">មិនមានសិទ្ធិ</span>);
+
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <div style={{ display: 'flex', gap: 6 }}>{primary}</div>
+                                {secondary.length > 0 ? (<div style={{ display: 'flex', gap: 6 }}>{secondary}</div>) : null}
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                </tr>
-              );
+                    </td>
+                  </tr>
+                );
               })}
             </tbody>
           </table>
@@ -2440,81 +2964,83 @@ export default function FileTransfer() {
         </div>
       </div>
 
-      {missionModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded shadow-lg w-[560px] max-w-[95vw]">
-            <div className="text-lg font-semibold text-gray-900 mb-4">លិខិតបញ្ជាបេសកកម្ម</div>
+      {
+        missionModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded shadow-lg w-[560px] max-w-[95vw]">
+              <div className="text-lg font-semibold text-gray-900 mb-4">លិខិតបញ្ជាបេសកកម្ម</div>
 
-            <div className="grid grid-cols-1 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">យោង</label>
-                <input
-                  value={missionForm.reference}
-                  onChange={(e) => setMissionForm((s) => ({ ...s, reference: e.target.value }))}
-                  className="border border-gray-300 rounded px-3 py-2 w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">សូមចាត់បញ្ជូន</label>
-                <input
-                  value={missionForm.assignTo}
-                  onChange={(e) => setMissionForm((s) => ({ ...s, assignTo: e.target.value }))}
-                  className="border border-gray-300 rounded px-3 py-2 w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ចូលរួម</label>
-                <input
-                  value={missionForm.participants}
-                  onChange={(e) => setMissionForm((s) => ({ ...s, participants: e.target.value }))}
-                  className="border border-gray-300 rounded px-3 py-2 w-full"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">កាលបរិច្ឆេទ</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">យោង</label>
                   <input
-                    type="date"
-                    value={missionForm.date}
-                    onChange={(e) => setMissionForm((s) => ({ ...s, date: e.target.value }))}
+                    value={missionForm.reference}
+                    onChange={(e) => setMissionForm((s) => ({ ...s, reference: e.target.value }))}
                     className="border border-gray-300 rounded px-3 py-2 w-full"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ទីកន្លែង</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">សូមចាត់បញ្ជូន</label>
                   <input
-                    value={missionForm.location}
-                    onChange={(e) => setMissionForm((s) => ({ ...s, location: e.target.value }))}
+                    value={missionForm.assignTo}
+                    onChange={(e) => setMissionForm((s) => ({ ...s, assignTo: e.target.value }))}
                     className="border border-gray-300 rounded px-3 py-2 w-full"
                   />
                 </div>
-              </div>
-            </div>
 
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={saveMissionFromModal}
-                disabled={missionSaving}
-                className={missionSaving ? 'bg-blue-400 text-white px-4 py-2 rounded cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded'}
-              >
-                រក្សាទុក
-              </button>
-              <button
-                type="button"
-                onClick={closeMissionModal}
-                disabled={missionSaving}
-                className={missionSaving ? 'bg-gray-300 text-white px-4 py-2 rounded cursor-not-allowed' : 'bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded'}
-              >
-                បោះបង់
-              </button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ចូលរួម</label>
+                  <input
+                    value={missionForm.participants}
+                    onChange={(e) => setMissionForm((s) => ({ ...s, participants: e.target.value }))}
+                    className="border border-gray-300 rounded px-3 py-2 w-full"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">កាលបរិច្ឆេទ</label>
+                    <input
+                      type="date"
+                      value={missionForm.date}
+                      onChange={(e) => setMissionForm((s) => ({ ...s, date: e.target.value }))}
+                      className="border border-gray-300 rounded px-3 py-2 w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ទីកន្លែង</label>
+                    <input
+                      value={missionForm.location}
+                      onChange={(e) => setMissionForm((s) => ({ ...s, location: e.target.value }))}
+                      className="border border-gray-300 rounded px-3 py-2 w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={saveMissionFromModal}
+                  disabled={missionSaving}
+                  className={missionSaving ? 'bg-blue-400 text-white px-4 py-2 rounded cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded'}
+                >
+                  រក្សាទុក
+                </button>
+                <button
+                  type="button"
+                  onClick={closeMissionModal}
+                  disabled={missionSaving}
+                  className={missionSaving ? 'bg-gray-300 text-white px-4 py-2 rounded cursor-not-allowed' : 'bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded'}
+                >
+                  បោះបង់
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }

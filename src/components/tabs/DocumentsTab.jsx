@@ -10,6 +10,55 @@ export default function DocumentsTab({ editHR, setEditHR }) {
   const [form, setForm] = React.useState({ type: '', startDate: '', expiryDate: '', other: '', fileUrl: '' });
   const [previewUrl, setPreviewUrl] = React.useState('');
 
+  const videoRef = React.useRef(null);
+  const [isCameraOpen, setIsCameraOpen] = React.useState(false);
+  const [stream, setStream] = React.useState(null);
+
+  async function openCamera() {
+    setIsCameraOpen(true);
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      setStream(s);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = s;
+        }
+      }, 100);
+    } catch (e) {
+      console.error('Camera error:', e);
+      alert('មិនអាចបើកកាមេរ៉ាបានទេ!');
+      setIsCameraOpen(false);
+    }
+  }
+
+  function closeCamera() {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+    setStream(null);
+    setIsCameraOpen(false);
+  }
+
+  async function capturePhoto() {
+    if (!videoRef.current) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+    
+    canvas.toBlob(async (blob) => {
+      if (blob) {
+        const file = new File([blob], `scanned_doc_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        const url = await handleUpload(file);
+        if (url) {
+          setForm(f => ({ ...f, fileUrl: url }));
+          closeCamera();
+        }
+      }
+    }, 'image/jpeg', 0.8);
+  }
+
   const list = Array.isArray(editHR?.documents) ? editHR.documents : [];
 
   function openAdd() {
@@ -199,10 +248,24 @@ export default function DocumentsTab({ editHR, setEditHR }) {
               </div>
               <div style={{ width: '100%' }}>
                 <label className="block mb-1 font-medium text-sm">ឯកសារ</label>
-                <input type="file" accept="image/*,.pdf" onChange={async e => {
-                  const url = await handleUpload(e.target.files?.[0]);
-                  if (url) setForm(f => ({ ...f, fileUrl: url }));
-                }} className="border px-3 py-2 rounded w-full" />
+                <div className="flex gap-2 mb-2">
+                  <input type="file" accept="image/*,.pdf" onChange={async e => {
+                    const url = await handleUpload(e.target.files?.[0]);
+                    if (url) setForm(f => ({ ...f, fileUrl: url }));
+                  }} className="border px-3 py-2 rounded w-full" />
+                  <button type="button" className="bg-blue-600 text-white px-3 py-2 rounded flex-shrink-0" onClick={openCamera}>បើកកាមេរ៉ា</button>
+                </div>
+                
+                {isCameraOpen && (
+                  <div className="border p-2 rounded mb-2 flex flex-col items-center">
+                    <video ref={videoRef} autoPlay playsInline className="w-full max-w-sm border" />
+                    <div className="flex gap-2 mt-2">
+                      <button type="button" className="bg-green-600 text-white px-3 py-1 rounded" onClick={capturePhoto}>ថត</button>
+                      <button type="button" className="bg-gray-500 text-white px-3 py-1 rounded" onClick={closeCamera}>បិទ</button>
+                    </div>
+                  </div>
+                )}
+
                 {form.fileUrl && (
                   <div className="mt-2">
                     <a href={form.fileUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">មើលឯកសារ</a>

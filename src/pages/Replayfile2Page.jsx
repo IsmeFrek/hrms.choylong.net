@@ -48,7 +48,7 @@ function prepareCommentsForPrint() {
     el.style.visibility = 'visible';
   });
 }
-        // inject minimal styles and our print CSS
+// inject minimal styles and our print CSS
 const SentComments = ({ comments = [] }) => (
   <div className="sent-comments">
     {comments.length === 0 && <div className="no-comments">គ្មានមតិដាក់ផ្ញើ</div>}
@@ -102,10 +102,10 @@ export default function Replayfile2Page(props) {
         setLoading(false);
       }
 
-      };
-      load();
-      return () => { mounted = false; };
-    }, [recordId]);
+    };
+    load();
+    return () => { mounted = false; };
+  }, [recordId]);
   // helper: map stage role codes to readable labels
   // Prefer per-record (meta.feedbackStageRoles) mappings when available,
   // otherwise fall back to the built-in map or the raw role code.
@@ -283,23 +283,23 @@ export default function Replayfile2Page(props) {
   const [showNameStages, setShowNameStages] = useState(() => loadStageSet('replayfile2:showNameStages', []));
 
   useEffect(() => {
-    try { localStorage.setItem('replayfile2:showLetterNo', showLetterNo ? '1' : '0'); } catch (e) {}
+    try { localStorage.setItem('replayfile2:showLetterNo', showLetterNo ? '1' : '0'); } catch (e) { }
   }, [showLetterNo]);
   useEffect(() => {
-    try { localStorage.setItem('replayfile2:showCreatorName', showCreatorName ? '1' : '0'); } catch (e) {}
+    try { localStorage.setItem('replayfile2:showCreatorName', showCreatorName ? '1' : '0'); } catch (e) { }
   }, [showCreatorName]);
   useEffect(() => {
-    try { localStorage.setItem('replayfile2:showDoAtStages', Array.from(showDoAtStages || []).join(',')); } catch (e) {}
+    try { localStorage.setItem('replayfile2:showDoAtStages', Array.from(showDoAtStages || []).join(',')); } catch (e) { }
   }, [showDoAtStages]);
   useEffect(() => {
-    try { localStorage.setItem('replayfile2:showSignatureStages', Array.from(showSignatureStages || []).join(',')); } catch (e) {}
+    try { localStorage.setItem('replayfile2:showSignatureStages', Array.from(showSignatureStages || []).join(',')); } catch (e) { }
   }, [showSignatureStages]);
   useEffect(() => {
-    try { localStorage.setItem('replayfile2:showNameStages', Array.from(showNameStages || []).join(',')); } catch (e) {}
+    try { localStorage.setItem('replayfile2:showNameStages', Array.from(showNameStages || []).join(',')); } catch (e) { }
   }, [showNameStages]);
 
   useEffect(() => {
-    try { localStorage.setItem('replayfile2:manualResize', manualResizeEnabled ? '1' : '0'); } catch (e) {}
+    try { localStorage.setItem('replayfile2:manualResize', manualResizeEnabled ? '1' : '0'); } catch (e) { }
   }, [manualResizeEnabled]);
 
   // If the user hasn't selected any toggles yet, treat features as visible by default
@@ -310,7 +310,7 @@ export default function Replayfile2Page(props) {
       if (showDoAtStages && showDoAtStages.size > 0) return true;
       if (showSignatureStages && showSignatureStages.size > 0) return true;
       if (showNameStages && showNameStages.size > 0) return true;
-    } catch (e) {}
+    } catch (e) { }
     return false;
   }, [showLetterNo, showCreatorName, showDoAtStages, showSignatureStages, showNameStages]);
 
@@ -333,14 +333,14 @@ export default function Replayfile2Page(props) {
   useEffect(() => {
     try {
       const legacyKeys = ['replayfile:showDoAtStages', 'replayfile:showSignatureStages', 'replayfile:showNameStages', 'replayfile:showLetterNo', 'replayfile:showCreatorName'];
-      legacyKeys.forEach(k => { try { if (localStorage.getItem(k) !== null) localStorage.removeItem(k); } catch (e) {} });
+      legacyKeys.forEach(k => { try { if (localStorage.getItem(k) !== null) localStorage.removeItem(k); } catch (e) { } });
 
       const targets = ['replayfile2:showDoAtStages', 'replayfile2:showSignatureStages', 'replayfile2:showNameStages'];
-      targets.forEach(k => { try { if (localStorage.getItem(k) === null) localStorage.setItem(k, ''); } catch (e) {} });
+      targets.forEach(k => { try { if (localStorage.getItem(k) === null) localStorage.setItem(k, ''); } catch (e) { } });
 
       // ensure the simple boolean keys exist too
-      try { if (localStorage.getItem('replayfile2:showLetterNo') === null) localStorage.setItem('replayfile2:showLetterNo', '0'); } catch (e) {}
-      try { if (localStorage.getItem('replayfile2:showCreatorName') === null) localStorage.setItem('replayfile2:showCreatorName', '0'); } catch (e) {}
+      try { if (localStorage.getItem('replayfile2:showLetterNo') === null) localStorage.setItem('replayfile2:showLetterNo', '0'); } catch (e) { }
+      try { if (localStorage.getItem('replayfile2:showCreatorName') === null) localStorage.setItem('replayfile2:showCreatorName', '0'); } catch (e) { }
     } catch (e) {
       // ignore storage errors
     }
@@ -390,7 +390,7 @@ export default function Replayfile2Page(props) {
               const src = img.getAttribute('src');
               const data = await blobToDataURL(src);
               if (data) blobMap[src] = data;
-            } catch (e) {}
+            } catch (e) { }
           }));
 
           // create iframe for printing
@@ -415,7 +415,7 @@ export default function Replayfile2Page(props) {
             const baseEl = idoc.createElement('base');
             baseEl.href = document.baseURI || window.location.href;
             idoc.head.appendChild(baseEl);
-          } catch (e) {}
+          } catch (e) { }
 
           // copy stylesheets and inline styles. Recreate <link> elements with
           // absolute `href` so webfonts/CSS referenced by relative paths load
@@ -436,11 +436,11 @@ export default function Replayfile2Page(props) {
                     let txt = await res.text();
                     txt = txt.replace(/url\(([^)]+)\)/g, (m, u) => {
                       let url = u.trim().replace(/^['"]|['"]$/g, '');
-                      try { if (!/^https?:\/\//i.test(url) && !url.startsWith('data:')) url = new URL(url, abs).href; } catch (e) {}
+                      try { if (!/^https?:\/\//i.test(url) && !url.startsWith('data:')) url = new URL(url, abs).href; } catch (e) { }
                       return `url('${url}')`;
                     });
                     txt = txt.replace(/@import\s+(?:url\()?['"]?([^'"\)]+)['"]?\)?/g, (m, u) => {
-                      try { if (!/^https?:\/\//i.test(u) && !u.startsWith('data:')) u = new URL(u, abs).href; } catch (e) {}
+                      try { if (!/^https?:\/\//i.test(u) && !u.startsWith('data:')) u = new URL(u, abs).href; } catch (e) { }
                       return `@import url('${u}')`;
                     });
                     const s = idoc.createElement('style');
@@ -458,14 +458,14 @@ export default function Replayfile2Page(props) {
                 if (abs) nl.href = abs;
                 if (link.media) nl.media = link.media;
                 if (link.integrity) nl.integrity = link.integrity;
-                try { if (link.crossOrigin) nl.crossOrigin = link.crossOrigin; } catch (e) {}
+                try { if (link.crossOrigin) nl.crossOrigin = link.crossOrigin; } catch (e) { }
                 idoc.head.appendChild(nl);
-              } catch (e) {}
+              } catch (e) { }
             }
             Array.from(document.querySelectorAll('style')).forEach(s => {
-              try { idoc.head.appendChild(s.cloneNode(true)); } catch (e) {}
+              try { idoc.head.appendChild(s.cloneNode(true)); } catch (e) { }
             });
-          } catch (e) {}
+          } catch (e) { }
 
           // add a print-only rule to hide everything except the iframe
           const hideStyle = idoc.createElement('style');
@@ -492,15 +492,15 @@ export default function Replayfile2Page(props) {
                     ci.setAttribute('src', blobMap[s]);
                   } else if (s && !/^https?:\/\//i.test(s) && !s.startsWith('data:') && document.baseURI) {
                     // make relative src absolute so it resolves inside iframe
-                    try { ci.setAttribute('src', new URL(s, document.baseURI).href); } catch (e) {}
+                    try { ci.setAttribute('src', new URL(s, document.baseURI).href); } catch (e) { }
                   }
-                } catch (e) {}
+                } catch (e) { }
               });
-            } catch (e) {}
+            } catch (e) { }
             idoc.body.appendChild(clone);
           } catch (e) {
             // fallback: write outerHTML if cloning fails
-            try { idoc.body.innerHTML = el.outerHTML; } catch (err) {}
+            try { idoc.body.innerHTML = el.outerHTML; } catch (err) { }
           }
 
           idoc.close();
@@ -511,7 +511,7 @@ export default function Replayfile2Page(props) {
     };
 
     const onAfterPrint = () => {
-      try { const iframe = document.getElementById('replay-print-iframe'); if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (e) {}
+      try { const iframe = document.getElementById('replay-print-iframe'); if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (e) { }
     };
 
     window.addEventListener('beforeprint', onBeforePrint);
@@ -519,23 +519,30 @@ export default function Replayfile2Page(props) {
     return () => { window.removeEventListener('beforeprint', onBeforePrint); window.removeEventListener('afterprint', onAfterPrint); onAfterPrint(); };
   }, [meta, uiFontSize, uiLineHeight, uiPaddingTop]);
 
-  
+
+
+  const hasPopulated = useRef(false);
 
   useEffect(() => {
-    setLeftContent(firstCourse1Note(meta) || '');
-    setS1Content((meta && meta.Course1Note) || '');
-    setCenterContent((meta && meta.centerNote) || '');
-    setRightContent((meta && meta.rightNote) || '');
-    setDeptContent((meta && meta.Course2Note) || '');
-    setContent3((meta && meta.Course3Note) || '');
-    setContent4((meta && meta.Course4Note) || '');
-    setContent5((meta && meta.Course5Note) || '');
-    setDeputyContent((meta && meta.Course3Note) || '');
-    setDeputyRightContent((meta && meta.Course4Note) || '');
-    setHeadOfficeContent((meta && meta.Course6Note) || '');
-    setDirectorContent((meta && meta.Course5Note) || '');
-    // skip autosave for the initial population
-    initialLoad.current = false;
+    if (!record) return;
+    if (!hasPopulated.current) {
+      setLeftContent(firstCourse1Note(meta) || '');
+      setS1Content((meta && meta.Course1Note) || '');
+      setCenterContent((meta && meta.centerNote) || '');
+      setRightContent((meta && meta.rightNote) || '');
+      setDeptContent((meta && meta.Course2Note) || '');
+      setContent3((meta && meta.Course3Note) || '');
+      setContent4((meta && meta.Course4Note) || '');
+      setContent5((meta && meta.Course5Note) || '');
+      setDeputyContent((meta && meta.Course3Note) || '');
+      setDeputyRightContent((meta && meta.Course4Note) || '');
+      setHeadOfficeContent((meta && meta.Course6Note) || '');
+      setDirectorContent((meta && meta.Course5Note) || '');
+      // skip autosave for the initial population
+      initialLoad.current = false;
+      hasPopulated.current = true;
+    }
+
     // set captured date from record if available
     if (record && record.date) {
       try {
@@ -548,7 +555,7 @@ export default function Replayfile2Page(props) {
             if (/T00:00:00(?:\.000)?(?:Z|\+00:00)?$/.test(rawDateStr)) isDateOnly = true;
             if (/^\d{4}-\d{2}-\d{2}$/.test(rawDateStr)) isDateOnly = true;
           }
-        } catch (e) {}
+        } catch (e) { }
 
         if (isDateOnly || (parsed.getHours && parsed.getHours() === 0 && parsed.getMinutes && parsed.getMinutes() === 0)) {
           const now = new Date();
@@ -566,7 +573,7 @@ export default function Replayfile2Page(props) {
                 if (/T00:00:00(?:\.000)?(?:Z|\+00:00)?$/.test(rawM)) isMetaDateOnly = true;
                 if (/^\d{4}-\d{2}-\d{2}$/.test(rawM)) isMetaDateOnly = true;
               }
-            } catch (e) {}
+            } catch (e) { }
             if (isMetaDateOnly || (m.getHours && m.getHours() === 0 && m.getMinutes && m.getMinutes() === 0)) {
               const now2 = new Date();
               m.setHours(now2.getHours(), now2.getMinutes(), now2.getSeconds());
@@ -601,7 +608,7 @@ export default function Replayfile2Page(props) {
         } catch (e) {
           // ignore — not all createdBy values map to signatures
         }
-      } catch (e) {}
+      } catch (e) { }
     })();
     return () => { mounted = false; };
   }, [record && record.createdBy, signaturesMap]);
@@ -623,7 +630,7 @@ export default function Replayfile2Page(props) {
           }
         }
         if (!url) return;
-        items.push({ name: name || (typeof a === 'string' ? a : (a && (a.name || a.filename || a.url)) ) || url, url });
+        items.push({ name: name || (typeof a === 'string' ? a : (a && (a.name || a.filename || a.url))) || url, url });
       } catch (e) {
         // ignore
       }
@@ -697,7 +704,7 @@ export default function Replayfile2Page(props) {
     // log for debugging
     try {
       console.debug('Replay: found attachment URLs', uniq.map(u => u.url));
-    } catch (e) {}
+    } catch (e) { }
 
     setRefUrls(uniq);
     setSelectedRef(uniq.length ? uniq[0].url : null);
@@ -947,91 +954,52 @@ export default function Replayfile2Page(props) {
     // Course6 is handled by Head of Office (`headOfficeContent`) autosave
   }, []);
 
+  const safeResize = (el) => {
+    if (!el || manualResizeEnabled) return;
+    const MIN_H = 24;
+    // Don't shrink while focused so Khmer IME composition isn't interrupted
+    if (document.activeElement !== el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.max(el.scrollHeight, MIN_H)}px`;
+    } else if (el.scrollHeight > el.clientHeight || el.style.height === 'auto' || el.style.height === '') {
+      el.style.height = `${Math.max(el.scrollHeight, MIN_H)}px`;
+    }
+  };
+
   // Adjust textarea height to fit content (auto-resize) for CourseNote textarea
   useEffect(() => {
-    if (manualResizeEnabled) return undefined;
-    const el = courseNoteRef.current;
-    if (!el) return undefined;
-    // reset then set to scrollHeight to accommodate shrink & grow
-    el.style.height = 'auto';
-    // keep a small minimum so the textarea initially shows ~1 line
-    const MIN_H = 24; // px ~ one line
-    const h = Math.max(el.scrollHeight, MIN_H);
-    el.style.height = `${h}px`;
-    return undefined;
-  }, [leftContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
+    safeResize(courseNoteRef.current);
+  }, [leftContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter, manualResizeEnabled]);
 
   // autosize for S1 textarea (Stage 1)
   useEffect(() => {
-    if (manualResizeEnabled) return undefined;
-    const el = s1TextareaRef.current;
-    if (!el) return undefined;
-    el.style.height = 'auto';
-    const MIN_H = 24;
-    const h = Math.max(el.scrollHeight, MIN_H);
-    el.style.height = `${h}px`;
-    return undefined;
-  }, [s1Content, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
+    safeResize(s1TextareaRef.current);
+  }, [s1Content, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter, manualResizeEnabled]);
 
   // autosize for department textarea
   useEffect(() => {
-    if (manualResizeEnabled) return undefined;
-    const el = deptTextareaRef.current;
-    if (!el) return undefined;
-    el.style.height = 'auto';
-    const MIN_H_D = 24;
-    const h = Math.max(el.scrollHeight, MIN_H_D);
-    el.style.height = `${h}px`;
-    return undefined;
-  }, [deptContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
+    safeResize(deptTextareaRef.current);
+  }, [deptContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter, manualResizeEnabled]);
 
   // autosize for deputy textarea
   useEffect(() => {
-    if (manualResizeEnabled) return undefined;
-    const el = deputyTextareaRef.current;
-    if (!el) return undefined;
-    el.style.height = 'auto';
-    const MIN_H_D = 24;
-    const h = Math.max(el.scrollHeight, MIN_H_D);
-    el.style.height = `${h}px`;
-    return undefined;
-  }, [deputyContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
+    safeResize(deputyTextareaRef.current);
+  }, [deputyContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter, manualResizeEnabled]);
 
   // autosize for deputy-right textarea
   useEffect(() => {
-    if (manualResizeEnabled) return undefined;
-    const el = deputyRightTextareaRef.current;
-    if (!el) return undefined;
-    el.style.height = 'auto';
-    const MIN_H_D = 24;
-    const h = Math.max(el.scrollHeight, MIN_H_D);
-    el.style.height = `${h}px`;
-    return undefined;
-  }, [deputyRightContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
+    safeResize(deputyRightTextareaRef.current);
+  }, [deputyRightContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter, manualResizeEnabled]);
 
   // autosize for director textarea
   useEffect(() => {
-    if (manualResizeEnabled) return undefined;
-    const el = directorTextareaRef.current;
-    if (!el) return undefined;
-    el.style.height = 'auto';
-    const MIN_H_D = 24;
-    const h = Math.max(el.scrollHeight, MIN_H_D);
-    el.style.height = `${h}px`;
-    return undefined;
-  }, [directorContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
+    safeResize(directorTextareaRef.current);
+  }, [directorContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter, manualResizeEnabled]);
 
   // autosize for head office textarea
   useEffect(() => {
-    if (manualResizeEnabled) return undefined;
-    const el = headOfficeTextareaRef.current;
-    if (!el) return undefined;
-    el.style.height = 'auto';
-    const MIN_H_D = 24;
-    const h = Math.max(el.scrollHeight, MIN_H_D);
-    el.style.height = `${h}px`;
-    return undefined;
-  }, [headOfficeContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
+    safeResize(headOfficeTextareaRef.current);
+  }, [headOfficeContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter, manualResizeEnabled]);
 
   const printPage = () => window.print();
 
@@ -1170,7 +1138,7 @@ export default function Replayfile2Page(props) {
       printWin.document.open();
       const pd = printWin.document;
       // clear any existing content
-      try { while (pd.body && pd.body.firstChild) pd.body.removeChild(pd.body.firstChild); } catch (e) {}
+      try { while (pd.body && pd.body.firstChild) pd.body.removeChild(pd.body.firstChild); } catch (e) { }
       // set basic head/meta
       try {
         pd.title = document.title || '';
@@ -1182,8 +1150,8 @@ export default function Replayfile2Page(props) {
           const base = pd.createElement('base');
           base.href = document.baseURI || window.location.href;
           pd.head.appendChild(base);
-        } catch (e) {}
-      } catch (e) {}
+        } catch (e) { }
+      } catch (e) { }
 
       // inject minimal styles and our print CSS, then recreate stylesheet links
       try {
@@ -1209,29 +1177,29 @@ export default function Replayfile2Page(props) {
               if (abs) nl.href = abs;
               if (link.media) nl.media = link.media;
               if (link.integrity) nl.integrity = link.integrity;
-              try { if (link.crossOrigin) nl.crossOrigin = link.crossOrigin; } catch (e) {}
+              try { if (link.crossOrigin) nl.crossOrigin = link.crossOrigin; } catch (e) { }
               pd.head.appendChild(nl);
-            } catch (e) {}
+            } catch (e) { }
           });
           Array.from(document.querySelectorAll('style')).forEach(s => {
-            try { pd.head.appendChild(s.cloneNode(true)); } catch (e) {}
+            try { pd.head.appendChild(s.cloneNode(true)); } catch (e) { }
           });
-        } catch (e) {}
-      } catch (e) {}
+        } catch (e) { }
+      } catch (e) { }
 
       // clone the sheet node into the print document
       try {
         const clone = el.cloneNode(true);
         // remove any data attributes that might cause scripts to run
-        try { clone.querySelectorAll && clone.querySelectorAll('[data-reactroot],[data-reactid]').forEach(n => { n.removeAttribute && n.removeAttribute('data-reactroot'); n.removeAttribute && n.removeAttribute('data-reactid'); }); } catch (e) {}
+        try { clone.querySelectorAll && clone.querySelectorAll('[data-reactroot],[data-reactid]').forEach(n => { n.removeAttribute && n.removeAttribute('data-reactroot'); n.removeAttribute && n.removeAttribute('data-reactid'); }); } catch (e) { }
         pd.body.appendChild(clone);
       } catch (e) {
         // fallback: write outerHTML if cloning fails
-        try { pd.body.innerHTML = el.outerHTML; } catch (err) {}
+        try { pd.body.innerHTML = el.outerHTML; } catch (err) { }
       }
 
       pd.close();
-      try { printWin.focus(); } catch (e) {}
+      try { printWin.focus(); } catch (e) { }
 
       // Give the new window a moment to render before printing
       setTimeout(() => {
@@ -1242,7 +1210,7 @@ export default function Replayfile2Page(props) {
         }
         // close the window shortly after printing
         setTimeout(() => {
-          try { printWin.close(); } catch (e) {}
+          try { printWin.close(); } catch (e) { }
           setIsPrinting(false);
         }, 800);
       }, 250);
@@ -1304,11 +1272,11 @@ export default function Replayfile2Page(props) {
       try {
         const iframe = document.getElementById('print-iframe');
         if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
-      } catch (e) {}
+      } catch (e) { }
       try {
         const hs = document.getElementById('print-hide-everything');
         if (hs && hs.parentNode) hs.parentNode.removeChild(hs);
-      } catch (e) {}
+      } catch (e) { }
     };
 
     window.addEventListener('beforeprint', onBefore);
@@ -1364,12 +1332,12 @@ export default function Replayfile2Page(props) {
         document.body.appendChild(iframe);
 
         const cleanup = () => {
-          try { if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (e) {}
-          try { URL.revokeObjectURL(url); } catch (e) {}
+          try { if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (e) { }
+          try { URL.revokeObjectURL(url); } catch (e) { }
           window.removeEventListener('message', msgHandler);
         };
 
-        const msgHandler = () => {};
+        const msgHandler = () => { };
 
         // when iframe loads, print it
         iframe.onload = () => {
@@ -1584,7 +1552,7 @@ export default function Replayfile2Page(props) {
     }
 
   };
- 
+
   // save deputy note (Deputy director)
   const saveCourse3Note = async () => {
     if (!record) return;
@@ -1811,8 +1779,8 @@ export default function Replayfile2Page(props) {
   };
 
   // Khmer date formatting helpers
-  const KHMER_DIGITS = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
-  const KHMER_MONTHS = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
+  const KHMER_DIGITS = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
+  const KHMER_MONTHS = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
   const toKhmerDigits = (num) => {
     if (num === null || num === undefined) return '';
     const s = String(num);
@@ -1881,7 +1849,7 @@ export default function Replayfile2Page(props) {
         const now = new Date();
         d.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
       }
-    } catch (e) {}
+    } catch (e) { }
     return d;
   };
 
@@ -1899,7 +1867,7 @@ export default function Replayfile2Page(props) {
         try {
           const sig = signaturesMap && signaturesMap[cb];
           if (sig) return sig.fullNameKh || sig.fullName || sig.name || String(cb);
-        } catch (e) {}
+        } catch (e) { }
       }
       // next prefer explicit createdByName or reporterName in meta
       if (record.createdByName) return record.createdByName;
@@ -1928,7 +1896,7 @@ export default function Replayfile2Page(props) {
   };
 
   // recipient signature from feedbackStages.S1
-  
+
   const sigS = sigFor && sigFor('S');
   const sig1 = sigFor && sigFor('S1');
   const sig2 = sigFor && sigFor('S2');
@@ -2025,8 +1993,8 @@ export default function Replayfile2Page(props) {
     return () => {
       mounted = false;
       window.removeEventListener('resize', onResize);
-      try { if (ro) ro.disconnect(); } catch (e) {}
-      try { clearInterval(poll); } catch (e) {}
+      try { if (ro) ro.disconnect(); } catch (e) { }
+      try { clearInterval(poll); } catch (e) { }
     };
   }, [sheetRef, refPreviewWrapper, uiFontSize, uiLineHeight, uiPaddingTop, selectedRef]);
 
@@ -2152,7 +2120,7 @@ export default function Replayfile2Page(props) {
 
     return () => {
       mounted = false;
-      try { if (loadingTask && loadingTask.destroy) loadingTask.destroy(); } catch (e) {}
+      try { if (loadingTask && loadingTask.destroy) loadingTask.destroy(); } catch (e) { }
     };
   }, [selectedRef]);
 
@@ -2178,7 +2146,7 @@ export default function Replayfile2Page(props) {
           if (s && (s.fullNameKh || s.fullName || s.name)) return true;
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return false;
   };
 
@@ -2205,10 +2173,10 @@ export default function Replayfile2Page(props) {
         { key: 'S', variants: ['S'], metaKey: 'CourseNote', local: leftContent },
         { key: 'S1', variants: ['S1'], metaKey: 'Course1Note', local: s1Content },
         { key: 'S2', variants: ['S2'], metaKey: 'Course2Note', local: deptContent },
-        { key: 'S3', variants: ['SD','S3'], metaKey: 'Course3Note', local: deputyContent },
-        { key: 'S4', variants: ['SDR','S4'], metaKey: 'Course4Note', local: deputyRightContent },
-        { key: 'S5', variants: ['S5','DIR','SDIR'], metaKey: 'Course5Note', local: directorContent },
-        { key: 'S6', variants: ['S6','HO'], metaKey: 'Course6Note', local: headOfficeContent }
+        { key: 'S3', variants: ['SD', 'S3'], metaKey: 'Course3Note', local: deputyContent },
+        { key: 'S4', variants: ['SDR', 'S4'], metaKey: 'Course4Note', local: deputyRightContent },
+        { key: 'S5', variants: ['S5', 'DIR', 'SDIR'], metaKey: 'Course5Note', local: directorContent },
+        { key: 'S6', variants: ['S6', 'HO'], metaKey: 'Course6Note', local: headOfficeContent }
       ];
 
       // Consider a variant "selected" only when the key exists in
@@ -2224,7 +2192,7 @@ export default function Replayfile2Page(props) {
             if (typeof raw === 'object') return true;
             if (String(raw).trim() !== '') return true;
           }
-        } catch (e) {}
+        } catch (e) { }
         return false;
       };
 
@@ -2233,7 +2201,7 @@ export default function Replayfile2Page(props) {
           if (localVal && String(localVal).trim() !== '') return true;
           const v = meta && meta[metaKey];
           if (v && String(v).trim() !== '') return true;
-        } catch (e) {}
+        } catch (e) { }
         return false;
       };
 
@@ -2300,7 +2268,7 @@ export default function Replayfile2Page(props) {
     } catch (e) { return new Set(); }
   }, [normalizedStages, leftContent, s1Content, deptContent, deputyContent, deputyRightContent, directorContent, headOfficeContent, signaturesMap, meta]);
 
-  
+
 
   // Stages that have actually sent feedback (note exists)
   const stagesWithFeedback = useMemo(() => {
@@ -2333,7 +2301,7 @@ export default function Replayfile2Page(props) {
   const waitingStageSender = useMemo(() => {
     try {
       if (!normalizedStages) return null;
-      const order = ['S','S1','S2','SD','SDR','S3','S4','S5','S6'];
+      const order = ['S', 'S1', 'S2', 'SD', 'SDR', 'S3', 'S4', 'S5', 'S6'];
       for (const k of order) {
         const raw = normalizedStages[k];
         if (!raw) continue;
@@ -2366,7 +2334,7 @@ export default function Replayfile2Page(props) {
           return `Stage ${k}`;
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return null;
   }, [normalizedStages, meta, leftContent, deptContent, deputyContent, deputyRightContent, directorContent, headOfficeContent, signaturesMap]);
 
@@ -2380,12 +2348,12 @@ export default function Replayfile2Page(props) {
 
   // helper: check whether the current logged-in user is the assigned sender for any of the given stage keys
   const isAssignedToStage = (keys) => {
-        // Admin users may edit all stages
-        try {
-          if (perms && perms.canEditDocuments) return true;
-        } catch (e) {
-          // ignore
-        }
+    // Admin users may edit all stages
+    try {
+      if (perms && perms.canEditDocuments) return true;
+    } catch (e) {
+      // ignore
+    }
     try {
       if (!normalizedStages || !currentUser) return false;
       const normalize = (v) => (v || '').toString().normalize ? v.toString().normalize('NFKD').replace(/\p{Diacritic}/gu, '') : (v || '').toString();
@@ -2417,7 +2385,7 @@ export default function Replayfile2Page(props) {
     return false;
   };
 
-  
+
   // When true, show placeholder stage boxes even if no stage assignments or notes exist
   // Set to false so placeholders only appear when feedback stages/notes exist
   // helper: check whether any of the stage dropdowns were actually selected
@@ -2451,14 +2419,14 @@ export default function Replayfile2Page(props) {
   const alwaysShowPlaceholders = false;
   // Only show blocks for stages that have saved notes — hide placeholders for empty/assigned-only stages
   // Show deputy left when either a note exists or the stage was selected/sent
-  const showDeputyLeft = hasNote('Course3Note', deputyContent) || stageSelected(['SD','S3']);
+  const showDeputyLeft = hasNote('Course3Note', deputyContent) || stageSelected(['SD', 'S3']);
 
   // Right deputy should be shown when it has a saved note or was selected
-  const showDeputyRight = hasNote('Course4Note', deputyRightContent) || stageSelected(['SDR','S4']);
+  const showDeputyRight = hasNote('Course4Note', deputyRightContent) || stageSelected(['SDR', 'S4']);
   // Show HeadOffice when Course6Note exists or S6 was selected
   const showHeadOffice = hasNote('Course6Note', headOfficeContent) || stageSelected(['S6']);
   // Show director block when Course5Note exists or director stage was selected
-  const showDirector = hasNote('Course5Note', directorContent) || stageSelected(['DIR','SDIR','S5']);
+  const showDirector = hasNote('Course5Note', directorContent) || stageSelected(['DIR', 'SDIR', 'S5']);
   // Show department head when Course2Note exists or S2 was selected
   const showDept = hasNote('Course2Note', deptContent) || stageSelected(['S2']);
 
@@ -2479,17 +2447,17 @@ export default function Replayfile2Page(props) {
     const leftJSX = (
       <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
         <div style={{ padding: 1 }}>
-                      <div className="role-label" style={{ textAlign: 'center', marginTop: 2, fontFamily: 'Khmer OS Muol Light' }}>
-                        {(meta && meta.feedbackStageRoles && meta.feedbackStageRoles.s3) || getRoleLabel('s3')}
-                      </div>
-                      <textarea
-                        rows={4}
-                        ref={deputyTextareaRef}
-                        value={deputyContent}
-                        onChange={(e) => { setDeputyContent(e.target.value); clearStageMessage('S3'); }}
-                        placeholder=""
-                        style={{ width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%', height: 'auto', minHeight: '72px', lineHeight: uiLineHeight, textAlign: 'justify', margin: 0, marginRight: manualResizeEnabled ? '18px' : 0, marginBottom: manualResizeEnabled ? '12px' : 0, padding: '8px 22px 12px 8px', resize: manualResizeEnabled ? 'both' : 'none', overflow: manualResizeEnabled ? 'auto' : 'hidden', backgroundImage: manualResizeEnabled ? "linear-gradient(135deg, rgba(0,0,0,0.22) 25%, transparent 25%), linear-gradient(135deg, rgba(0,0,0,0.16) 25%, transparent 25%), linear-gradient(135deg, rgba(0,0,0,0.1) 25%, transparent 25%)" : 'none', backgroundSize: manualResizeEnabled ? '14px 14px, 10px 10px, 6px 6px' : '0 0', backgroundRepeat: manualResizeEnabled ? 'no-repeat' : 'no-repeat', backgroundPosition: manualResizeEnabled ? 'right 6px bottom 6px, right 4px bottom 4px, right 2px bottom 2px' : '0 0', fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", boxSizing: 'border-box', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', textIndent: '30px' }} disabled={!isAssignedToStage(['SD','S3'])} />
-            <div style={{ textAlign: 'center', marginTop: 0 }}>
+          <div className="role-label" style={{ textAlign: 'center', marginTop: 2, fontFamily: 'Khmer OS Muol Light' }}>
+            {(meta && meta.feedbackStageRoles && meta.feedbackStageRoles.s3) || getRoleLabel('s3')}
+          </div>
+          <textarea
+            rows={4}
+            ref={deputyTextareaRef}
+            value={deputyContent}
+            onChange={(e) => { setDeputyContent(e.target.value); clearStageMessage('S3'); }}
+            placeholder=""
+            style={{ width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%', height: 'auto', minHeight: '72px', lineHeight: uiLineHeight, textAlign: 'justify', margin: 0, marginRight: manualResizeEnabled ? '18px' : 0, marginBottom: manualResizeEnabled ? '12px' : 0, padding: '8px 22px 12px 8px', resize: manualResizeEnabled ? 'both' : 'none', overflow: manualResizeEnabled ? 'auto' : 'hidden', backgroundImage: manualResizeEnabled ? "linear-gradient(135deg, rgba(0,0,0,0.22) 25%, transparent 25%), linear-gradient(135deg, rgba(0,0,0,0.16) 25%, transparent 25%), linear-gradient(135deg, rgba(0,0,0,0.1) 25%, transparent 25%)" : 'none', backgroundSize: manualResizeEnabled ? '14px 14px, 10px 10px, 6px 6px' : '0 0', backgroundRepeat: manualResizeEnabled ? 'no-repeat' : 'no-repeat', backgroundPosition: manualResizeEnabled ? 'right 6px bottom 6px, right 4px bottom 4px, right 2px bottom 2px' : '0 0', fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", boxSizing: 'border-box', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', textIndent: '30px' }} disabled={!isAssignedToStage(['SD', 'S3'])} />
+          <div style={{ textAlign: 'center', marginTop: 0 }}>
             {hasDeputy ? (
               <>
                 {effectiveShowDoAt('S3') ? (
@@ -2502,8 +2470,8 @@ export default function Replayfile2Page(props) {
                 ) : null}
               </>
             ) : null}
-                            {(((effectiveShowName('S3') && (stagesWithFeedback && stagesWithFeedback.has('S3'))) || stageHasSenderForKeys(['SD','S3']))) ? (
-              <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['SD','S3']) || ''}</div>
+            {(((effectiveShowName('S3') && (stagesWithFeedback && stagesWithFeedback.has('S3'))) || stageHasSenderForKeys(['SD', 'S3']))) ? (
+              <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['SD', 'S3']) || ''}</div>
             ) : null}
           </div>
           {/* --- Telegram Feedback Section --- */}
@@ -2544,31 +2512,33 @@ export default function Replayfile2Page(props) {
               value={deputyRightContent}
               onChange={(e) => { setDeputyRightContent(e.target.value); clearStageMessage('S4'); }}
               placeholder=""
-              style={{ width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%', 
-                height: 'auto', 
-                minHeight: '72px', 
-                lineHeight: uiLineHeight, 
-                textAlign: 'justify', 
-                margin: 0, 
+              style={{
+                width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%',
+                height: 'auto',
+                minHeight: '72px',
+                lineHeight: uiLineHeight,
+                textAlign: 'justify',
+                margin: 0,
                 marginRight: manualResizeEnabled ? '18px' : 0,
                 marginBottom: manualResizeEnabled ? '12px' : 0,
-                padding: '8px 22px 12px 8px', 
-                resize: manualResizeEnabled ? 'both' : 'none', 
-                overflow: manualResizeEnabled ? 'auto' : 'hidden', 
+                padding: '8px 22px 12px 8px',
+                resize: manualResizeEnabled ? 'both' : 'none',
+                overflow: manualResizeEnabled ? 'auto' : 'hidden',
                 backgroundImage: manualResizeEnabled ? "linear-gradient(135deg, rgba(0,0,0,0.22) 25%, transparent 25%), linear-gradient(135deg, rgba(0,0,0,0.16) 25%, transparent 25%), linear-gradient(135deg, rgba(0,0,0,0.1) 25%, transparent 25%)" : 'none',
                 backgroundSize: manualResizeEnabled ? '14px 14px, 10px 10px, 6px 6px' : '0 0',
                 backgroundRepeat: manualResizeEnabled ? 'no-repeat' : 'no-repeat',
-                backgroundPosition: manualResizeEnabled ? 'right 6px bottom 6px, right 4px bottom 4px, right 2px bottom 2px' : '0 0', 
-                fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", 
-                boxSizing: 'border-box', 
-                whiteSpace: 'pre-wrap', 
-                overflowWrap: 'anywhere', 
-                wordBreak: 'break-word', 
-                textIndent: '30px' }}
-              disabled={!isAssignedToStage(['SDR','S4'])}
+                backgroundPosition: manualResizeEnabled ? 'right 6px bottom 6px, right 4px bottom 4px, right 2px bottom 2px' : '0 0',
+                fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                boxSizing: 'border-box',
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'anywhere',
+                wordBreak: 'break-word',
+                textIndent: '30px'
+              }}
+              disabled={!isAssignedToStage(['SDR', 'S4'])}
             />
-                <div style={{ textAlign: 'center', marginTop: 0 }}>
-                {hasDeputyRight ? (
+            <div style={{ textAlign: 'center', marginTop: 0 }}>
+              {hasDeputyRight ? (
                 <>
                   {effectiveShowDoAt('S4') ? (
                     <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course4Date') || capturedDate)}</div>
@@ -2580,8 +2550,8 @@ export default function Replayfile2Page(props) {
                   ) : null}
                 </>
               ) : null}
-                {(((effectiveShowName('S4') && (stagesWithFeedback && stagesWithFeedback.has('S4'))) || stageHasSenderForKeys(['SDR','S4','S3']))) ? (
-                <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['SDR','S4','S3']) || ''}</div>
+              {(((effectiveShowName('S4') && (stagesWithFeedback && stagesWithFeedback.has('S4'))) || stageHasSenderForKeys(['SDR', 'S4', 'S3']))) ? (
+                <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['SDR', 'S4', 'S3']) || ''}</div>
               ) : null}
             </div>
           </div>
@@ -2609,7 +2579,7 @@ export default function Replayfile2Page(props) {
       </div>
     );
 
-    
+
 
     if (leftVisible && rightVisible) {
       // When director isn't present but both deputy left (S3/SD) and deputy right (SDR/S4)
@@ -2677,7 +2647,7 @@ export default function Replayfile2Page(props) {
             const nodes = Array.from(document.querySelectorAll(s));
             for (const n of nodes) {
               // save original display so we can restore
-              try { n.dataset.__replayOrigDisplay = (n.style && n.style.display) ? n.style.display : ''; } catch (e) {}
+              try { n.dataset.__replayOrigDisplay = (n.style && n.style.display) ? n.style.display : ''; } catch (e) { }
               try { n.style.setProperty('display', 'none', 'important'); } catch (e) { n.style.display = 'none'; }
               added.push(n);
             }
@@ -2692,15 +2662,15 @@ export default function Replayfile2Page(props) {
       try {
         const contentCandidates = Array.from(document.querySelectorAll('.ant-layout-content, .main-content, .content, .site-layout-content, .app-root'));
         for (const c of contentCandidates) {
-          try { c.dataset.__replayOrigPaddingLeft = c.style && c.style.paddingLeft ? c.style.paddingLeft : ''; } catch (e) {}
+          try { c.dataset.__replayOrigPaddingLeft = c.style && c.style.paddingLeft ? c.style.paddingLeft : ''; } catch (e) { }
           try { c.style.setProperty('padding-left', '0px', 'important'); } catch (e) { c.style.paddingLeft = '0px'; }
-          try { c.dataset.__replayOrigMarginLeft = c.style && c.style.marginLeft ? c.style.marginLeft : ''; } catch (e) {}
+          try { c.dataset.__replayOrigMarginLeft = c.style && c.style.marginLeft ? c.style.marginLeft : ''; } catch (e) { }
           try { c.style.setProperty('margin-left', '0px', 'important'); } catch (e) { c.style.marginLeft = '0px'; }
           added.push(c);
         }
-      } catch (e) {}
+      } catch (e) { }
 
-    } catch (e) {}
+    } catch (e) { }
 
     return () => {
       try {
@@ -2721,10 +2691,10 @@ export default function Replayfile2Page(props) {
                 delete n.dataset.__replayOrigMarginLeft;
               }
             }
-          } catch (e) {}
+          } catch (e) { }
         }
-      } catch (e) {}
-      try { document && document.body && document.body.classList && document.body.classList.remove('replay-hide-sidebar'); } catch (e) {}
+      } catch (e) { }
+      try { document && document.body && document.body.classList && document.body.classList.remove('replay-hide-sidebar'); } catch (e) { }
     };
   }, []);
 
@@ -2756,39 +2726,39 @@ export default function Replayfile2Page(props) {
       await new Promise(res => setTimeout(res, 30));
       try {
         window.focus();
-      } catch (e) {}
+      } catch (e) { }
       try {
         window.print();
       } catch (e) {
         console.error('printSheetDirect: window.print failed', e);
       }
     } finally {
-      try { setIsPrinting(false); } catch (e) {}
+      try { setIsPrinting(false); } catch (e) { }
     }
   };
 
-    // Intercept Ctrl+P / Cmd+P and route to our robust print flow so
-    // browser print dialog uses the same single-page, inlined print output.
-    useEffect(() => {
-      const onKey = (e) => {
-        try {
-          const isMod = e.ctrlKey || e.metaKey;
-          const key = e.key || String.fromCharCode(e.keyCode || 0).toLowerCase();
-          if (isMod && (key === 'p' || e.keyCode === 80)) {
-            // avoid hijacking when focus is on an editable field where user expects browser print
-            const tag = (e.target && e.target.tagName) ? String(e.target.tagName).toLowerCase() : '';
-            const editable = tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable);
-            if (editable) return;
-            e.preventDefault();
-            e.stopPropagation();
-            // call the robust print flow
-            try { printSheetV2(); } catch (err) { try { window.print(); } catch (e) {} }
-          }
-        } catch (err) {}
-      };
-      window.addEventListener('keydown', onKey, { capture: true });
-      return () => window.removeEventListener('keydown', onKey, { capture: true });
-    }, []);
+  // Intercept Ctrl+P / Cmd+P and route to our robust print flow so
+  // browser print dialog uses the same single-page, inlined print output.
+  useEffect(() => {
+    const onKey = (e) => {
+      try {
+        const isMod = e.ctrlKey || e.metaKey;
+        const key = e.key || String.fromCharCode(e.keyCode || 0).toLowerCase();
+        if (isMod && (key === 'p' || e.keyCode === 80)) {
+          // avoid hijacking when focus is on an editable field where user expects browser print
+          const tag = (e.target && e.target.tagName) ? String(e.target.tagName).toLowerCase() : '';
+          const editable = tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable);
+          if (editable) return;
+          e.preventDefault();
+          e.stopPropagation();
+          // call the robust print flow
+          try { printSheetV2(); } catch (err) { try { window.print(); } catch (e) { } }
+        }
+      } catch (err) { }
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
+  }, []);
 
   // New robust print function: inline CSS, convert blob images to data URIs,
   // rewrite relative URLs to absolute, then open a print window and print.
@@ -2831,58 +2801,58 @@ export default function Replayfile2Page(props) {
         } catch (e) { return url; }
       };
 
-        // helper: try to fetch a resource and convert to data: URI when possible
-        const fetchResourceToDataUrl = async (rawUrl) => {
+      // helper: try to fetch a resource and convert to data: URI when possible
+      const fetchResourceToDataUrl = async (rawUrl) => {
+        try {
+          if (!rawUrl) return rawUrl;
+          const u = rawUrl.trim().replace(/^['"]|['"]$/g, '');
+          if (u.startsWith('data:')) return u;
+          if (u.startsWith('blob:')) {
+            try { return await toDataUrl(u); } catch (e) { return u; }
+          }
+          const abs = (!/^https?:\/\//i.test(u)) ? (new URL(u, document.baseURI).href) : u;
           try {
-            if (!rawUrl) return rawUrl;
-            const u = rawUrl.trim().replace(/^['"]|['"]$/g, '');
-            if (u.startsWith('data:')) return u;
-            if (u.startsWith('blob:')) {
-              try { return await toDataUrl(u); } catch (e) { return u; }
-            }
-            const abs = (!/^https?:\/\//i.test(u)) ? (new URL(u, document.baseURI).href) : u;
-            try {
-              const res = await fetch(abs, { mode: 'cors' });
-              if (!res || !res.ok) return abs;
-              const b = await res.blob();
-              return await new Promise((resolve, reject) => {
-                const fr = new FileReader();
-                fr.onload = () => resolve(fr.result);
-                fr.onerror = reject;
-                fr.readAsDataURL(b);
-              });
-            } catch (e) {
-              return abs;
-            }
-          } catch (e) { return rawUrl; }
-        };
-
-        // Replace url(...) occurrences in a CSS text by converting resources to data: URIs when possible
-        const replaceCssUrls = async (cssText) => {
-          try {
-            if (!cssText || !/url\(/i.test(cssText)) return cssText;
-            const matches = [];
-            cssText.replace(/url\(([^)]+)\)/g, (m, u) => { matches.push(u); return m; });
-            if (!matches.length) return cssText;
-            const unique = Array.from(new Set(matches.map(m => m)));
-            const map = {};
-            await Promise.all(unique.map(async (raw) => {
-              try { map[raw] = await fetchResourceToDataUrl(raw); } catch (e) { map[raw] = raw; }
-            }));
-            // perform replacements
-            let out = cssText;
-            Object.keys(map).forEach(raw => {
-              try {
-                // escape for regex
-                const esc = raw.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-                  // quoted or unquoted
-                  out = out.replace(new RegExp("url\\((\\s*['\"]?" + esc + "['\"]?\\s*)\\)", 'g'), () => `url('${map[raw]}')`);
-                  out = out.replace(new RegExp("url\\((\\s*" + esc + "\\s*)\\)", 'g'), () => `url('${map[raw]}')`);
-              } catch (e) {}
+            const res = await fetch(abs, { mode: 'cors' });
+            if (!res || !res.ok) return abs;
+            const b = await res.blob();
+            return await new Promise((resolve, reject) => {
+              const fr = new FileReader();
+              fr.onload = () => resolve(fr.result);
+              fr.onerror = reject;
+              fr.readAsDataURL(b);
             });
-            return out;
-          } catch (e) { return cssText; }
-        };
+          } catch (e) {
+            return abs;
+          }
+        } catch (e) { return rawUrl; }
+      };
+
+      // Replace url(...) occurrences in a CSS text by converting resources to data: URIs when possible
+      const replaceCssUrls = async (cssText) => {
+        try {
+          if (!cssText || !/url\(/i.test(cssText)) return cssText;
+          const matches = [];
+          cssText.replace(/url\(([^)]+)\)/g, (m, u) => { matches.push(u); return m; });
+          if (!matches.length) return cssText;
+          const unique = Array.from(new Set(matches.map(m => m)));
+          const map = {};
+          await Promise.all(unique.map(async (raw) => {
+            try { map[raw] = await fetchResourceToDataUrl(raw); } catch (e) { map[raw] = raw; }
+          }));
+          // perform replacements
+          let out = cssText;
+          Object.keys(map).forEach(raw => {
+            try {
+              // escape for regex
+              const esc = raw.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+              // quoted or unquoted
+              out = out.replace(new RegExp("url\\((\\s*['\"]?" + esc + "['\"]?\\s*)\\)", 'g'), () => `url('${map[raw]}')`);
+              out = out.replace(new RegExp("url\\((\\s*" + esc + "\\s*)\\)", 'g'), () => `url('${map[raw]}')`);
+            } catch (e) { }
+          });
+          return out;
+        } catch (e) { return cssText; }
+      };
 
       // Convert img[src] inside clone to data: URIs when possible so images survive in the new print window
       const imgs = Array.from(clone.querySelectorAll('img'));
@@ -2893,7 +2863,7 @@ export default function Replayfile2Page(props) {
           // prefer fetching and converting to data: URI for robust print embedding
           const newSrc = await fetchResourceToDataUrl(s).catch(() => null) || await toDataUrl(s).catch(() => null);
           if (newSrc) img.setAttribute('src', newSrc);
-        } catch (e) {}
+        } catch (e) { }
       }));
 
       // Replace url(...) in inline style attributes
@@ -2918,9 +2888,9 @@ export default function Replayfile2Page(props) {
             }
             try { return `url('${new URL(raw, document.baseURI).href}')`; } catch (e) { return m; }
           });
-          try { newStyle = await replaceCssUrls(newStyle); } catch (e) {}
+          try { newStyle = await replaceCssUrls(newStyle); } catch (e) { }
           n.setAttribute('style', newStyle);
-        } catch (e) {}
+        } catch (e) { }
       }));
 
       // fetch and inline stylesheets (rewrite url() and @import)
@@ -2936,11 +2906,11 @@ export default function Replayfile2Page(props) {
               let txt = await res.text();
               txt = txt.replace(/url\(([^)]+)\)/g, (m, u) => {
                 let url = u.trim().replace(/^['"]|['"]$/g, '');
-                try { if (!/^https?:\/\//i.test(url) && !url.startsWith('data:')) url = new URL(url, abs).href; } catch (e) {}
+                try { if (!/^https?:\/\//i.test(url) && !url.startsWith('data:')) url = new URL(url, abs).href; } catch (e) { }
                 return `url('${url}')`;
               });
               txt = txt.replace(/@import\s+(?:url\()?['"]?([^'"\)]+)['"]?\)?/g, (m, u) => {
-                try { if (!/^https?:\/\//i.test(u) && !u.startsWith('data:')) u = new URL(u, abs).href; } catch (e) {}
+                try { if (!/^https?:\/\//i.test(u) && !u.startsWith('data:')) u = new URL(u, abs).href; } catch (e) { }
                 return `@import url('${u}')`;
               });
               headCss += '\n' + txt;
@@ -2951,14 +2921,14 @@ export default function Replayfile2Page(props) {
           }
           // fallback: use absolute link reference
           headCss += `\n@import url('${abs}');`;
-        } catch (e) {}
+        } catch (e) { }
       }
 
       // also copy inline styles
-      Array.from(document.querySelectorAll('style')).forEach(s => { try { headCss += '\n' + s.innerHTML; } catch (e) {} });
+      Array.from(document.querySelectorAll('style')).forEach(s => { try { headCss += '\n' + s.innerHTML; } catch (e) { } });
 
       // also replace urls inside headCss to data: URIs when possible so background images/fonts inline
-      try { headCss = await replaceCssUrls(headCss); } catch (e) {}
+      try { headCss = await replaceCssUrls(headCss); } catch (e) { }
 
       // compute conservative scale to fit content on one A4 page bottom Printheight
       let scale = 1;
@@ -2997,9 +2967,9 @@ export default function Replayfile2Page(props) {
       printWin.document.close();
       // wait for the new window to finish rendering before printing
       const doPrint = () => {
-        try { printWin.focus(); } catch (e) {}
+        try { printWin.focus(); } catch (e) { }
         try { printWin.print(); } catch (e) { console.error('print error', e); }
-        setTimeout(() => { try { printWin.close(); } catch (e) {} }, 700);
+        setTimeout(() => { try { printWin.close(); } catch (e) { } }, 700);
       };
 
       try {
@@ -3016,7 +2986,7 @@ export default function Replayfile2Page(props) {
               if (ok || Date.now() - start > 3000) {
                 clearInterval(poll);
                 // remove the event listener to avoid duplicate prints
-                try { printWin.removeEventListener && printWin.removeEventListener('load', doPrint); } catch (e) {}
+                try { printWin.removeEventListener && printWin.removeEventListener('load', doPrint); } catch (e) { }
                 doPrint();
               }
             } catch (e) {
@@ -3026,10 +2996,10 @@ export default function Replayfile2Page(props) {
         }
       } catch (e) {
         // last-resort fallback
-        setTimeout(() => { try { printWin.print(); } catch (err) {} }, 500);
+        setTimeout(() => { try { printWin.print(); } catch (err) { } }, 500);
       }
     } finally {
-      try { setIsPrinting(false); } catch (e) {}
+      try { setIsPrinting(false); } catch (e) { }
     }
   };
 
@@ -3072,14 +3042,14 @@ export default function Replayfile2Page(props) {
               {'ផ្ញើមតិ'}
             </button>
           ) : null}
-          <button 
-            onClick={() => printSheetV2()} 
+          <button
+            onClick={() => printSheetV2()}
             disabled={isPrinting}
-            style={{ 
-              padding: '6px 10px', 
-              background: isPrinting ? '#9ca3af' : '#4f46e5', 
-              color: '#fff', 
-              borderRadius: 4, 
+            style={{
+              padding: '6px 10px',
+              background: isPrinting ? '#9ca3af' : '#4f46e5',
+              color: '#fff',
+              borderRadius: 4,
               marginRight: 100,
               cursor: isPrinting ? 'not-allowed' : 'pointer',
               opacity: isPrinting ? 0.6 : 1
@@ -3128,7 +3098,7 @@ export default function Replayfile2Page(props) {
                     localStorage.removeItem('replayfile2:showDoAtStages');
                     localStorage.removeItem('replayfile2:showSignatureStages');
                     localStorage.removeItem('replayfile2:showNameStages');
-                  } catch (e) {}
+                  } catch (e) { }
                   setShowLetterNo(false);
                   setShowCreatorName(false);
                   setShowDoAtStages(new Set());
@@ -3233,347 +3203,405 @@ export default function Replayfile2Page(props) {
         <div style={{ position: 'relative', display: 'flex', gap: 12, alignItems: 'flex-start', width: '100%', justifyContent: 'center', paddingTop: 16, paddingLeft: 24, paddingRight: 24, background: '#efefef', flexWrap: 'wrap', overflowX: 'auto' }}>
           <div className="sheet" ref={sheetRef} style={{ width: '210mm', minWidth: '210mm', height: '297mm', flexShrink: 0, margin: '24px 12px 24px 24px', background: '#fff', boxShadow: '0 10px 24px rgba(0,0,0,0.14)', borderRadius: 6, boxSizing: 'border-box', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
             <div className="page" style={{ padding: '10mm', fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", color: '#000', height: '100%', overflow: 'auto', boxSizing: 'border-box' }}>
-            <div style={{ textAlign: 'center', fontWeight: 300, marginBottom: 6, fontFamily:'Khmer OS Muol Light', fontSize: 18 }}>
-              ព្រះរាជាណាចក្រកម្ពុជា
-            </div>
+              <div style={{ textAlign: 'center', fontWeight: 300, marginBottom: 6, fontFamily: 'Khmer OS Muol Light', fontSize: 18 }}>
+                ព្រះរាជាណាចក្រកម្ពុជា
+              </div>
 
-            <div style={{ textAlign: 'center', fontWeight: 300, marginBottom: 5, fontFamily:'Khmer OS Muol Light', fontSize: 1}}>
-              ជាតិ សាសនា ព្រះមហាក្សត្រ
-            </div>
+              <div style={{ textAlign: 'center', fontWeight: 300, marginBottom: 5, fontFamily: 'Khmer OS Muol Light', fontSize: 1 }}>
+                ជាតិ សាសនា ព្រះមហាក្សត្រ
+              </div>
 
-            <div style={{ position: 'relative', textAlign: 'center', margin: '10px 0' }}>
-              {true ? (
-                <img
-                  src={logo3} // or a URL like `${API_BASE}${signature.filePath}`
-                  alt=""
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: 100,
-                    height: 'auto',
-                    opacity: 98,
-                    pointerEvents: 'none',
-                    zIndex: 1
-                  }}
-                />
-              ) : null}
-            </div>
+              <div style={{ position: 'relative', textAlign: 'center', margin: '10px 0' }}>
+                {true ? (
+                  <img
+                    src={logo3} // or a URL like `${API_BASE}${signature.filePath}`
+                    alt=""
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: 100,
+                      height: 'auto',
+                      opacity: 98,
+                      pointerEvents: 'none',
+                      zIndex: 1
+                    }}
+                  />
+                ) : null}
+              </div>
 
-            <div style={{ textAlign: 'left', padding: '0mm 0', fontFamily:'Khmer OS Muol Light', fontSize: 16 }}>
-              ក្រសួងសុខាភិបាល
-            </div>
+              <div style={{ textAlign: 'left', padding: '0mm 0', fontFamily: 'Khmer OS Muol Light', fontSize: 16 }}>
+                ក្រសួងសុខាភិបាល
+              </div>
 
-            <div style={{ textAlign: 'left', padding: '1mm 0', fontFamily:'Khmer OS Muol Light', fontSize: 15 }}>
-              មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត
-            </div>
+              <div style={{ textAlign: 'left', padding: '1mm 0', fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>
+                មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត
+              </div>
 
-            <div style={{ textAlign: 'center', fontFamily:'Khmer OS Muol Light', fontSize: 15, marginTop: 0 }}>
-              កំណត់បង្ហាញ
-            </div>
-            
-                
+              <div style={{ textAlign: 'center', fontFamily: 'Khmer OS Muol Light', fontSize: 15, marginTop: 0 }}>
+                កំណត់បង្ហាញ
+              </div>
+
+
               <div className="field" style={{ marginTop: 5, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
-              <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>លេខលិខិតចូល:</span>
-              <span className="value" style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ lineHeight: 1 }}>{record?.entryNo ? toKhmerDigits(record.entryNo) : ''} ម.ម.ខ.ស</div>
-                  <div style={{ fontSize: 14, color: '#000' }}>{(() => {
-                    const raw = (record && (record.entryDate || record.date)) || capturedDate;
-                    if (!raw) return '';
-                    const entryTime = (record && (record.entryTime || record.entry_time)) || '';
-                    const dt = applyEntryTime(parsePreferLocalTime(raw, entryTime), entryTime);
-                    return `ចុះ ${formatKhmerDateTime(dt)}`;
-                  })()}</div>
-                </div>
-              </span>
-            </div>
-            {effectiveShowLetterNo ? (
-              <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
-                <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>លិខិតលេខ:</span>
+                <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>លេខលិខិតចូល:</span>
                 <span className="value" style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div>{record?.letterNo ? toKhmerDigits(record.letterNo) : ''}</div>
-                    <div style={{ fontSize: 12, color: '#070707ff' }}>{(() => {
-                      const raw = (record && record.date) || capturedDate;
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ lineHeight: 1 }}>{record?.entryNo ? toKhmerDigits(record.entryNo) : ''} ម.ម.ខ.ស</div>
+                    <div style={{ fontSize: 14, color: '#000' }}>{(() => {
+                      const raw = (record && (record.entryDate || record.date)) || capturedDate;
                       if (!raw) return '';
-                      const dt = (raw instanceof Date) ? raw : new Date(raw);
-                      return `ចុះ ${formatKhmerDate(dt)}`;
+                      const entryTime = (record && (record.entryTime || record.entry_time)) || '';
+                      const dt = applyEntryTime(parsePreferLocalTime(raw, entryTime), entryTime);
+                      return `ចុះ ${formatKhmerDateTime(dt)}`;
                     })()}</div>
                   </div>
                 </span>
               </div>
-            ) : null}
-            <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
-              <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>មកពី:</span>
-              <span className="value" style={{ flex: 1 }}>{record?.source || ''}</span>
-            </div>
-
-            <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
-              <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>កម្មវត្ថុ:</span>
-              <span className="value-plain" style={{ flex: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{record?.content || ''}</span>
-            </div>
-
-           
-
-            {effectiveShowCreatorName ? (
+              {effectiveShowLetterNo ? (
+                <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
+                  <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>លិខិតលេខ:</span>
+                  <span className="value" style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div>{record?.letterNo ? toKhmerDigits(record.letterNo) : ''}</div>
+                      <div style={{ fontSize: 12, color: '#070707ff' }}>{(() => {
+                        const raw = (record && record.date) || capturedDate;
+                        if (!raw) return '';
+                        const dt = (raw instanceof Date) ? raw : new Date(raw);
+                        return `ចុះ ${formatKhmerDate(dt)}`;
+                      })()}</div>
+                    </div>
+                  </span>
+                </div>
+              ) : null}
               <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
-                <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>បញ្ចូលលិខិតដោយ:</span>
-                <span className="value" style={{ flex: 1 }}>{record?.creatorName || ''}</span>
+                <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>មកពី:</span>
+                <span className="value" style={{ flex: 1 }}>{record?.source || ''}</span>
               </div>
-            ) : null}
 
-           
+              <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
+                <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>កម្មវត្ថុ:</span>
+                <span className="value-plain" style={{ flex: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{record?.content || ''}</span>
+              </div>
 
-            {visibleStages && visibleStages.has('S') && (
-              <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '50fr', gap: 12 }}>
-                  <div style={{ padding: 1 }}>
-                   <div className="role-label" style={{ textAlign: 'center', marginTop: 2, fontFamily: 'Khmer OS Muol Light', fontSize: 10 }}>
-                      {(meta && meta.feedbackStageRoles && meta.feedbackStageRoles.s) || getRoleLabel('s') || (meta && meta.reporterName)}
-                    </div>
-                    <textarea
-                      rows={4}
-                      ref={courseNoteRef}
-                      value={leftContent}
-                      onChange={(e) => { setLeftContent(e.target.value); clearStageMessage('S'); }}
-                      placeholder=""
-                      disabled={!isAssignedToStage(['S'])}
-                      style={{
-                        width: '100%',
-                        height: 'auto',
-                        minHeight: '24px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'justify',
-                        margin: 0,
-                        padding: '8px 22px 12px 8px',
-                        resize: manualResizeEnabled ? 'both' : 'none',
-                        overflow: manualResizeEnabled ? 'auto' : 'hidden',
-                        backgroundImage: manualResizeEnabled ? "linear-gradient(135deg, rgba(0,0,0,0.22) 25%, transparent 25%), linear-gradient(135deg, rgba(0,0,0,0.16) 25%, transparent 25%), linear-gradient(135deg, rgba(0,0,0,0.1) 25%, transparent 25%)" : 'none',
-                        backgroundSize: manualResizeEnabled ? '14px 14px, 10px 10px, 6px 6px' : '0 0',
-                        backgroundRepeat: manualResizeEnabled ? 'no-repeat' : 'no-repeat',
-                        backgroundPosition: manualResizeEnabled ? 'right 6px bottom 6px, right 4px bottom 4px, right 2px bottom 2px' : '0 0',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
-                      }}
-                    />
 
-                    <div style={{ textAlign: 'center', marginTop: 0 }}>
-                      {hasCourseNote ? (
-                        <>
-                          {effectiveShowDoAt('S') ? (
-                            <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('CourseDate') || capturedDate)}</div>
-                          ) : null}
-                          {(effectiveShowSignature('S') && sigSUrl) ? (
-                            <div style={{ marginTop: 0 }}>
-                              <img src={sigSUrl} alt="sig-s" style={{ maxWidth: 100, maxHeight: 80, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
-                            </div>
-                          ) : null}
-                        </>
-                      ) : null}
-                      {(((effectiveShowName('S') && (stagesWithFeedback && stagesWithFeedback.has('S'))) || stageHasSenderForKeys(['S']))) ? (
-                      <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>
-                        {getStageSenderName('S') || ''}
-                      </div>
-                      ) : null}
-                    </div>
 
-                    <div style={{ display: 'flex', justifyContent: hasCourseNote ? 'space-between' : 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
-                      <div style={{ color: stageMessageFor('S') ? '#0b6623' : '#e53333ff', minHeight: 0 }}>{stageMessageFor('S')}</div>
-                      {/* In-sheet Send Feedback button removed; toolbar and print-only buttons used instead */}
-                    </div>
-                  </div>
+              {effectiveShowCreatorName ? (
+                <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
+                  <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>បញ្ចូលលិខិតដោយ:</span>
+                  <span className="value" style={{ flex: 1 }}>{record?.creatorName || ''}</span>
                 </div>
+              ) : null}
 
-              </div>
-            )}
 
-            
-            <div style={{ marginTop: '0mm' }} />
 
-            {/* Stage 1 (S1) - Office box: show when S1 assigned or has a value */}
-            {visibleStages && visibleStages.has('S1') && (
-              <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-                  <div style={{ padding: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 }}>
-                      <div className="role-label" style={{ textAlign: 'center', fontFamily: 'Khmer OS Muol Light', flex: 1 }}>{getRoleLabel('S1')}</div>
-                    </div>
-                    <textarea
-                      rows={4}
-                      ref={s1TextareaRef}
-                      value={s1Content}
-                      onChange={(e) => { setS1Content(e.target.value); clearStageMessage('S1'); }}
-                      placeholder=""
-                      disabled={!isAssignedToStage(['S1'])}
-                      style={{
-                        width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%',
-                        height: 'auto',
-                        minHeight: '72px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'justify',
-                        margin: 0,
-                        marginRight: manualResizeEnabled ? '18px' : 0,
-                        marginBottom: manualResizeEnabled ? '12px' : 0,
-                        padding: '8px 22px 12px 8px',
-                        resize: manualResizeEnabled ? 'both' : 'none',
-                        overflow: manualResizeEnabled ? 'auto' : 'hidden',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
-                      }}
-                    />
-
-                    <div style={{ textAlign: 'center', marginTop: 0 }}>
-                      {hasCourse1Note ? (
-                        <>
-                              {effectiveShowDoAt('S1') ? (
-                                <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course1Date') || capturedDate)}</div>
-                              ) : null}
-                              {(effectiveShowSignature('S1') && sig1Url) ? (
-                            <div style={{ marginTop: 0 }}>
-                              <img src={sig1Url} alt="sig-s1" style={{ maxWidth: 120, maxHeight: 80, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
-                            </div>
-                          ) : null}
-                        </>
-                      ) : null}
-
-                              {(((effectiveShowName('S1') && (stagesWithFeedback && stagesWithFeedback.has('S1'))) || stageHasSenderForKeys(['S1']))) ? (
-                        <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName('S1') || ''}</div>
-                      ) : null}
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: hasCourse1Note ? 'space-between' : 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
-                      <div style={{ color: stageMessageFor('S1') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S1')}</div>
-                      {/* in-sheet send button removed; use toolbar/print-only controls instead */}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {/* Department Head block similar UI to the recipient block */}
-            {/** Department head note block: textarea + signature/date like Course1Note */}
-            {visibleStages && visibleStages.has('S2') && (
-              <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-                  <div style={{ padding: 1 }}>
-                    <div className="role-s2 role-label" style={{ textAlign: 'center', marginTop: 5, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S2')}</div>
-                    <textarea
-                      rows={4}
-                      ref={deptTextareaRef}
-                      value={deptContent}
-                      onChange={(e) => { setDeptContent(e.target.value); clearStageMessage('S2'); }}
-                      placeholder=""
-                      disabled={!isAssignedToStage(['S2'])}
-                      style={{
-                        width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%',
-                        height: 'auto',
-                        minHeight: '72px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'justify',
-                        margin: 0,
-                        marginRight: manualResizeEnabled ? '18px' : 0,
-                        marginBottom: manualResizeEnabled ? '12px' : 0,
-                        padding: '8px 22px 12px 8px',
-                        resize: manualResizeEnabled ? 'both' : 'none',
-                        overflow: manualResizeEnabled ? 'auto' : 'hidden',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
-                      }}
-                    />
-
-                    <div style={{ textAlign: 'center', marginTop: 0 }}>
-                      {hasDeptNote ? (
-                        <>
-                          {effectiveShowDoAt('S2') ? (
-                            <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course2Date') || capturedDate)}</div>
-                          ) : null}
-                          {(effectiveShowSignature('S2') && sig2Url) ? (
-                            <div style={{ marginTop: 6 }}>
-                              <img src={sig2Url} alt="sig-head" style={{ maxWidth: 120, maxHeight: 60, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
-                            </div>
-                          ) : null}
-                        </>
-                      ) : null}
-                          {(((effectiveShowName('S2') && (stagesWithFeedback && stagesWithFeedback.has('S2'))) || stageHasSenderForKeys(['S2']))) ? (
-                        <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 5, fontWeight: 100 }}>{getStageSenderName('S2') || ''}</div>
-                      ) : null}
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: hasDeptNote ? 'space-between' : 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
-                      <div style={{ color: stageMessageFor('S2') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S2')}</div>
-                      {/* in-sheet send button removed; use toolbar/print-only controls instead */}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          
-            {/* Stage area end — Deputy Director block matching recipient UI វគ្គទី4 ទី5 */}
-            {(visibleStages && (visibleStages.has('S3') || visibleStages.has('S4'))) ? deputyBlock : null}
-
-            {visibleStages && visibleStages.has('S5') && (
-              (visibleStages && visibleStages.has('S4')) ? (
-                // Side-by-side S4 (deputy right) and S5 (director)
-                <div style={{ marginTop: 5, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div style={{ border: '1px dashed #161616ff', padding: 5 }}>
+              {visibleStages && visibleStages.has('S') && (
+                <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '50fr', gap: 12 }}>
                     <div style={{ padding: 1 }}>
-                      <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S4')}</div>
-                      <textarea rows={4} ref={deputyRightTextareaRef} value={deputyRightContent} onChange={(e) => { setDeputyRightContent(e.target.value); clearStageMessage('S4'); }}
-                        placeholder="" style={{ width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%', height: 'auto', minHeight: '72px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'justify',
-                        margin: 0,
-                        marginRight: manualResizeEnabled ? '18px' : 0,
-                        marginBottom: manualResizeEnabled ? '12px' : 0,
-                        padding: '8px 22px 12px 8px',
-                        resize: manualResizeEnabled ? 'both' : 'none',
-                        overflow: manualResizeEnabled ? 'auto' : 'hidden',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
-                    }}
-                       disabled={!isAssignedToStage(['SDR','S4'])} />
+                      <div className="role-label" style={{ textAlign: 'center', marginTop: 2, fontFamily: 'Khmer OS Muol Light', fontSize: 10 }}>
+                        {(meta && meta.feedbackStageRoles && meta.feedbackStageRoles.s) || getRoleLabel('s') || (meta && meta.reporterName)}
+                      </div>
+                      <textarea
+                        rows={4}
+                        ref={courseNoteRef}
+                        value={leftContent}
+                        onChange={(e) => { setLeftContent(e.target.value); clearStageMessage('S'); }}
+                        placeholder=""
+                        disabled={!isAssignedToStage(['S'])}
+                        style={{
+                          width: '100%',
+                          height: 'auto',
+                          minHeight: '24px',
+                          lineHeight: uiLineHeight,
+                          textAlign: 'justify',
+                          margin: 0,
+                          padding: '8px 22px 12px 8px',
+                          resize: manualResizeEnabled ? 'both' : 'none',
+                          overflow: manualResizeEnabled ? 'auto' : 'hidden',
+                          backgroundImage: manualResizeEnabled ? "linear-gradient(135deg, rgba(0,0,0,0.22) 25%, transparent 25%), linear-gradient(135deg, rgba(0,0,0,0.16) 25%, transparent 25%), linear-gradient(135deg, rgba(0,0,0,0.1) 25%, transparent 25%)" : 'none',
+                          backgroundSize: manualResizeEnabled ? '14px 14px, 10px 10px, 6px 6px' : '0 0',
+                          backgroundRepeat: manualResizeEnabled ? 'no-repeat' : 'no-repeat',
+                          backgroundPosition: manualResizeEnabled ? 'right 6px bottom 6px, right 4px bottom 4px, right 2px bottom 2px' : '0 0',
+                          fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                          boxSizing: 'border-box',
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          textIndent: '30px'
+                        }}
+                      />
+
                       <div style={{ textAlign: 'center', marginTop: 0 }}>
-                        {hasDeputyRight ? (
+                        {hasCourseNote ? (
                           <>
-                            {effectiveShowDoAt('S4') ? (
-                              <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course4Date') || capturedDate)}</div>
+                            {effectiveShowDoAt('S') ? (
+                              <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('CourseDate') || capturedDate)}</div>
                             ) : null}
-                            {(effectiveShowSignature('S4') && sigDeputyRightUrl) ? (
+                            {(effectiveShowSignature('S') && sigSUrl) ? (
                               <div style={{ marginTop: 0 }}>
-                                <img src={sigDeputyRightUrl} alt="sig-deputy-right" style={{ maxWidth: 100,maxHeight: 80, objectFit: 'contain',display: 'block',margin: '0 auto' }} />
+                                <img src={sigSUrl} alt="sig-s" style={{ maxWidth: 100, maxHeight: 80, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
                               </div>
                             ) : null}
                           </>
                         ) : null}
-                            {(((effectiveShowName('S6') && (stagesWithFeedback && stagesWithFeedback.has('S6'))) || stageHasSenderForKeys(['HO','S6','S4','S3']))) ? (
-                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", 
-                              marginTop: 5, fontWeight: 100 }}>{getStageSenderName(['HO','S6','S4','S3']) || ''}</div>
+                        {(((effectiveShowName('S') && (stagesWithFeedback && stagesWithFeedback.has('S'))) || stageHasSenderForKeys(['S']))) ? (
+                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>
+                            {getStageSenderName('S') || ''}
+                          </div>
                         ) : null}
                       </div>
+
+                      <div style={{ display: 'flex', justifyContent: hasCourseNote ? 'space-between' : 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
+                        <div style={{ color: stageMessageFor('S') ? '#0b6623' : '#e53333ff', minHeight: 0 }}>{stageMessageFor('S')}</div>
+                        {/* In-sheet Send Feedback button removed; toolbar and print-only buttons used instead */}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+
+              <div style={{ marginTop: '0mm' }} />
+
+              {/* Stage 1 (S1) - Office box: show when S1 assigned or has a value */}
+              {visibleStages && visibleStages.has('S1') && (
+                <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                    <div style={{ padding: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 }}>
+                        <div className="role-label" style={{ textAlign: 'center', fontFamily: 'Khmer OS Muol Light', flex: 1 }}>{getRoleLabel('S1')}</div>
+                      </div>
+                      <textarea
+                        rows={4}
+                        ref={s1TextareaRef}
+                        value={s1Content}
+                        onChange={(e) => { setS1Content(e.target.value); clearStageMessage('S1'); }}
+                        placeholder=""
+                        disabled={!isAssignedToStage(['S1'])}
+                        style={{
+                          width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%',
+                          height: 'auto',
+                          minHeight: '72px',
+                          lineHeight: uiLineHeight,
+                          textAlign: 'justify',
+                          margin: 0,
+                          marginRight: manualResizeEnabled ? '18px' : 0,
+                          marginBottom: manualResizeEnabled ? '12px' : 0,
+                          padding: '8px 22px 12px 8px',
+                          resize: manualResizeEnabled ? 'both' : 'none',
+                          overflow: manualResizeEnabled ? 'auto' : 'hidden',
+                          fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                          boxSizing: 'border-box',
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          textIndent: '30px'
+                        }}
+                      />
+
+                      <div style={{ textAlign: 'center', marginTop: 0 }}>
+                        {hasCourse1Note ? (
+                          <>
+                            {effectiveShowDoAt('S1') ? (
+                              <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course1Date') || capturedDate)}</div>
+                            ) : null}
+                            {(effectiveShowSignature('S1') && sig1Url) ? (
+                              <div style={{ marginTop: 0 }}>
+                                <img src={sig1Url} alt="sig-s1" style={{ maxWidth: 120, maxHeight: 80, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                              </div>
+                            ) : null}
+                          </>
+                        ) : null}
+
+                        {(((effectiveShowName('S1') && (stagesWithFeedback && stagesWithFeedback.has('S1'))) || stageHasSenderForKeys(['S1']))) ? (
+                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName('S1') || ''}</div>
+                        ) : null}
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: hasCourse1Note ? 'space-between' : 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
+                        <div style={{ color: stageMessageFor('S1') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S1')}</div>
+                        {/* in-sheet send button removed; use toolbar/print-only controls instead */}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Department Head block similar UI to the recipient block */}
+              {/** Department head note block: textarea + signature/date like Course1Note */}
+              {visibleStages && visibleStages.has('S2') && (
+                <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                    <div style={{ padding: 1 }}>
+                      <div className="role-s2 role-label" style={{ textAlign: 'center', marginTop: 5, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S2')}</div>
+                      <textarea
+                        rows={4}
+                        ref={deptTextareaRef}
+                        value={deptContent}
+                        onChange={(e) => { setDeptContent(e.target.value); clearStageMessage('S2'); }}
+                        placeholder=""
+                        disabled={!isAssignedToStage(['S2'])}
+                        style={{
+                          width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%',
+                          height: 'auto',
+                          minHeight: '72px',
+                          lineHeight: uiLineHeight,
+                          textAlign: 'justify',
+                          margin: 0,
+                          marginRight: manualResizeEnabled ? '18px' : 0,
+                          marginBottom: manualResizeEnabled ? '12px' : 0,
+                          padding: '8px 22px 12px 8px',
+                          resize: manualResizeEnabled ? 'both' : 'none',
+                          overflow: manualResizeEnabled ? 'auto' : 'hidden',
+                          fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                          boxSizing: 'border-box',
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          textIndent: '30px'
+                        }}
+                      />
+
+                      <div style={{ textAlign: 'center', marginTop: 0 }}>
+                        {hasDeptNote ? (
+                          <>
+                            {effectiveShowDoAt('S2') ? (
+                              <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course2Date') || capturedDate)}</div>
+                            ) : null}
+                            {(effectiveShowSignature('S2') && sig2Url) ? (
+                              <div style={{ marginTop: 6 }}>
+                                <img src={sig2Url} alt="sig-head" style={{ maxWidth: 120, maxHeight: 60, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                              </div>
+                            ) : null}
+                          </>
+                        ) : null}
+                        {(((effectiveShowName('S2') && (stagesWithFeedback && stagesWithFeedback.has('S2'))) || stageHasSenderForKeys(['S2']))) ? (
+                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 5, fontWeight: 100 }}>{getStageSenderName('S2') || ''}</div>
+                        ) : null}
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: hasDeptNote ? 'space-between' : 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
+                        <div style={{ color: stageMessageFor('S2') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S2')}</div>
+                        {/* in-sheet send button removed; use toolbar/print-only controls instead */}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Stage area end — Deputy Director block matching recipient UI វគ្គទី4 ទី5 */}
+              {(visibleStages && (visibleStages.has('S3') || visibleStages.has('S4'))) ? deputyBlock : null}
+
+              {visibleStages && visibleStages.has('S5') && (
+                (visibleStages && visibleStages.has('S4')) ? (
+                  // Side-by-side S4 (deputy right) and S5 (director)
+                  <div style={{ marginTop: 5, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div style={{ border: '1px dashed #161616ff', padding: 5 }}>
+                      <div style={{ padding: 1 }}>
+                        <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S4')}</div>
+                        <textarea rows={4} ref={deputyRightTextareaRef} value={deputyRightContent} onChange={(e) => { setDeputyRightContent(e.target.value); clearStageMessage('S4'); }}
+                          placeholder="" style={{
+                            width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%', height: 'auto', minHeight: '72px',
+                            lineHeight: uiLineHeight,
+                            textAlign: 'justify',
+                            margin: 0,
+                            marginRight: manualResizeEnabled ? '18px' : 0,
+                            marginBottom: manualResizeEnabled ? '12px' : 0,
+                            padding: '8px 22px 12px 8px',
+                            resize: manualResizeEnabled ? 'both' : 'none',
+                            overflow: manualResizeEnabled ? 'auto' : 'hidden',
+                            fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                            boxSizing: 'border-box',
+                            whiteSpace: 'pre-wrap',
+                            overflowWrap: 'anywhere',
+                            wordBreak: 'break-word',
+                            textIndent: '30px'
+                          }}
+                          disabled={!isAssignedToStage(['SDR', 'S4'])} />
+                        <div style={{ textAlign: 'center', marginTop: 0 }}>
+                          {hasDeputyRight ? (
+                            <>
+                              {effectiveShowDoAt('S4') ? (
+                                <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course4Date') || capturedDate)}</div>
+                              ) : null}
+                              {(effectiveShowSignature('S4') && sigDeputyRightUrl) ? (
+                                <div style={{ marginTop: 0 }}>
+                                  <img src={sigDeputyRightUrl} alt="sig-deputy-right" style={{ maxWidth: 100, maxHeight: 80, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                                </div>
+                              ) : null}
+                            </>
+                          ) : null}
+                          {(((effectiveShowName('S6') && (stagesWithFeedback && stagesWithFeedback.has('S6'))) || stageHasSenderForKeys(['HO', 'S6', 'S4', 'S3']))) ? (
+                            <div className="sender-name" style={{
+                              fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                              marginTop: 5, fontWeight: 100
+                            }}>{getStageSenderName(['HO', 'S6', 'S4', 'S3']) || ''}</div>
+                          ) : null}
+                        </div>
                         <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
                           <div style={{ color: stageMessageFor('S4') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S4')}</div>
                         </div>
+                      </div>
+                    </div>
+                    <div style={{ border: '1px dashed #161616ff', padding: 5 }}>
+                      <div style={{ padding: 1 }}>
+                        <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S5')}</div>
+                        <textarea
+                          rows={4}
+                          ref={directorTextareaRef}
+                          value={directorContent}
+                          onChange={(e) => { setDirectorContent(e.target.value); clearStageMessage('S5'); }}
+                          placeholder=""
+                          disabled={!isAssignedToStage(['DIR', 'SDIR', 'S5'])}
+                          style={{
+                            width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%',
+                            height: 'auto',
+                            minHeight: '72px',
+                            lineHeight: uiLineHeight,
+                            textAlign: 'justify',
+                            margin: 0,
+                            marginRight: manualResizeEnabled ? '18px' : 0,
+                            marginBottom: manualResizeEnabled ? '12px' : 0,
+                            padding: '8px 22px 12px 8px',
+                            resize: manualResizeEnabled ? 'both' : 'none',
+                            overflow: manualResizeEnabled ? 'auto' : 'hidden',
+                            fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                            boxSizing: 'border-box',
+                            whiteSpace: 'pre-wrap',
+                            overflowWrap: 'anywhere',
+                            wordBreak: 'break-word',
+                            textIndent: '30px'
+                          }}
+                        />
+
+                        <div style={{ textAlign: 'left', marginTop: 0 }}>
+                          {hasDirector ? (
+                            <>
+                              {effectiveShowDoAt('S5') ? (
+                                <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course5Date') || capturedDate)}</div>
+                              ) : null}
+                              {(effectiveShowSignature('S5') && sigDirectorUrl) ? (
+                                <div style={{ marginTop: 0 }}>
+                                  <img src={sigDirectorUrl} alt="sig-director" style={{ maxWidth: 100, maxHeight: 70, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                                </div>
+                              ) : null}
+                            </>
+                          ) : null}
+                          {(((effectiveShowName('S5') && (stagesWithFeedback && stagesWithFeedback.has('S5'))) || stageHasSenderForKeys(['DIR', 'SDIR', 'S5']))) ? (
+                            <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['DIR', 'SDIR', 'S5']) || ''}</div>
+                          ) : null}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
+                          <div style={{ color: stageMessageFor('S5') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S5')}</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div style={{ border: '1px dashed #161616ff', padding: 5 }}>
+                ) : (
+                  <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
                     <div style={{ padding: 1 }}>
                       <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S5')}</div>
                       <textarea
@@ -3582,29 +3610,29 @@ export default function Replayfile2Page(props) {
                         value={directorContent}
                         onChange={(e) => { setDirectorContent(e.target.value); clearStageMessage('S5'); }}
                         placeholder=""
-                        disabled={!isAssignedToStage(['DIR','SDIR','S5'])}
+                        disabled={!isAssignedToStage(['DIR', 'SDIR', 'S5'])}
                         style={{
-                        width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%',
-                        height: 'auto',
-                        minHeight: '72px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'justify',
-                        margin: 0,
-                        marginRight: manualResizeEnabled ? '18px' : 0,
-                        marginBottom: manualResizeEnabled ? '12px' : 0,
-                        padding: '8px 22px 12px 8px',
-                        resize: manualResizeEnabled ? 'both' : 'none',
-                        overflow: manualResizeEnabled ? 'auto' : 'hidden',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
+                          width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%',
+                          height: 'auto',
+                          minHeight: '72px',
+                          lineHeight: uiLineHeight,
+                          textAlign: 'left',
+                          margin: 0,
+                          marginRight: manualResizeEnabled ? '18px' : 0,
+                          marginBottom: manualResizeEnabled ? '12px' : 0,
+                          padding: '8px 22px 12px 8px',
+                          resize: manualResizeEnabled ? 'both' : 'none',
+                          overflow: manualResizeEnabled ? 'auto' : 'hidden',
+                          fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                          boxSizing: 'border-box',
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          textIndent: '30px'
                         }}
                       />
 
-                      <div style={{ textAlign: 'left', marginTop: 0 }}>
+                      <div style={{ textAlign: 'center', marginTop: 0 }}>
                         {hasDirector ? (
                           <>
                             {effectiveShowDoAt('S5') ? (
@@ -3612,13 +3640,13 @@ export default function Replayfile2Page(props) {
                             ) : null}
                             {(effectiveShowSignature('S5') && sigDirectorUrl) ? (
                               <div style={{ marginTop: 0 }}>
-                                <img src={sigDirectorUrl} alt="sig-director" style={{ maxWidth: 100, maxHeight: 70, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                                <img src={sigDirectorUrl} alt="sig-director" style={{ maxWidth: 50, maxHeight: 50, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
                               </div>
                             ) : null}
                           </>
                         ) : null}
-                        {(((effectiveShowName('S5') && (stagesWithFeedback && stagesWithFeedback.has('S5'))) || stageHasSenderForKeys(['DIR','SDIR','S5']))) ? (
-                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['DIR','SDIR','S5']) || ''}</div>
+                        {(effectiveShowName('S5') || stageHasSenderForKeys(['DIR', 'SDIR', 'S5'])) ? (
+                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['DIR', 'SDIR', 'S5']) || ''}</div>
                         ) : null}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
@@ -3626,149 +3654,94 @@ export default function Replayfile2Page(props) {
                       </div>
                     </div>
                   </div>
-                </div>
-              ) : (
+                )
+              )}
+
+              {visibleStages && visibleStages.has('S6') && (
                 <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
-                  <div style={{ padding: 1 }}>
-                    <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S5')}</div>
-                    <textarea
-                      rows={4}
-                      ref={directorTextareaRef}
-                      value={directorContent}
-                      onChange={(e) => { setDirectorContent(e.target.value); clearStageMessage('S5'); }}
-                      placeholder=""
-                      disabled={!isAssignedToStage(['DIR','SDIR','S5'])}
-                      style={{
-                        width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%',
-                        height: 'auto',
-                        minHeight: '72px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'left',
-                        margin: 0,
-                        marginRight: manualResizeEnabled ? '18px' : 0,
-                        marginBottom: manualResizeEnabled ? '12px' : 0,
-                        padding: '8px 22px 12px 8px',
-                        resize: manualResizeEnabled ? 'both' : 'none',
-                        overflow: manualResizeEnabled ? 'auto' : 'hidden',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
-                      }}
-                    />
+                  <div style={{ display: 'grid', gridTemplateColumns: '50fr', gap: 12 }}>
+                    <div style={{ padding: 1 }}>
+                      <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S6')}</div>
+                      <textarea
+                        rows={4}
+                        ref={headOfficeTextareaRef}
+                        value={headOfficeContent}
+                        onChange={(e) => { setHeadOfficeContent(e.target.value); clearStageMessage('S6'); }}
+                        placeholder=""
+                        disabled={!isAssignedToStage(['S6'])}
+                        style={{
+                          width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%',
+                          height: 'auto',
+                          minHeight: '72px',
+                          lineHeight: uiLineHeight,
+                          textAlign: 'center',
+                          margin: 0,
+                          marginRight: manualResizeEnabled ? '18px' : 0,
+                          marginBottom: manualResizeEnabled ? '12px' : 0,
+                          padding: '8px 22px 12px 8px',
+                          resize: manualResizeEnabled ? 'both' : 'none',
+                          overflow: manualResizeEnabled ? 'auto' : 'hidden',
+                          fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                          boxSizing: 'border-box',
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          textIndent: '30px'
+                        }}
+                      />
 
-                    <div style={{ textAlign: 'center', marginTop: 0 }}>
-                      {hasDirector ? (
-                        <>
-                          {effectiveShowDoAt('S5') ? (
-                            <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course5Date') || capturedDate)}</div>
-                          ) : null}
-                          {(effectiveShowSignature('S5') && sigDirectorUrl) ? (
-                            <div style={{ marginTop: 0 }}>
-                              <img src={sigDirectorUrl} alt="sig-director" style={{ maxWidth: 50, maxHeight: 50, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
-                            </div>
-                          ) : null}
-                        </>
-                      ) : null}
-                      {(effectiveShowName('S5') || stageHasSenderForKeys(['DIR','SDIR','S5'])) ? (
-                        <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['DIR','SDIR','S5']) || ''}</div>
-                      ) : null}
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
-                      <div style={{ color: stageMessageFor('S5') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S5')}</div>
-                    </div>
-                  </div>
-                </div>
-              )
-            )}
+                      <div style={{ textAlign: 'center', marginTop: 0 }}>
+                        {hasHeadOffice ? (
+                          <>
+                            {effectiveShowDoAt('S6') ? (
+                              <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course6Date') || capturedDate)}</div>
+                            ) : null}
+                            {(effectiveShowSignature('S6') && sigHeadOfficeUrl) ? (
+                              <div style={{ marginTop: 5 }}>
+                                <img src={sigHeadOfficeUrl} alt="sig-headoffice" style={{ maxWidth: 160, maxHeight: 90, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                              </div>
+                            ) : null}
+                          </>
+                        ) : null}
 
-            {visibleStages && visibleStages.has('S6') && (
-              <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '50fr', gap: 12 }}>
-                  <div style={{ padding: 1 }}>
-                    <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S6')}</div>
-                    <textarea
-                      rows={4}
-                      ref={headOfficeTextareaRef}
-                      value={headOfficeContent}
-                      onChange={(e) => { setHeadOfficeContent(e.target.value); clearStageMessage('S6'); }}
-                      placeholder=""
-                      disabled={!isAssignedToStage(['S6'])}
-                      style={{
-                        width: manualResizeEnabled ? 'calc(100% - 18px)' : '100%',
-                      height: 'auto',
-                        minHeight: '72px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'center',
-                        margin: 0,
-                        marginRight: manualResizeEnabled ? '18px' : 0,
-                        marginBottom: manualResizeEnabled ? '12px' : 0,
-                        padding: '8px 22px 12px 8px',
-                        resize: manualResizeEnabled ? 'both' : 'none',
-                        overflow: manualResizeEnabled ? 'auto' : 'hidden',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
-                      }}
-                    />
-
-                    <div style={{ textAlign: 'center', marginTop: 0 }}>
-                      {hasHeadOffice ? (
-                        <>
-                          {effectiveShowDoAt('S6') ? (
-                            <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course6Date') || capturedDate)}</div>
-                          ) : null}
-                          {(effectiveShowSignature('S6') && sigHeadOfficeUrl) ? (
-                            <div style={{ marginTop: 5 }}>
-                              <img src={sigHeadOfficeUrl} alt="sig-headoffice" style={{ maxWidth: 160, maxHeight: 90, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
-                            </div>
-                          ) : null}
-                        </>
-                      ) : null}
-
-                      {(effectiveShowName('S6') || stageHasSenderForKeys(['HO','S6','S4','S3'])) ? (
-                        <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 5, fontWeight: 100 }}>
-                          {getStageSenderName(['HO','S6','S4','S3']) || ''}
-                        </div>
-                      ) : null}
+                        {(effectiveShowName('S6') || stageHasSenderForKeys(['HO', 'S6', 'S4', 'S3'])) ? (
+                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 5, fontWeight: 100 }}>
+                            {getStageSenderName(['HO', 'S6', 'S4', 'S3']) || ''}
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 0, padding: '0 px' }}>
+                    <div style={{ color: stageMessageFor('S6') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S6')}</div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 0, padding: '0 px' }}>
-                  <div style={{ color: stageMessageFor('S6') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S6')}</div>
+              )}
+
+            </div>
+            {/* Right-side reference panel placed as a sibling so heights match */}
+            <div className="ref-panel" style={{ position: 'relative', boxSizing: 'border-box', zIndex: 100, overflow: 'visible', background: 'transparent', width: '210mm', margin: '5mm auto 0', alignSelf: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', height: 'auto', border: '1px solid #ebe5eaff', borderRadius: 1, background: '#fff' }}>
+                {/* header / toolbar */}
+                <div style={{ padding: '0px 12px', borderBottom: '1px solid #eef2f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, background: '#ffffff' }}>
+                  <div style={{ fontWeight: 100, fontFamily: "'Khmer OS Muol Light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", fontSize: 14 }}>ឯកសារយោង</div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {refUrls && refUrls.length ? (
+                      <div style={{ fontSize: 13, color: '#333' }}>{refUrls[0] && (refUrls[0].name || refUrls[0].url)}</div>
+                    ) : null}
+                    {selectedRef ? (
+                      <a href={selectedRef} target="_blank" rel="noreferrer" style={{ fontSize: 16, marginLeft: 8 }}>Open</a>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            )}
 
-          </div>
-          {/* Right-side reference panel placed as a sibling so heights match */}
-          <div className="ref-panel" style={{ position: 'relative', boxSizing: 'border-box', zIndex: 100, overflow: 'visible', background: 'transparent', width: '210mm', margin: '5mm auto 0', alignSelf: 'center' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', height: 'auto', border: '1px solid #ebe5eaff', borderRadius: 1, background: '#fff' }}>
-              {/* header / toolbar */}
-              <div style={{ padding: '0px 12px', borderBottom: '1px solid #eef2f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, background: '#ffffff' }}>
-                <div style={{ fontWeight: 100, fontFamily: "'Khmer OS Muol Light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", fontSize: 14 }}>ឯកសារយោង</div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  {refUrls && refUrls.length ? (
-                    <div style={{ fontSize: 13, color: '#333' }}>{refUrls[0] && (refUrls[0].name || refUrls[0].url)}</div>
-                  ) : null}
-                  {selectedRef ? (
-                    <a href={selectedRef} target="_blank" rel="noreferrer" style={{ fontSize: 16, marginLeft: 8 }}>Open</a>
-                  ) : null}
-                </div>
-              </div>
+                <div style={{ padding: 0, paddingTop: '0mm', overflow: 'visible', display: 'block' }}>
 
-              <div style={{ padding: 0, paddingTop: '0mm', overflow: 'visible', display: 'block' }}>
-                
 
-                <div style={{ flex: 1, minHeight: 80, overflow: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 8 }}>
-                  {selectedRef ? (
-                    // render preview filling the ref-panel area (use full-height container)
-                    <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <div style={{ flex: 1, minHeight: 80, overflow: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 8 }}>
+                    {selectedRef ? (
+                      // render preview filling the ref-panel area (use full-height container)
+                      <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                         <div ref={refPreviewWrapper} style={{ width: '210mm', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'visible', background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 2px 6px rgba(0,0,0,0.12)', padding: 8 }}>
                           {(String(selectedRef).toLowerCase().endsWith('.pdf')) ? (
                             // PDF.js renders canvases into this container; let it expand to show all pages
@@ -3777,38 +3750,38 @@ export default function Replayfile2Page(props) {
                             <img src={selectedRef} alt="reference" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                           )}
                         </div>
-                    </div>
-                  ) : (
-                    <div style={{ padding: 1, color: '#666', fontFamily: "'Khmer OS Muol Light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'" }}>
-                      <div style={{ marginBottom: 8 }}>មិនមានឯកសារយោង
-                        <div style={{ fontSize: 12, color: '#999' }}> (debug hints shown below)</div>
                       </div>
-                      <div style={{ fontSize: 13, color: '#444' }}>
-                        <div style={{ marginBottom: 6 }}>កំណត់ត្រា exposed to console as <code>window.__REPLAY_RECORD</code></div>
-                        <div style={{ fontWeight: 600, marginBottom: 6 }}>Attachment hints:</div>
-                        {(() => {
-                          const hints = getAttachmentHints(record);
-                          if (!hints || hints.length === 0) return (<div style={{ color: '#999' }}>No obvious attachment-like fields found in record (check console).</div>);
-                          return (
-                            <div style={{ maxHeight: 220, overflow: 'auto', border: '1px dashed #eee', padding: 8, background: '#fafafa' }}>
-                              {hints.map((h, i) => (
-                                <div key={i} style={{ marginBottom: 8 }}>
-                                  <div style={{ fontSize: 12, color: '#333', fontWeight: 600 }}>{h.path}</div>
-                                  <div style={{ fontSize: 12, color: '#555', wordBreak: 'break-all' }}>{h.excerpt}</div>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
+                    ) : (
+                      <div style={{ padding: 1, color: '#666', fontFamily: "'Khmer OS Muol Light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'" }}>
+                        <div style={{ marginBottom: 8 }}>មិនមានឯកសារយោង
+                          <div style={{ fontSize: 12, color: '#999' }}> (debug hints shown below)</div>
+                        </div>
+                        <div style={{ fontSize: 13, color: '#444' }}>
+                          <div style={{ marginBottom: 6 }}>កំណត់ត្រា exposed to console as <code>window.__REPLAY_RECORD</code></div>
+                          <div style={{ fontWeight: 600, marginBottom: 6 }}>Attachment hints:</div>
+                          {(() => {
+                            const hints = getAttachmentHints(record);
+                            if (!hints || hints.length === 0) return (<div style={{ color: '#999' }}>No obvious attachment-like fields found in record (check console).</div>);
+                            return (
+                              <div style={{ maxHeight: 220, overflow: 'auto', border: '1px dashed #eee', padding: 8, background: '#fafafa' }}>
+                                {hints.map((h, i) => (
+                                  <div key={i} style={{ marginBottom: 8 }}>
+                                    <div style={{ fontSize: 12, color: '#333', fontWeight: 600 }}>{h.path}</div>
+                                    <div style={{ fontSize: 12, color: '#555', wordBreak: 'break-all' }}>{h.excerpt}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
       )}
       {/* Floating send-to-Telegram button removed per UI request */}
       {/* Global Telegram feedback block: show regardless of stage notes */}
@@ -3863,7 +3836,7 @@ if (typeof window !== 'undefined' && window.__REPLAY_DEBUG__) {
     try {
       const meta = window.__REPLAY_RECORD && window.__REPLAY_RECORD.meta;
       if (meta) console.log('REPLAY record meta:', meta);
-    } catch (e) {}
+    } catch (e) { }
     // list dashed boxes and first 200 chars of their text (best-effort)
     try {
       const els = document ? [...document.querySelectorAll('[style*="dashed"]')] : [];

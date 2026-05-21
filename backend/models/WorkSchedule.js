@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const WorkScheduleSchema = new mongoose.Schema({
-  employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkScheduleEmployee', required: true },
+  employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'HR', required: true },
   date: { type: Date, required: true },
   shiftTitle: { type: String, required: true }, // 'Work' or 'Day Off'
   shiftStart: { type: String }, // Time like "07:30"

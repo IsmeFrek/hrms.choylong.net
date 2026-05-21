@@ -52,9 +52,10 @@ export default function AttendanceEditModal({ open, onClose, record, onSave }) {
         } catch (e) { return ''; }
       };
 
-      setForm({
+        setForm({
         staffId: record.staffId || '',
         staffName: record.staffName || (record.staff && (record.staff.fullName || record.staff.name)) || record.khmerName || record.name || '',
+        service: record.service || '',
         date: record.date ? new Date(record.date).toISOString().slice(0,10) : '',
         checkIn: extractTime(record.checkIn || record.inTime || record.checkInShort || ''),
         checkOut: extractTime(record.checkOut || record.outTime || record.checkOutShort || ''),
@@ -62,6 +63,7 @@ export default function AttendanceEditModal({ open, onClose, record, onSave }) {
         checkOut2: extractTime(record.checkOut2 || record.outTime2 || record.checkOut2Short || ''),
         status: record.status || '',
         notes: record.notes || '',
+        departmentKh: record.departmentKh || '',
       });
     } else {
       setForm({});
@@ -93,6 +95,10 @@ export default function AttendanceEditModal({ open, onClose, record, onSave }) {
           <div>
             <label className="text-sm block">Date</label>
             <input type="date" value={form.date||''} onChange={e=>update('date', e.target.value)} className="border rounded px-2 py-1 w-full" />
+            <div style={{marginTop:6}}>
+              <label className="text-sm block">Service/Dept (សេវាកម្ម/ផ្នែក)</label>
+              <input value={form.service||''} onChange={e=>update('service', e.target.value)} className="border rounded px-2 py-1 w-full" />
+            </div>
           </div>
 
           <div>
@@ -123,6 +129,11 @@ export default function AttendanceEditModal({ open, onClose, record, onSave }) {
               <option value="absent">absent</option>
               <option value="leave">leave</option>
             </select>
+          </div>
+
+          <div style={{gridColumn:'1 / -1'}}>
+            <label className="text-sm block">Dept_Kh (ផ្នែកក្នុងប្រព័ន្ធ)</label>
+            <input value={form.departmentKh||''} onChange={e=>update('departmentKh', e.target.value)} className="border rounded px-2 py-1 w-full" />
           </div>
 
           <div style={{gridColumn:'1 / -1'}}>

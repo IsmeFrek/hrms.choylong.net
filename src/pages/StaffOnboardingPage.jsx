@@ -11,7 +11,7 @@ import ParentTab from '../components/tabs/ParentTab';
 import ChildrenTab from '../components/tabs/ChildrenTab';
 import OtherTab from '../components/tabs/OtherTab';
 
-export default function StaffOnboardingPage({ embedded = false, allowApproved = false, onSubmitted } = {}) {
+export default function StaffOnboardingPage({ embedded = false, allowApproved = false, onSubmitted, initialData } = {}) {
   const { user, token } = useAuth();
   const navigate = useNavigate();
 
@@ -49,6 +49,7 @@ export default function StaffOnboardingPage({ embedded = false, allowApproved = 
   const [form, setForm] = useState({
     no: '',
     staffId: '',
+    cardId: '',
     khmerName: '',
     name: '',
     gender: '',
@@ -138,6 +139,43 @@ export default function StaffOnboardingPage({ embedded = false, allowApproved = 
     // keep user's display name to help admin; not part of HR schema
     fullName: user?.fullName || '',
   });
+
+  const parsePlaceString = (str) => {
+    const parts = { houseNo: '', road: '', village: '', commune: '', district: '', province: '' };
+    if (!str || typeof str !== 'string') return parts;
+    
+    const segments = str.split(', ');
+    segments.forEach(seg => {
+      const [key, val] = seg.split(':');
+      if (key === 'ផ្ទះលេខ') parts.houseNo = val || '';
+      if (key === 'ផ្លូវ') parts.road = val || '';
+      if (key === 'ភូមិ') parts.village = val || '';
+      if (key === 'ឃុំ/សង្កាត់') parts.commune = val || '';
+      if (key === 'ស្រុក/ខណ្ឌ') parts.district = val || '';
+      if (key === 'ខេត្ត/ក្រុង') parts.province = val || '';
+    });
+    return parts;
+  };
+
+  useEffect(() => {
+    if (initialData) {
+      setForm((prev) => {
+        const next = { ...prev, ...initialData };
+        
+        // Parse birthPlace string if birthPlaceParts is empty
+        if (initialData.birthPlace && (!next.birthPlaceParts || Object.values(next.birthPlaceParts).every(v => !v))) {
+          next.birthPlaceParts = parsePlaceString(initialData.birthPlace);
+        }
+        
+        // Parse currentPlace string if currentPlaceParts is empty
+        if (initialData.currentPlace && (!next.currentPlaceParts || Object.values(next.currentPlaceParts).every(v => !v))) {
+          next.currentPlaceParts = parsePlaceString(initialData.currentPlace);
+        }
+        
+        return next;
+      });
+    }
+  }, [initialData]);
 
   const isCivilServant = useMemo(
     () => String(form?.officerType || '').trim() === 'មន្ត្រីរាជការ',
@@ -398,12 +436,16 @@ export default function StaffOnboardingPage({ embedded = false, allowApproved = 
       try { data = text ? JSON.parse(text) : {}; } catch { data = {}; }
       if (!res.ok) throw new Error(data.message || text || 'Submit failed');
 
-      setSuccess('បានផ្ញើព័ត៌មានរួចហើយ។ សូមរង់ចាំ Admin អនុម័ត');
+      setSuccess('បានផ្ញើព័ត៌មានរួចហើយ។');
       if (typeof onSubmitted === 'function') {
         try { onSubmitted(data); } catch {}
       }
       if (!embedded) {
-        navigate('/pending-approval', { replace: true });
+        if (data && data._id) {
+          navigate(`/staff-biography/${data._id}`, { replace: true });
+        } else {
+          navigate('/staff-biography', { replace: true });
+        }
       }
     } catch (e2) {
       setError(e2.message || 'Submit failed');
@@ -411,6 +453,29 @@ export default function StaffOnboardingPage({ embedded = false, allowApproved = 
       setSaving(false);
     }
   };
+                    
+  async function handleUpload(file) {
+    if (!file) return '';
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const base = API_BASE_RAW;
+      const endpoint = `${API_PREFIX}/upload`;
+      const res = await fetch(endpoint, { method: 'POST', body: formData });
+      if (!res.ok) {
+        console.error('Upload failed:', res.status, await res.text());
+        return '';
+      }
+      const result = await res.json();
+      let url = result.url || '';
+      if (url && /^https?:\/\//i.test(url)) return url;
+      if (url && base) return `${base.replace(/\/+$/,'')}${url}`;
+      return url;
+    } catch (e) {
+      console.error('Upload error:', e);
+      return '';
+    }
+  }
 
   // If user changes officerType away from civil servant, don't keep them on civil tab.
   useEffect(() => {
@@ -433,6 +498,8 @@ export default function StaffOnboardingPage({ embedded = false, allowApproved = 
     }
   }, [activeTab, hideEducation]);
 
+  const isPersonalValid = form.khmerName && form.name && form.gender && form.dob;
+
   return (
     <div className={embedded ? '' : 'min-h-screen flex items-start justify-center bg-gray-50 p-4'}>
       <div className={embedded ? '' : 'w-full max-w-5xl bg-white border rounded-lg shadow p-6'}>
@@ -451,18 +518,19 @@ export default function StaffOnboardingPage({ embedded = false, allowApproved = 
             {success && <div className="mb-3 text-green-700 text-sm">{success}</div>}
 
             <form onSubmit={submit} className={embedded ? 'space-y-4' : 'space-y-4'}>
-              <div className="sticky top-0 z-20 -mx-2 px-2 py-2 bg-white/95 backdrop-blur flex flex-wrap items-center gap-2 border-b">
+              <div className="sticky top-0 z-20 -mx-2 px-2 py-2 bg-white/95 backdrop-blur flex overflow-x-auto whitespace-nowrap items-center gap-2 border-b">
                 <button
                   type="button"
                   onClick={() => setActiveTab('personal')}
-                  className={`px-3 py-2 rounded text-sm border ${activeTab === 'personal' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'}`}
+                  className={`flex-shrink-0 px-3 py-2 rounded text-sm border ${activeTab === 'personal' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'}`}
                 >
                   ព័ត៌មានផ្ទាល់ខ្លួន
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('work')}
-                  className={`px-3 py-2 rounded text-sm border ${activeTab === 'work' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'}`}
+                  className={`flex-shrink-0 px-3 py-2 rounded text-sm border ${activeTab === 'work' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'} ${!isPersonalValid ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={!isPersonalValid}
                 >
                   ព័ត៌មានការងារ
                 </button>
@@ -470,7 +538,8 @@ export default function StaffOnboardingPage({ embedded = false, allowApproved = 
                   <button
                     type="button"
                     onClick={() => setActiveTab('education')}
-                    className={`px-3 py-2 rounded text-sm border ${activeTab === 'education' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'}`}
+                    className={`flex-shrink-0 px-3 py-2 rounded text-sm border ${activeTab === 'education' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'} ${!isPersonalValid ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={!isPersonalValid}
                   >
                     ការអប់រំ
                   </button>
@@ -478,7 +547,8 @@ export default function StaffOnboardingPage({ embedded = false, allowApproved = 
                 <button
                   type="button"
                   onClick={() => setActiveTab('documents')}
-                  className={`px-3 py-2 rounded text-sm border ${activeTab === 'documents' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'}`}
+                  className={`flex-shrink-0 px-3 py-2 rounded text-sm border ${activeTab === 'documents' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'} ${!isPersonalValid ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={!isPersonalValid}
                 >
                   ឯកសារ
                 </button>
@@ -486,7 +556,8 @@ export default function StaffOnboardingPage({ embedded = false, allowApproved = 
                   <button
                     type="button"
                     onClick={() => setActiveTab('civil')}
-                    className={`px-3 py-2 rounded text-sm border ${activeTab === 'civil' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'}`}
+                    className={`flex-shrink-0 px-3 py-2 rounded text-sm border ${activeTab === 'civil' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'} ${!isPersonalValid ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={!isPersonalValid}
                   >
                     មន្ត្រីរាជការ
                   </button>
@@ -495,7 +566,8 @@ export default function StaffOnboardingPage({ embedded = false, allowApproved = 
                   <button
                     type="button"
                     onClick={() => setActiveTab('union')}
-                    className={`px-3 py-2 rounded text-sm border ${activeTab === 'union' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'}`}
+                    className={`flex-shrink-0 px-3 py-2 rounded text-sm border ${activeTab === 'union' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'} ${!isPersonalValid ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={!isPersonalValid}
                   >
                     ព័ត៌មានសហព័ន្ធ
                   </button>
@@ -503,7 +575,8 @@ export default function StaffOnboardingPage({ embedded = false, allowApproved = 
                 <button
                   type="button"
                   onClick={() => setActiveTab('parents')}
-                  className={`px-3 py-2 rounded text-sm border ${activeTab === 'parents' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'}`}
+                  className={`flex-shrink-0 px-3 py-2 rounded text-sm border ${activeTab === 'parents' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'} ${!isPersonalValid ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={!isPersonalValid}
                 >
                   ព័ត៌មានឪពុកម្ដាយ
                 </button>
@@ -511,7 +584,8 @@ export default function StaffOnboardingPage({ embedded = false, allowApproved = 
                   <button
                     type="button"
                     onClick={() => setActiveTab('children')}
-                    className={`px-3 py-2 rounded text-sm border ${activeTab === 'children' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'}`}
+                    className={`flex-shrink-0 px-3 py-2 rounded text-sm border ${activeTab === 'children' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'} ${!isPersonalValid ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={!isPersonalValid}
                   >
                     ព័ត៌មានកូន
                   </button>
@@ -519,25 +593,38 @@ export default function StaffOnboardingPage({ embedded = false, allowApproved = 
                 <button
                   type="button"
                   onClick={() => setActiveTab('other')}
-                  className={`px-3 py-2 rounded text-sm border ${activeTab === 'other' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'}`}
+                  className={`flex-shrink-0 px-3 py-2 rounded text-sm border ${activeTab === 'other' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'} ${!isPersonalValid ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={!isPersonalValid}
                 >
                   ព័ត៌មានផ្សេងៗ
                 </button>
               </div>
 
               {activeTab === 'personal' && (
-                <PersonalTab
-                  data={form}
-                  setData={setForm}
-                  isRequiredInvalid={isRequiredInvalid}
-                  noOptions={[]}
-                  takenNos={[]}
-                  hideNo
-                  hideStaffId
-                  splitBirthPlace
-                  splitCurrentPlace
-                  inputTextClass="text-base"
-                />
+                <>
+                  <PersonalTab
+                    data={form}
+                    setData={setForm}
+                    isRequiredInvalid={isRequiredInvalid}
+                    noOptions={[]}
+                    takenNos={[]}
+                    hideNo
+                    splitBirthPlace
+                    splitCurrentPlace
+                    inputTextClass="text-base"
+                    handleUpload={handleUpload}
+                  />
+                  <div className="flex justify-end mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('work')}
+                      className={`bg-blue-600 text-white px-4 py-2 rounded ${!isPersonalValid ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
+                      disabled={!isPersonalValid}
+                    >
+                      បន្តទៅផ្ទាំងបន្ទាប់
+                    </button>
+                  </div>
+                </>
               )}
 
               {activeTab === 'work' && (

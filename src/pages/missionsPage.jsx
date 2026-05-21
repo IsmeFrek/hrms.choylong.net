@@ -5,6 +5,7 @@ import logo3 from '../assets/3.JPG';
 import HRAPI from '../services/hrAPI';
 import api from '../services/api';
 import { fetchFileTransfers } from '../api/fileTransfer';
+import usePermission from '../hooks/usePermission';
 
 const KHMER_FONT = { fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" };
 
@@ -245,6 +246,7 @@ const persistMissions = (missions) => {
 };
 
 export default function MissionsPage() {
+  const perms = usePermission();
   const location = useLocation();
   const navigate = useNavigate();
   const wordPageRef = useRef(null);
@@ -370,7 +372,7 @@ export default function MissionsPage() {
   useEffect(() => {
     try {
       if (serverAvailable === false) persistMissions(missions);
-    } catch (e) {}
+    } catch (e) { }
   }, [missions, serverAvailable]);
 
   // Load from server on mount, fallback to localStorage
@@ -415,11 +417,11 @@ export default function MissionsPage() {
 
     const onCustom = () => reload();
 
-    try { window.addEventListener('storage', onStorage); } catch (e) {}
-    try { window.addEventListener('missions-updated', onCustom); } catch (e) {}
+    try { window.addEventListener('storage', onStorage); } catch (e) { }
+    try { window.addEventListener('missions-updated', onCustom); } catch (e) { }
     return () => {
-      try { window.removeEventListener('storage', onStorage); } catch (e) {}
-      try { window.removeEventListener('missions-updated', onCustom); } catch (e) {}
+      try { window.removeEventListener('storage', onStorage); } catch (e) { }
+      try { window.removeEventListener('missions-updated', onCustom); } catch (e) { }
     };
   }, []);
 
@@ -514,11 +516,11 @@ export default function MissionsPage() {
     const s = String(v).trim();
     // dd/mm/yyyy
     const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (dmy) return `${dmy[3]}-${String(Number(dmy[2])).padStart(2,'0')}-${String(Number(dmy[1])).padStart(2,'0')}`;
+    if (dmy) return `${dmy[3]}-${String(Number(dmy[2])).padStart(2, '0')}-${String(Number(dmy[1])).padStart(2, '0')}`;
     // yyyy-mm-dd
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
     const dt = new Date(s);
-    if (!Number.isNaN(dt.getTime())) return dt.toISOString().slice(0,10);
+    if (!Number.isNaN(dt.getTime())) return dt.toISOString().slice(0, 10);
     return '';
   };
 
@@ -543,7 +545,7 @@ export default function MissionsPage() {
         const letterDate = safeParseDateToISO(String(row?.date ?? row?.created_at ?? row?.createdAt ?? '').trim());
         const sourceDoc = String(row?.source ?? row?.origin ?? '').trim();
         let referenceDoc = '';
-        try { const list = (Array.isArray(row?.attachments) && row.attachments.length) ? row.attachments.map(String) : (row?.attachments || ''); referenceDoc = Array.isArray(list) ? list.join('\n') : String(list || ''); } catch {};
+        try { const list = (Array.isArray(row?.attachments) && row.attachments.length) ? row.attachments.map(String) : (row?.attachments || ''); referenceDoc = Array.isArray(list) ? list.join('\n') : String(list || ''); } catch { };
         const content = String(row?.content ?? row?.description ?? '').trim();
         const others = String(row?.others ?? row?.notes ?? '').trim();
 
@@ -747,11 +749,11 @@ export default function MissionsPage() {
     try {
       // Print from the same window so the UI matches wordMode (Tailwind/styles apply).
       const cleanup = () => {
-        try { window.removeEventListener('afterprint', cleanup); } catch {}
-        try { document.documentElement.classList.remove('printing-word'); } catch {}
+        try { window.removeEventListener('afterprint', cleanup); } catch { }
+        try { document.documentElement.classList.remove('printing-word'); } catch { }
       };
-      try { window.addEventListener('afterprint', cleanup); } catch {}
-      try { document.documentElement.classList.add('printing-word'); } catch {}
+      try { window.addEventListener('afterprint', cleanup); } catch { }
+      try { document.documentElement.classList.add('printing-word'); } catch { }
       setTimeout(() => {
         try { window.print(); } catch (e) {
           console.error('window.print failed', e);
@@ -769,7 +771,7 @@ export default function MissionsPage() {
             w.document.close();
             w.focus();
             setTimeout(() => {
-              try { w.print(); } catch {}
+              try { w.print(); } catch { }
             }, 250);
           } catch (e2) {
             console.error('printWord fallback failed', e2);
@@ -1055,15 +1057,15 @@ export default function MissionsPage() {
 
       arr.sort((a, b) => {
         const getVal = (r, key) => {
-            if (key === 'date') return String(r.participationDate || r.date || r.letterDate || '').toLowerCase();
-            if (key === 'participationDate') return String(r.participationDate || r.date || r.letterDate || '').toLowerCase();
-            if (key === 'stage') return String(r.stage || '').toLowerCase();
-            if (key === 'assignTo') return String(r.assignTo || '').toLowerCase();
-            if (key === 'participants') return String(r.participants || '').toLowerCase();
-            if (key === 'reference') return String(r.letterNo || r.reference || '').toLowerCase();
-            if (key === 'location' || key === 'participationLocation') return String(r.participationLocation || r.location || '').toLowerCase();
-            return String(r[key] || '').toLowerCase();
-          };
+          if (key === 'date') return String(r.participationDate || r.date || r.letterDate || '').toLowerCase();
+          if (key === 'participationDate') return String(r.participationDate || r.date || r.letterDate || '').toLowerCase();
+          if (key === 'stage') return String(r.stage || '').toLowerCase();
+          if (key === 'assignTo') return String(r.assignTo || '').toLowerCase();
+          if (key === 'participants') return String(r.participants || '').toLowerCase();
+          if (key === 'reference') return String(r.letterNo || r.reference || '').toLowerCase();
+          if (key === 'location' || key === 'participationLocation') return String(r.participationLocation || r.location || '').toLowerCase();
+          return String(r[key] || '').toLowerCase();
+        };
 
         const va = getVal(a, sortBy);
         const vb = getVal(b, sortBy);
@@ -1180,13 +1182,13 @@ export default function MissionsPage() {
             </select>
           </label>
 
-          <button
+          {(perms.isAdmin || perms.canEditMissions) && <button
             type="button"
             onClick={() => openFullEdit(null)}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
           >
             បន្ថែមថ្មី
-          </button>
+          </button>}
         </div>
 
         {/* Tabs */}
@@ -1264,7 +1266,7 @@ export default function MissionsPage() {
                 <th className="border border-gray-200 px-2 py-2 text-left w-40">Telegram</th>
               )}
               <th className="border border-gray-200 px-2 py-2 text-center w-10">ស្ថានភាព</th>
-              <th className="border border-gray-200 px-2 py-2 text-center w-10">សកម្មភាព</th>
+              {(perms.isAdmin || perms.canEditMissions) && <th className="border border-gray-200 px-2 py-2 text-center w-10">សកម្មភាព</th>}
             </tr>
           </thead>
           <tbody>
@@ -1284,26 +1286,28 @@ export default function MissionsPage() {
                     {r.statusText}
                   </span>
                 </td>
-                <td className="border border-gray-200 px-2 py-2">
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <button type="button" onClick={() => openEdit(r)} className="hover:text-blue-600" title="កែ">
-                      <FaEdit />
-                    </button>
-                    <button type="button" onClick={() => openFullEdit(r)} className="hover:text-indigo-600" title="កែ (ពេញ)">
-                      <FaUser />
-                    </button>
-                   
-                    <button type="button" onClick={() => sendRow(r)} className="hover:text-green-700" title="ផ្ញើ">
-                      <FaPaperPlane />
-                    </button>
-                    <button type="button" onClick={() => replyRow(r)} className="hover:text-amber-700" title="តប">
-                      <FaReply />
-                    </button>
-                     <button type="button" onClick={() => deleteRow(r)} className="hover:text-red-600" title="លុប">
-                      <FaTrash />
-                    </button>
-                  </div>
-                </td>
+                {(perms.isAdmin || perms.canEditMissions) && (
+                  <td className="border border-gray-200 px-2 py-2">
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <button type="button" onClick={() => openEdit(r)} className="hover:text-blue-600" title="កែ">
+                        <FaEdit />
+                      </button>
+                      <button type="button" onClick={() => openFullEdit(r)} className="hover:text-indigo-600" title="កែ (ពេញ)">
+                        <FaUser />
+                      </button>
+
+                      <button type="button" onClick={() => sendRow(r)} className="hover:text-green-700" title="ផ្ញើ">
+                        <FaPaperPlane />
+                      </button>
+                      <button type="button" onClick={() => replyRow(r)} className="hover:text-amber-700" title="តប">
+                        <FaReply />
+                      </button>
+                      <button type="button" onClick={() => deleteRow(r)} className="hover:text-red-600" title="លុប">
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
             {pageRows.length === 0 && (
@@ -1427,7 +1431,7 @@ export default function MissionsPage() {
             </div>
 
             {wordMode && (
-                <div className="mb-4 bg-gray-100 p-3 rounded">
+              <div className="mb-4 bg-gray-100 p-3 rounded">
                 <div
                   ref={wordPageRef}
                   id="wordPrintRoot"
@@ -1444,9 +1448,9 @@ export default function MissionsPage() {
                   )}
 
                   <div className="relative z-10 px-16 pt-6 pb-24 text-[16px] leading-2">
-                    <div className={`text-center font-nomal text-[18px] ${showNationalHeader ? '' : 'invisible'}`} style={{fontFamily: 'Khmer OS Muol Light'}}>ព្រះរាជាណាចក្រកម្ពុជា</div>
-                    <div className={`text-center font-nomal text-[18px] ${showNationalHeader ? '' : 'invisible'}`} style={{fontFamily: 'Khmer OS Muol Light'}}>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
-                    <div className="text-center font-nomal text-[16px]" style={{fontFamily: 'Khmer OS Muol Light',marginTop:200}}>លិខិតបញ្ជាបេសកកម្ម</div>
+                    <div className={`text-center font-nomal text-[18px] ${showNationalHeader ? '' : 'invisible'}`} style={{ fontFamily: 'Khmer OS Muol Light' }}>ព្រះរាជាណាចក្រកម្ពុជា</div>
+                    <div className={`text-center font-nomal text-[18px] ${showNationalHeader ? '' : 'invisible'}`} style={{ fontFamily: 'Khmer OS Muol Light' }}>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
+                    <div className="text-center font-nomal text-[16px]" style={{ fontFamily: 'Khmer OS Muol Light', marginTop: 200 }}>លិខិតបញ្ជាបេសកកម្ម</div>
                     <div className="mt-1 flex justify-center">
                       <img src={logo3} alt="" className="h-[20px] w-auto object-contain" />
                     </div>
@@ -1473,7 +1477,7 @@ export default function MissionsPage() {
                             disabled={(selectedHrIds || []).length === 0}
                             className={(selectedHrIds || []).length === 0 ? 'bg-gray-200 text-gray-400 px-2 py-1 rounded cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded'}
                           >
-                            
+
                             <span className="ml-2 inline-block bg-white/5 px-2 py-0.1 rounded text-sm">{toKhmerDigits((selectedHrIds || []).length)} +</span>
                           </button>
                         </div>
@@ -1529,11 +1533,11 @@ export default function MissionsPage() {
                         </div>
                       </div>
                     )}
-                  
+
                     <div className="mt-4">
                       <div className="flex items-baseline min-w-0 w-full" style={{ marginTop: 6, fontSize: 15, fontFamily: 'Khmer OS Siemreap' }}>
                         <span className="label" style={{ fontFamily: 'Khmer OS Muol Light', fontSize: 15, paddingLeft: 20 }}>យោង ៖</span>
-                        <span 
+                        <span
                           contentEditable
                           suppressContentEditableWarning
                           onInput={onCombinedHeaderInput}
@@ -1546,11 +1550,11 @@ export default function MissionsPage() {
                       </div>
                     </div>
 
-                    
+
 
                     <div className="mt-4">
-                        <span className="label" style={{ fontFamily: 'Khmer OS Muol Light', fontSize: 15, paddingLeft: 20 }}>សូមចាត់បញ្ជូន</span>
-                      
+                      <span className="label" style={{ fontFamily: 'Khmer OS Muol Light', fontSize: 15, paddingLeft: 20 }}>សូមចាត់បញ្ជូន</span>
+
                       <div
                         contentEditable
                         suppressContentEditableWarning
@@ -1617,7 +1621,7 @@ export default function MissionsPage() {
                     <div className="mt-14 text-[15px]">
                       <div className="font-semibold">បញ្ជូនជូន៖</div>
                       <div className="mt-2 whitespace-pre-wrap pl-6">- ឯកសារជូនជ្រាប
-- រក្សាទុក</div>
+                        - រក្សាទុក</div>
                     </div>
                   </div>
                 </div>
@@ -1675,7 +1679,7 @@ export default function MissionsPage() {
               </div>
             )}
 
-            
+
           </div>
         </div>
       )}

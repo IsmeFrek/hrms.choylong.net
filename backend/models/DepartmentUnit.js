@@ -7,6 +7,10 @@ const DepartmentUnitSchema = new mongoose.Schema({
   code: { type: String }, // កូដ (ស្រេចចិត្ត)
   description: { type: String }, // ផ្សេងៗ
   order: { type: Number, default: 0 }, // សម្រាប់តម្រៀប
+  customPattern: { 
+    type: mongoose.Schema.Types.Mixed, 
+    default: null 
+  },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

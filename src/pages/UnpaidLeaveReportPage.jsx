@@ -5,7 +5,7 @@ import usePermission from '../hooks/usePermission';
 import headerBg from '../assets/3.JPG';
 
 function toKhmerDigits(n) {
-  const map = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+  const map = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
   return String(n).replace(/[0-9]/g, d => map[d]);
 }
 
@@ -13,14 +13,14 @@ function fmtKhmerLongDate(d) {
   if (!d) return '';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '';
-  const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
-  const dd = toKhmerDigits(String(dt.getDate()).padStart(1,'0'));
+  const khMonths = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
+  const dd = toKhmerDigits(String(dt.getDate()).padStart(1, '0'));
   const mmName = khMonths[dt.getMonth()];
   const yyyy = toKhmerDigits(dt.getFullYear());
   return `ថ្ងៃទី ${dd} ខែ ${mmName} ឆ្នាំ ${yyyy}`;
 }
 function khWeekday(d) {
-  const names = ['អាទិត្យ','ចន្ទ','អង្គារ','ពុធ','ព្រហស្បតិ៍','សុក្រ','សៅរ៍'];
+  const names = ['អាទិត្យ', 'ចន្ទ', 'អង្គារ', 'ពុធ', 'ព្រហស្បតិ៍', 'សុក្រ', 'សៅរ៍'];
   const dt = new Date(d);
   return names[dt.getDay()];
 }
@@ -29,28 +29,163 @@ function buddhistEraYear(d) {
   return dt.getFullYear() + 543;
 }
 
+// Convert Excel serial date (e.g. 45627) to a JS Date at local midnight
+function excelSerialToDate(serial) {
+  if (serial == null || serial === '') return null;
+  const n = Number(serial);
+  if (!Number.isFinite(n)) return null;
+  try {
+    if (typeof XLSX !== 'undefined' && XLSX && XLSX.SSF && typeof XLSX.SSF.parse_date_code === 'function') {
+      const dc = XLSX.SSF.parse_date_code(n);
+      if (dc && dc.y && dc.m && dc.d) {
+        const dt = new Date(dc.y, dc.m - 1, dc.d);
+        if (!isNaN(dt.getTime())) {
+          dt.setHours(0, 0, 0, 0);
+          return dt;
+        }
+      }
+    }
+  } catch (e) {
+    // ignore and fallback to manual calculation below
+  }
+  try {
+    // Excel serial 1 = 1900-01-01, which is JS date 1899-12-31 or 1899-12-30 depending on leap-year bug.
+    // Using 1899-12-30 is the common convention that matches most XLSX readers.
+    const base = new Date(1899, 11, 30);
+    const dt = new Date(base.getTime() + n * 86400000);
+    if (isNaN(dt.getTime())) return null;
+    dt.setHours(0, 0, 0, 0);
+    return dt;
+  } catch {
+    return null;
+  }
+}
+
 function fmtShortDate(d) {
   if (!d) return '';
   try {
-    const dt = new Date(d);
-    if (!isNaN(dt.getTime())) {
-      const dd = String(dt.getDate()).padStart(2,'0');
-      const mm = String(dt.getMonth()+1).padStart(2,'0');
+    if (d instanceof Date) {
+      const dt = new Date(d.getTime());
+      const dd = String(dt.getDate()).padStart(2, '0');
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
       const yyyy = dt.getFullYear();
       return `${dd}/${mm}/${yyyy}`;
     }
-    // If it's already in dd/mm/yyyy form, return as-is
-    return String(d);
+    if (typeof d === 'number') {
+      const dt = excelSerialToDate(d);
+      if (dt) {
+        const dd = String(dt.getDate()).padStart(2, '0');
+        const mm = String(dt.getMonth() + 1).padStart(2, '0');
+        const yyyy = dt.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+      }
+    }
+    const s = String(d).trim();
+    if (!s) return '';
+
+    // Already dd/mm/yyyy (or dd/mm/yyyyy) -> normalize padding.
+    // If year looks like an Excel serial (e.g. 45627), treat it as such.
+    let m = /^([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4,5})$/.exec(s);
+    if (m) {
+      const yearNum = Number(m[3]);
+      if (m[3].length > 4 || yearNum > 3000) {
+        const dt = excelSerialToDate(yearNum);
+        if (dt) {
+          const dd = String(dt.getDate()).padStart(2, '0');
+          const mm = String(dt.getMonth() + 1).padStart(2, '0');
+          const yyyy = dt.getFullYear();
+          return `${dd}/${mm}/${yyyy}`;
+        }
+      }
+      const dd = String(Number(m[1])).padStart(2, '0');
+      const mm = String(Number(m[2])).padStart(2, '0');
+      const yyyy = String(yearNum).padStart(4, '0');
+      return `${dd}/${mm}/${yyyy}`;
+    }
+
+    // ISO yyyy-mm-dd -> convert to dd/mm/yyyy
+    m = /^([0-9]{4,5})-([0-9]{2})-([0-9]{2})$/.exec(s);
+    if (m) {
+      const yearNum = Number(m[1]);
+      if (m[1].length > 4 || yearNum > 3000) {
+        const dt = excelSerialToDate(yearNum);
+        if (dt) {
+          const dd = String(dt.getDate()).padStart(2, '0');
+          const mm = String(dt.getMonth() + 1).padStart(2, '0');
+          const yyyy = dt.getFullYear();
+          return `${dd}/${mm}/${yyyy}`;
+        }
+      }
+      const yyyy = m[1];
+      const mm = m[2];
+      const dd = m[3];
+      return `${dd}/${mm}/${yyyy}`;
+    }
+
+    // Fallback: let Date parse, then format
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime())) {
+      const dd = String(dt.getDate()).padStart(2, '0');
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      const yyyy = dt.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+    return s;
   } catch { return String(d); }
 }
 
 function parseDateSafe(v) {
   if (!v) return null;
   try {
-    const dt = new Date(v);
+    if (v instanceof Date) {
+      const dt0 = new Date(v.getTime());
+      dt0.setHours(0, 0, 0, 0);
+      return isNaN(dt0.getTime()) ? null : dt0;
+    }
+    if (typeof v === 'number') {
+      const dtNum = excelSerialToDate(v);
+      if (dtNum) return dtNum;
+    }
+    const s = String(v).trim();
+    if (!s) return null;
+
+    // dd/mm/yyyy (or dd/mm/yyyyy if year accidentally stored as Excel serial)
+    let m = /^([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4,5})$/.exec(s);
+    if (m) {
+      const yearNum = Number(m[3]);
+      if (m[3].length > 4 || yearNum > 3000) {
+        const dtSerial = excelSerialToDate(yearNum);
+        if (dtSerial) return dtSerial;
+      }
+      const dd = Number(m[1]);
+      const mm = Number(m[2]);
+      const yyyy = yearNum;
+      const dt = new Date(yyyy, mm - 1, dd);
+      if (isNaN(dt.getTime())) return null;
+      dt.setHours(0, 0, 0, 0);
+      return dt;
+    }
+
+    // ISO yyyy-mm-dd (allow 5-digit year to catch Excel-serial strings like 45627-01-01)
+    m = /^([0-9]{4,5})-([0-9]{2})-([0-9]{2})$/.exec(s);
+    if (m) {
+      const yearNum = Number(m[1]);
+      if (m[1].length > 4 || yearNum > 3000) {
+        const dtSerial = excelSerialToDate(yearNum);
+        if (dtSerial) return dtSerial;
+      }
+      const yyyy = yearNum;
+      const mm = Number(m[2]);
+      const dd = Number(m[3]);
+      const dt = new Date(yyyy, mm - 1, dd);
+      if (isNaN(dt.getTime())) return null;
+      dt.setHours(0, 0, 0, 0);
+      return dt;
+    }
+
+    const dt = new Date(s);
     if (isNaN(dt.getTime())) return null;
-    // normalize to midnight
-    dt.setHours(0,0,0,0);
+    dt.setHours(0, 0, 0, 0);
     return dt;
   } catch { return null; }
 }
@@ -75,14 +210,36 @@ function formatDurationDaysToKhmer(days) {
   return `${toKhmerDigits(days)} ថ្ងៃ`;
 }
 
-function computeUnpaidMeta(unpaid) {
+// Convert any stored date-like value into an ISO yyyy-mm-dd string
+// suitable for `<input type="date" />` value. If invalid, return empty.
+function toDateInputValue(v) {
+  const dt = parseDateSafe(v);
+  if (!dt) return '';
+  try {
+    return dt.toISOString().slice(0, 10);
+  } catch {
+    return '';
+  }
+}
+
+function computeUnpaidMeta(unpaid, hr) {
   const start = parseDateSafe(unpaid && (unpaid.Start || unpaid.start));
   const end = parseDateSafe(unpaid && (unpaid.End || unpaid.end));
-  const today = new Date(); today.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
 
   let statusLabel = '';
   let validityLabel = '';
   let durationLabel = '';
+
+  // Detect if the employee has resigned or is inactive/deleted
+  const isResigned = hr && (
+    (hr.status || '').toString().toLowerCase() === 'resigned' ||
+    (hr.status || '').toString().toLowerCase() === 'inactive' ||
+    (hr.status || '').toString().toLowerCase() === 'deleted' ||
+    hr.resignationDate ||
+    hr.resignDate ||
+    (hr.delisted && (hr.delisted.dateDelisted || hr.delisted.date))
+  );
 
   // Only show "prepare" when there is a Start date in the future.
   if (start && start > today) {
@@ -92,8 +249,13 @@ function computeUnpaidMeta(unpaid) {
     statusLabel = 'កំពុងបន្តទំនេរគ្មានបៀវត្ស';
   } else if (end && end < today) {
     const daysSinceEnd = daysBetween(end, today);
-    if (daysSinceEnd > 30) statusLabel = 'បញ្ចប់ទំនេរគ្មានបៀវត្សលើស១ខែ';
-    else statusLabel = 'ចូលបម្រើការងារវិញ';
+    if (isResigned) {
+      statusLabel = 'បានលាឈប់';
+    } else if (daysSinceEnd > 30) {
+      statusLabel = 'បញ្ចប់ទំនេរគ្មានបៀវត្សលើស១ខែ';
+    } else {
+      statusLabel = 'ចូលបម្រើការងារវិញ';
+    }
   }
 
   let validityDays = null;
@@ -125,19 +287,49 @@ export default function RetirementReportPage() {
   const [list, setList] = useState([]);
   const [q, setQ] = useState('');
   const [dept] = useState('');
-  
+
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState('');
   const [retireYear] = useState(new Date().getFullYear());
   const printRef = useRef();
+  const importFileRef = useRef();
   // Column order state for draggable headers
   const defaultCols = [
-    'index','staffId','civilId','name','gender','role','position','dept','number','reason','validity','status','duration','other','Start','End','image','action'
+    'index', 'staffId', 'civilId', 'name', 'gender', 'dob', 'role', 'position', 'dept', 'number', 'Start', 'End', 'image', 'validity', 'status', 'duration', 'reason', 'other'
   ];
+  if (perms.isAdmin || perms.canEditUnpaidLeaveReport) defaultCols.push('action');
   const [colOrder, setColOrder] = useState(defaultCols);
+  const [visibleCols, setVisibleCols] = useState(() => {
+    const obj = {};
+    (defaultCols || []).forEach(k => { obj[k] = true; });
+    return obj;
+  });
+  const [showColsPanel, setShowColsPanel] = useState(false);
+  const colLabels = {
+    index: 'ល.រ',
+    staffId: 'លេខកាត',
+    civilId: 'លេខមន្ត្រី',
+    name: 'គោត្តនាម និងនាម',
+    gender: 'ភេទ',
+    dob: 'ថ្ងៃខែឆ្នាំកំណើត',
+    role: 'មុខងារ',
+    position: 'តួនាទី',
+    dept: 'ផ្នែក',
+    number: 'ចំនួនទំនេរ',
+    Start: 'ថ្ងៃចាប់ផ្ដើម',
+    End: 'ថ្ងៃបញ្ចប់',
+    image: 'ឯកសារយោង',
+    validity: 'សុពលភាព',
+    status: 'ស្ថានភាព',
+    duration: 'រយៈពេល',
+    reason: 'មូលហេតុ',
+    other: 'ផ្សេងៗ',
+    ...((perms.isAdmin || perms.canEditUnpaidLeaveReport) ? { action: 'សកម្មភាព' } : {})
+  };
   const draggingKeyRef = useRef(null);
   const [lunarText, setLunarText] = useState('');
-  const [footerDate, setFooterDate] = useState(() => new Date().toISOString().slice(0,10));
+  const [footerDate, setFooterDate] = useState(() => new Date().toISOString().slice(0, 10));
   // Edit modal state for unpaid fields
   const [showEdit, setShowEdit] = useState(false);
   const [editingHr, setEditingHr] = useState(null);
@@ -251,7 +443,17 @@ export default function RetirementReportPage() {
     const rows = (list || [])
       .filter(hr => {
         if (dept && (hr.Department_Kh || hr.department || '').trim() !== dept.trim()) return false;
-        const sid = (hr.civilServantId || hr.staffId || hr.no || hr.cardNo || hr.cardNumber || '').toString().toLowerCase();
+        // Combine all ID-like fields so searching by any of them works
+        const sid = [
+          hr.civilServantId,
+          hr.staffId,
+          hr.no,
+          hr.cardNo,
+          hr.cardNumber,
+        ]
+          .filter(v => v != null && v !== '')
+          .map(v => v.toString().toLowerCase())
+          .join(' ');
         const name = (hr.khmerName || hr.name || '').toString().toLowerCase();
         const position = (hr.position || hr.role || hr.title || '').toString().toLowerCase();
         const deptField = (hr.Department_Kh || hr.department || '').toString().toLowerCase();
@@ -280,6 +482,7 @@ export default function RetirementReportPage() {
     if (s.includes('ត្រៀម') || s.includes('prepare')) return { background: '#f59e0b', color: '#fff' }; // amber
     if (s.includes('កំពុង') || s.includes('ongoing')) return { background: '#10b981', color: '#fff' }; // green
     if (s.includes('បញ្ចប់') || s.includes('ended') || s.includes('លើស')) return { background: '#6366f1', color: '#fff' }; // indigo/purple
+    if (s.includes('លាឈប់') || s.includes('resigned')) return { background: '#dc2626', color: '#fff' }; // red
     if (s.includes('ចូល') || s.includes('returned') || s.includes('resume')) return { background: '#047857', color: '#fff' }; // darker green
     // default blue
     return { background: '#2563eb', color: '#fff' };
@@ -287,31 +490,32 @@ export default function RetirementReportPage() {
   // Render status badge (reuse Study styling)
   const renderStatusBadge = (s) => {
     if (!s) return null;
-    const style = { display:'inline-block', padding:'6px 10px', borderRadius:14, color:'#fff', fontSize:13, fontWeight:700, minWidth:40, textAlign:'center' };
+    const style = { display: 'inline-block', padding: '6px 10px', borderRadius: 14, color: '#fff', fontSize: 13, fontWeight: 700, minWidth: 40, textAlign: 'center' };
     const mapping = {
       'ត្រៀមទំនេរ': { background: '#f39c12' },
       'ត្រៀមទំនេរគ្មានបៀវត្ស': { background: '#f39c12' },
       'កំពុងទំនេរ': { background: '#16a34a' },
       'កំពុងបន្តទំនេរគ្មានបៀវត្ស': { background: '#16a34a' },
       'ចូលបម្រើការងារវិញ': { background: '#230ab4ff' },
+      'បានលាឈប់': { background: '#dc2626' },
       'បញ្ចប់ទំនេរគ្មានបៀវត្សលើស១ខែ': { background: '#b91c1c' }
     };
     const sStyle = mapping[s] || { background: '#333' };
     return <span style={{ ...style, ...sStyle }}>{s}</span>;
   };
-  
+
 
   // Debug: log fetched list and computed rows for troubleshooting
   useEffect(() => {
     if (typeof console !== 'undefined' && console.debug) {
       console.debug('[UnpaidLeaveReport] list count:', Array.isArray(list) ? list.length : 0, 'derived rows:', derived.rows ? derived.rows.length : 0);
-      console.debug('[UnpaidLeaveReport] sample rows:', (derived.rows || []).slice(0,5).map(r => ({ id: r.hr._id || r.hr.no || r.hr.staffId, name: r.hr.khmerName || r.hr.name })));
+      console.debug('[UnpaidLeaveReport] sample rows:', (derived.rows || []).slice(0, 5).map(r => ({ id: r.hr._id || r.hr.no || r.hr.staffId, name: r.hr.khmerName || r.hr.name })));
     }
   }, [list, derived]);
 
   const openEdit = (hr) => {
     setEditingHr({ ...hr, unpaid: { ...(hr.unpaid || {}) } });
-    setEditingUnpaid(hr && hr.unpaid ? { ...hr.unpaid } : {});
+    setEditingUnpaid(hr && hr.unpaid ? { ...hr.unpaid } : { image: '' });
     try { setOriginalUnpaid(JSON.parse(JSON.stringify(hr && hr.unpaid ? hr.unpaid : {}))); } catch { setOriginalUnpaid(hr && hr.unpaid ? { ...hr.unpaid } : {}); }
     setSelectedFile(null);
     setSelectedPreviewUrl(null);
@@ -347,7 +551,7 @@ export default function RetirementReportPage() {
         if (st && valid !== '' && valid != null && !isNaN(Number(valid))) {
           const end = new Date(st);
           end.setDate(end.getDate() + Number(valid));
-          next.End = end.toISOString().slice(0,10);
+          next.End = end.toISOString().slice(0, 10);
         }
       } catch { /* ignore */ }
       return next;
@@ -368,7 +572,9 @@ export default function RetirementReportPage() {
       const fd = new FormData();
       fd.append('file', selectedFile);
       const { data } = await api.post('/upload', fd);
-      const url = data && (data.url || data.path || data.fileUrl) ? (data.url || data.path || data.fileUrl) : (data && data[0] ? data[0].url : null);
+      const url = data && (data.url || data.path || data.fileUrl)
+        ? (data.url || data.path || data.fileUrl)
+        : (data && data[0] ? data[0].url : null);
       if (url) {
         // set into editingUnpaid so preview/current file updates
         setEditingUnpaid(prev => ({ ...(prev || {}), image: url }));
@@ -390,7 +596,7 @@ export default function RetirementReportPage() {
     const ok = window.confirm('លុបឯកសារយោង?');
     if (!ok) return;
     const imageUrl = editingUnpaid.image;
-    setEditingUnpaid(prev => ({ ...(prev||{}), image: '' }));
+    setEditingUnpaid(prev => ({ ...(prev || {}), image: '' }));
     try {
       const q = new URL(imageUrl, window.location.origin).pathname;
       await api.delete('/upload', { params: { path: q } });
@@ -463,6 +669,29 @@ export default function RetirementReportPage() {
     }
   };
 
+  const handleDeleteUnpaid = async (hr) => {
+    if (!hr) return;
+    const ok = window.confirm('លុបទិន្នន័យទំនេរគ្មានបៀវត្ស?');
+    if (!ok) return;
+    setSaving(true);
+    try {
+      const id = hr._id || hr.no || hr.staffId;
+      // send empty unpaid object to clear unpaid data for this staff
+      const { data } = await api.put(`/hr/${id}`, { unpaid: {} });
+      setList(prev => prev.map(h => {
+        if (h._id && data && data._id && h._id === data._id) return data;
+        if (h._id && hr._id && h._id === hr._id) return { ...h, unpaid: {} };
+        if (!h._id && (h.no === hr.no || h.staffId === hr.staffId)) return { ...h, unpaid: {} };
+        return h;
+      }));
+    } catch (err) {
+      console.error('Delete unpaid failed', err);
+      window.alert('លុបទិន្នន័យបរាជ័យ: ' + (err?.response?.data?.message || err.message || 'Error'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // removed edit modal and file-upload related handlers — this page is decoupled from study/edit flows
 
   const SCREEN_CSS = `
@@ -519,48 +748,46 @@ export default function RetirementReportPage() {
     const header = [
       'ល.រ',
       'លេខកាត',
-      'លេខមន្ត្រីរាជការ',
+      'លេខមន្ត្រី',
       'គោត្តនាម និងនាម',
       'ភេទ',
+      'ថ្ងៃខែឆ្នាំកំណើត',
       'មុខងារ',
       'តួនាទី',
       'ផ្នែក',
-      'ចំនួនទំនេរគ្មានបៀវត្ស',
-      'មូលហេតុ',
-      'សុពលភាពទំនេរគ្មានបៀវត្ស',
-      'ស្ថានភាពទំនេរគ្មានបៀវត្ស',
-      'រយៈពេលទំនេរគ្មានបៀវត្ស',
-      'ផ្សេងៗ',
+      'ចំនួនទំនេរ',
       'ថ្ងៃចាប់ផ្ដើម',
       'ថ្ងៃបញ្ចប់',
-      'ឯកសារយោង'
+      'ឯកសារយោង',
+      'សុពលភាព',
+      'ស្ថានភាព',
+      'រយៈពេល',
+      'មូលហេតុ',
+      'ផ្សេងៗ'
     ];
     const data = rows.map((row, idx) => {
       // Export basic identifying fields + unpaid.* fields
       const unpaid = row.hr && row.hr.unpaid ? row.hr.unpaid : {};
       return ([
-        idx+1,
+        idx + 1,
         row.hr.staffId || row.hr.cardNumber || row.hr.cardNo || row.hr.no || '',
         row.hr.civilServantId || row.hr.officerId || row.hr.staffId || row.hr.no || '',
         row.hr.khmerName || row.hr.name || '',
         row.hr.gender === 'Male' ? 'ប' : row.hr.gender === 'Female' ? 'ស' : '',
+        fmtShortDate(row.hr.birthDate || row.hr.dob || row.hr.BirthDate || ''),
         row.hr.civilServantRole || row.hr.role || row.hr.title || row.hr.position || '',
         row.hr.position || row.hr.role || row.hr.title || '',
         row.hr.Department_Kh || row.hr.department || '',
-  unpaid.number || '',
-  unpaid.Reason || unpaid.reason || '',
-  // prefer numeric validityDays if available, else raw validity
-  ((computeUnpaidMeta(unpaid).validityDays !== null && typeof computeUnpaidMeta(unpaid).validityDays !== 'undefined') ? computeUnpaidMeta(unpaid).validityDays : (unpaid.validity || '')),
-  (unpaid.status || ''),
-  unpaid.duration || '',
-  // computed fields (labels)
-  (computeUnpaidMeta(unpaid).validityLabel || ''),
-  (computeUnpaidMeta(unpaid).statusLabel || ''),
-  (computeUnpaidMeta(unpaid).durationLabel || ''),
-        unpaid.other || '',
-        unpaid.Start || unpaid.start || '',
-        unpaid.End || unpaid.end || '',
-        unpaid.image || ''
+        unpaid.number || '',
+        fmtShortDate(unpaid.Start || unpaid.start || ''),
+        fmtShortDate(unpaid.End || unpaid.end || ''),
+        unpaid.image || '',
+        // validity (prefer numeric days when available)
+        ((computeUnpaidMeta(unpaid, row.hr).validityDays !== null && typeof computeUnpaidMeta(unpaid, row.hr).validityDays !== 'undefined') ? computeUnpaidMeta(unpaid, row.hr).validityDays : (unpaid.validity || '')),
+        (unpaid.status || ''),
+        (computeUnpaidMeta(unpaid, row.hr).durationLabel || unpaid.duration || ''),
+        unpaid.Reason || unpaid.reason || '',
+        unpaid.other || ''
       ]);
     });
 
@@ -570,15 +797,230 @@ export default function RetirementReportPage() {
 
     const ws = XLSX.utils.aoa_to_sheet([header, ...data, [], ...summary]);
     // Adjust column widths
-    // adjusted column widths for the reduced columns
     ws['!cols'] = [
-      { wch: 5 }, { wch: 12 }, { wch: 12 }, { wch: 30 }, { wch: 6 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
-      { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 24 }
+      { wch: 16 }, // staffId
+      { wch: 16 }, // civilId
+      { wch: 14 }, // Start
+      { wch: 14 }, // End
+      { wch: 24 }  // Other
     ];
     const wb = XLSX.utils.book_new();
     const sheetName = `Nivatt_${retireYear}`;
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  XLSX.writeFile(wb, `UnpaidLeave_${retireYear}.xlsx`);
+    XLSX.writeFile(wb, `UnpaidLeave_${retireYear}.xlsx`);
+  };
+
+  const handleImportExcel = (file) => {
+    if (!file) return;
+    try {
+      setImporting(true);
+      setLoading(true);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        (async () => {
+          try {
+            const dataArr = new Uint8Array(e.target.result);
+            const wb = XLSX.read(dataArr, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
+
+            if (!aoa || aoa.length < 2) {
+              window.alert('រកមិនឃើញទិន្នន័យសមរម្យក្នុង Excel ទេ');
+              return;
+            }
+
+            const headers = aoa[0] || [];
+
+            const findCol = (pred) => headers.findIndex((h) => {
+              const t = String(h || '').toLowerCase();
+              return pred(t, h);
+            });
+
+            const staffIdCol = findCol((t, h) => t.includes('លេខកាត') || t.includes('card') || t.includes('staff'));
+            const civilIdCol = findCol((t, h) => t.includes('លេខមន្ត្រី') || t.includes('civil') || t.includes('officer'));
+            const nameCol = findCol((t, h) => t.includes('ឈ្មោះ') || t.includes('name'));
+            const numberCol = findCol((t, h) => t.includes('ចំនួនទំនេរ') || t.includes('number'));
+            const startCol = findCol((t, h) => t.includes('ថ្ងៃចាប់') || t.includes('start'));
+            const endCol = findCol((t, h) => t.includes('ថ្ងៃបញ្ចប់') || t.includes('end'));
+            const validityCol = findCol((t, h) => t.includes('សុពលភាព') || t.includes('validity'));
+            const statusCol = findCol((t, h) => t.includes('ស្ថានភាព') || t.includes('status'));
+            const durationCol = findCol((t, h) => t.includes('រយៈពេល') || t.includes('duration'));
+            const reasonCol = findCol((t, h) => t.includes('មូលហេតុ') || t.includes('reason'));
+            const otherCol = findCol((t, h) => t.includes('ផ្សេងៗ') || t.includes('other'));
+
+            if (staffIdCol === -1 && civilIdCol === -1) {
+              window.alert('រកមិនឃើញជួរឈរ "លេខកាត" ឬ "លេខមន្ត្រី" ក្នុង Excel ទេ');
+              return;
+            }
+
+            // Always build maps from the full HR list (not only the current filtered list)
+            let hrList = Array.isArray(list) ? list : [];
+            try {
+              const { data: allHr } = await api.get('/hr', { params: {} });
+              if (Array.isArray(allHr) && allHr.length > 0) {
+                hrList = allHr;
+              }
+            } catch (loadAllErr) {
+              console.debug('Load all HR for unpaid import failed, fallback to current list', loadAllErr?.message || loadAllErr);
+            }
+
+            const byStaff = new Map();
+            const byCivil = new Map();
+
+            hrList.forEach((hr) => {
+              const sid = hr.staffId || hr.cardNumber || hr.cardNo || hr.no;
+              const cid = hr.civilServantId || hr.officerId || hr.staffId || hr.no;
+              if (sid) byStaff.set(String(sid).trim(), hr);
+              if (cid) byCivil.set(String(cid).trim(), hr);
+            });
+
+            const normCell = (v) => {
+              if (v == null || v === '') return '';
+              if (v instanceof Date) {
+                try {
+                  return v.toISOString().slice(0, 10);
+                } catch {
+                  return v.toString();
+                }
+              }
+              if (typeof v === 'number') {
+                const dt = excelSerialToDate(v);
+                if (dt) return dt.toISOString().slice(0, 10);
+                return String(v);
+              }
+              const s = String(v).trim();
+              return s;
+            };
+
+            let updated = 0;
+            let failed = 0;
+            let rowsWithData = 0;
+            const failedDetails = [];
+            let skippedNoMatch = 0;
+            let skippedNoData = 0;
+            const updatePromises = [];
+
+            for (let i = 1; i < aoa.length; i++) {
+              const row = aoa[i];
+              if (!row || row.length === 0) continue;
+
+              const excelRowNumber = i + 1; // 1-based row index for user display
+
+              const rawStaff = staffIdCol !== -1 ? normCell(row[staffIdCol]) : '';
+              const rawCivil = civilIdCol !== -1 ? normCell(row[civilIdCol]) : '';
+              const rawName = nameCol !== -1 ? normCell(row[nameCol]) : '';
+
+              if (!rawStaff && !rawCivil && !rawName) continue;
+
+              const hr = (rawStaff && byStaff.get(rawStaff)) || (rawCivil && byCivil.get(rawCivil));
+              if (!hr) {
+                skippedNoMatch++;
+                continue;
+              }
+
+              const numVal = numberCol !== -1 ? normCell(row[numberCol]) : '';
+              const startVal = startCol !== -1 ? normCell(row[startCol]) : '';
+              const endVal = endCol !== -1 ? normCell(row[endCol]) : '';
+              const validityVal = validityCol !== -1 ? normCell(row[validityCol]) : '';
+              const statusVal = statusCol !== -1 ? normCell(row[statusCol]) : '';
+              const durationVal = durationCol !== -1 ? normCell(row[durationCol]) : '';
+              const reasonVal = reasonCol !== -1 ? normCell(row[reasonCol]) : '';
+              const otherVal = otherCol !== -1 ? normCell(row[otherCol]) : '';
+
+              const hasAny = [numVal, startVal, endVal, validityVal, statusVal, durationVal, reasonVal, otherVal].some((v) => v && v !== '');
+              if (!hasAny) {
+                skippedNoData++;
+                continue;
+              }
+              rowsWithData++;
+
+              const existingUnpaid = hr.unpaid || {};
+              const payloadUnpaid = { ...existingUnpaid };
+
+              if (numVal) payloadUnpaid.number = numVal;
+              if (startVal) payloadUnpaid.Start = startVal;
+              if (endVal) payloadUnpaid.End = endVal;
+              if (validityVal) payloadUnpaid.validity = isNaN(Number(validityVal)) ? validityVal : Number(validityVal);
+              if (statusVal) payloadUnpaid.status = statusVal;
+              if (durationVal) payloadUnpaid.duration = durationVal;
+              if (reasonVal) payloadUnpaid.Reason = reasonVal;
+              if (otherVal) payloadUnpaid.other = otherVal;
+
+              const id = hr._id || hr.no || hr.staffId;
+              if (!id) {
+                skippedNoMatch++;
+                continue;
+              }
+
+              updatePromises.push(
+                api
+                  .put(`/hr/${id}`, { unpaid: payloadUnpaid })
+                  .then((resp) => {
+                    updated++;
+                    const updatedHr = resp && resp.data ? resp.data : { ...hr, unpaid: payloadUnpaid };
+                    setList((prev) =>
+                      (prev || []).map((h) => {
+                        if (h._id && updatedHr._id && h._id === updatedHr._id) return updatedHr;
+                        if (h._id && hr._id && h._id === hr._id) return { ...h, unpaid: payloadUnpaid };
+                        if (!h._id && (h.no === hr.no || h.staffId === hr.staffId)) return { ...h, unpaid: payloadUnpaid };
+                        return h;
+                      })
+                    );
+                  })
+                  .catch((errReq) => {
+                    failed++;
+                    const errMsg = errReq?.response?.data?.message || errReq?.message || 'Error';
+                    console.error('Update unpaid from Excel failed', errMsg, errReq);
+                    failedDetails.push({
+                      row: excelRowNumber,
+                      staff: rawStaff || rawCivil || rawName || '',
+                      error: errMsg,
+                    });
+                  })
+              );
+            }
+
+            if (updatePromises.length > 0) {
+              await Promise.allSettled(updatePromises);
+            }
+
+            let msg = `Import បញ្ចប់៖ មានជួរដេកមានទិន្នន័យ ${rowsWithData}` +
+              `\nបច្ចុប្បន្នភាពបានជោគជ័យ: ${updated} កំណត់ត្រា` +
+              `\nបរាជ័យពេលធ្វើបច្ចុប្បន្នភាព: ${failed} ជួរដេក` +
+              `\nមិនរកឃើញបុគ្គលិក: ${skippedNoMatch} ជួរដេក` +
+              `\nមិនមានទិន្ន័យទំនេរ: ${skippedNoData} ជួរដេក`;
+            if (failedDetails.length > 0) {
+              msg += '\n\nលំអិតបរាជ័យ:\n' + failedDetails
+                .slice(0, 10)
+                .map((f) => `ជួរដេក ${f.row} (ID: ${f.staff || 'N/A'}) → ${f.error}`)
+                .join('\n');
+              if (failedDetails.length > 10) {
+                msg += `\n… ចំនួនបន្ថែម ${failedDetails.length - 10} ជួរដេក`;
+              }
+            }
+            window.alert(msg);
+          } catch (err2) {
+            console.error('Import unpaid Excel failed', err2);
+            window.alert('Import Excel បរាជ័យ: ' + (err2?.message || 'Unknown error'));
+          } finally {
+            setImporting(false);
+            setLoading(false);
+            if (importFileRef.current) {
+              try {
+                importFileRef.current.value = '';
+              } catch {
+                // ignore
+              }
+            }
+          }
+        })();
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (err) {
+      console.error('Import Excel បរាជ័យ', err);
+      setImporting(false);
+      setLoading(false);
+    }
   };
 
   // status badges removed (not used in UnpaidLeave report)
@@ -591,16 +1033,16 @@ export default function RetirementReportPage() {
       const u = (r.hr && r.hr.unpaid) ? r.hr.unpaid : {};
       try {
         if (field === 'validity') {
-          const m = computeUnpaidMeta(u || {});
+          const m = computeUnpaidMeta(u || {}, r.hr);
           return (m && (m.validityDays !== null && typeof m.validityDays !== 'undefined')) || (u && u.validity !== null && typeof u.validity !== 'undefined' && u.validity !== '');
         }
         if (field === 'status') {
-          const m = computeUnpaidMeta(u || {});
+          const m = computeUnpaidMeta(u || {}, r.hr);
           const raw = (u && (u.status || u.status === 0)) ? String(u.status).trim() : '';
           return (m && m.statusLabel) || (raw !== '');
         }
         if (field === 'duration') {
-          const m = computeUnpaidMeta(u || {});
+          const m = computeUnpaidMeta(u || {}, r.hr);
           return (m && m.durationLabel) || (u && u.duration !== null && typeof u.duration !== 'undefined' && u.duration !== '');
         }
         if (field === 'other') return (u && u.other !== null && typeof u.other !== 'undefined' && u.other !== '');
@@ -631,6 +1073,7 @@ export default function RetirementReportPage() {
       { key: 'civilId', label: 'លេខមន្ត្រី', width: '80px' },
       { key: 'name', label: 'គោត្តនាម និងនាម', width: '120px' },
       { key: 'gender', label: 'ភេទ', width: '30px' },
+      { key: 'dob', label: 'ថ្ងៃខែឆ្នាំកំណើត', width: '110px' },
       { key: 'role', label: 'មុខងារ', width: '150px' },
       { key: 'position', label: 'តួនាទី', width: '150px' },
       { key: 'dept', label: 'ផ្នែក', width: '250px' },
@@ -643,10 +1086,10 @@ export default function RetirementReportPage() {
       ...(visible.Start ? [{ key: 'Start', label: 'ថ្ងៃចាប់ផ្ដើម', width: '90px' }] : []),
       ...(visible.End ? [{ key: 'End', label: 'ថ្ងៃបញ្ចប់', width: '90px' }] : []),
       ...(visible.image ? [{ key: 'image', label: 'ឯកសារយោង', width: '80px' }] : []),
-      { key: 'action', label: 'សកម្មភាព', width: '70px' }
+      { key: 'action', label: 'សកម្មភាព', width: '100px' }
     ];
     // Filter columnDefs to the order in colOrder (keep only defined keys)
-    const orderedDefs = (colOrder || defaultCols).map(k => columnDefs.find(c => c.key === k)).filter(Boolean);
+    const orderedDefs = (colOrder || defaultCols).map(k => columnDefs.find(c => c.key === k)).filter(Boolean).filter(c => !!visibleCols[c.key]);
     const numCols = orderedDefs.length;
     const equalPct = (100 / numCols).toFixed(4) + '%';
     // Use explicit width from columnDefs when provided (e.g., '40px' or '90px'),
@@ -656,18 +1099,18 @@ export default function RetirementReportPage() {
       return <col key={c.key || i} style={{ width: w }} />;
     });
     return (
-      <div style={{marginBottom:12}}>
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6}}>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           {(() => {
             const totalN = rows.length || 0;
             const maleN = rows.filter(r => r.hr && r.hr.gender === 'Male').length;
             const femaleN = rows.filter(r => r.hr && r.hr.gender === 'Female').length;
             return (
-              <h4 style={{fontSize:12, fontWeight:700, margin:0}}>{title} — {toKhmerDigits(totalN)} នាក់ ( ប្រុស: {toKhmerDigits(maleN)} — ស្រី: {toKhmerDigits(femaleN)} )</h4>
+              <h4 style={{ fontSize: 12, fontWeight: 700, margin: 0 }}>{title} — {toKhmerDigits(totalN)} នាក់ ( ប្រុស: {toKhmerDigits(maleN)} — ស្រី: {toKhmerDigits(femaleN)} )</h4>
             );
           })()}
         </div>
-        <table style={{width:'100%', borderCollapse:'collapse', fontSize:12, tableLayout:'fixed'}}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed' }}>
           <colgroup>
             {colElems}
           </colgroup>
@@ -690,13 +1133,13 @@ export default function RetirementReportPage() {
                         const fi = next.indexOf(from);
                         const ti = next.indexOf(to);
                         if (fi === -1 || ti === -1) return prev;
-                        next.splice(fi,1);
-                        next.splice(ti,0,from);
+                        next.splice(fi, 1);
+                        next.splice(ti, 0, from);
                         return next;
                       });
                       draggingKeyRef.current = null;
                     }}
-                    style={{border:'1px solid #d1cfcf', padding:'6px', cursor:'grab', userSelect:'none', textAlign: 'center'}}
+                    style={{ border: '1px solid #d1cfcf', padding: '6px', cursor: 'grab', userSelect: 'none', textAlign: 'center' }}
                     className="center"
                   >
                     {col.label}
@@ -719,40 +1162,100 @@ export default function RetirementReportPage() {
                 <tr key={row.hr._id || idx}>
                   {orderedDefs.map((col) => {
                     const k = col.key;
-                    if (k === 'index') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}} className="center">{toKhmerDigits(idx+1)}</td>);
-                    if (k === 'staffId') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center">{staffId ? staffId : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'civilId') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}} className="center">{civilId ? civilId : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'name') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}}>{fullName ? fullName : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'gender') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}} className="center">{gender ? gender : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'role') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}}>{role ? role : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'position') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}}>{position ? position : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'dept') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}}>{deptName ? deptName : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'number') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center">{unpaid && unpaid.number ? unpaid.number : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'reason') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}}>{unpaid && (unpaid.Reason || unpaid.reason) ? (unpaid.Reason || unpaid.reason) : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'index') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }} className="center">{toKhmerDigits(idx + 1)}</td>);
+                    if (k === 'staffId') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{staffId ? staffId : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'civilId') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }} className="center">{civilId ? civilId : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'name') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }}>{fullName ? fullName : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'gender') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }} className="center">{gender ? gender : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'dob') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{(row.hr && (row.hr.birthDate || row.hr.dob || row.hr.BirthDate)) ? fmtShortDate(row.hr.birthDate || row.hr.dob || row.hr.BirthDate) : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'role') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }}>{role ? role : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'position') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }}>{position ? position : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'dept') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }}>{deptName ? deptName : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'number') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{unpaid && unpaid.number ? unpaid.number : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'reason') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }}>{unpaid && (unpaid.Reason || unpaid.reason) ? (unpaid.Reason || unpaid.reason) : (<span className="text-gray-400">-</span>)}</td>);
                     if (k === 'validity') {
-                      const meta = computeUnpaidMeta(unpaid || {});
+                      const meta = computeUnpaidMeta(unpaid || {}, row.hr);
                       let validityDisplay = null;
                       if (meta && (meta.validityDays !== null && typeof meta.validityDays !== 'undefined')) validityDisplay = toKhmerDigits(meta.validityDays);
                       else if (meta && meta.validityLabel) validityDisplay = meta.validityLabel;
                       else if (unpaid && unpaid.validity) validityDisplay = unpaid.validity;
-                      return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center">{validityDisplay || (<span className="text-gray-400">-</span>)}</td>);
+                      return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{validityDisplay || (<span className="text-gray-400">-</span>)}</td>);
                     }
                     if (k === 'status') {
-                      const meta = computeUnpaidMeta(unpaid || {});
+                      const meta = computeUnpaidMeta(unpaid || {}, row.hr);
                       const rawStatus = (unpaid && (typeof unpaid.status !== 'undefined' && unpaid.status !== null)) ? String(unpaid.status).trim() : '';
                       const statusToShow = (meta && meta.statusLabel) ? meta.statusLabel : (rawStatus !== '' ? rawStatus : null);
-                      return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center">{statusToShow ? renderStatusBadge(statusToShow) : (unpaid && unpaid.status ? renderStatusBadge(unpaid.status) : (<span className="text-gray-400">-</span>))}</td>);
+                      return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{statusToShow ? renderStatusBadge(statusToShow) : (unpaid && unpaid.status ? renderStatusBadge(unpaid.status) : (<span className="text-gray-400">-</span>))}</td>);
                     }
                     if (k === 'duration') {
-                      const meta = computeUnpaidMeta(unpaid || {});
-                      return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center">{(meta && meta.durationLabel) ? meta.durationLabel : ((unpaid && unpaid.duration) ? unpaid.duration : (<span className="text-gray-400">-</span>))}</td>);
+                      const meta = computeUnpaidMeta(unpaid || {}, row.hr);
+                      return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{(meta && meta.durationLabel) ? meta.durationLabel : ((unpaid && unpaid.duration) ? unpaid.duration : (<span className="text-gray-400">-</span>))}</td>);
                     }
-                    if (k === 'other') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}}>{(unpaid && unpaid.other) ? unpaid.other : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'Start') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center">{(unpaid && (unpaid.Start || unpaid.start)) ? fmtShortDate(unpaid.Start || unpaid.start) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'End') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center">{(unpaid && (unpaid.End || unpaid.end)) ? fmtShortDate(unpaid.End || unpaid.end) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'image') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}}>{unpaid && unpaid.image ? (<a href={unpaid.image} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'action') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center"><div style={{display:'inline-flex', gap:8, alignItems:'center', justifyContent:'center'}}><button type="button" onClick={() => openEdit(row.hr)} style={{background:'#facc15', borderRadius:4, padding:'4px 8px', border:'1px solid #d4af2b'}} className="text-xs">Edit</button></div></td>);
-                    return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}}>-</td>);
+                    if (k === 'other') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }}>{(unpaid && unpaid.other) ? unpaid.other : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'Start') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{(unpaid && (unpaid.Start || unpaid.start)) ? fmtShortDate(unpaid.Start || unpaid.start) : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'End') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{(unpaid && (unpaid.End || unpaid.end)) ? fmtShortDate(unpaid.End || unpaid.end) : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'image') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }}>{unpaid && unpaid.image ? (<a href={unpaid.image} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>) : (<span className="text-gray-400">-</span>)}</td>);
+                    if (k === 'action') {
+                      const unpaidObj = row.hr && row.hr.unpaid ? row.hr.unpaid : {};
+                      let hasUnpaid = false;
+                      try { hasUnpaid = Object.keys(unpaidObj || {}).some(uk => { const v = unpaidObj[uk]; return v !== null && typeof v !== 'undefined' && String(v).trim() !== ''; }); } catch { }
+                      return (
+                        <td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="center">
+                          <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => openEdit(row.hr)}
+                              title="កែប្រែ"
+                              aria-label="Edit unpaid"
+                              style={{
+                                background: '#f59e0b',
+                                width: 32,
+                                height: 32,
+                                borderRadius: 6,
+                                border: '1px solid #d4af2b',
+                                color: '#fff',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: 0
+                              }}
+                              className="text-xs"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" fill="currentColor">
+                                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" />
+                                <path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                              </svg>
+                            </button>
+                            {hasUnpaid && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteUnpaid(row.hr)}
+                                title="លុបទិន្នន័យ"
+                                aria-label="Delete unpaid"
+                                style={{
+                                  background: '#fa0404',
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 6,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  border: '2px solid #f30303',
+                                  color: '#ffffff',
+                                  padding: 0
+                                }}
+                                className="text-xs"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" fill="currentColor">
+                                  <path d="M9 3v1H15V3H9zM7 7v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7H7zm3 3h2v8H10V10zm4 0h2v8h-2V10z" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    }
+                    return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }}>-</td>);
                   })}
                 </tr>
               );
@@ -763,11 +1266,11 @@ export default function RetirementReportPage() {
     );
   };
 
-    if (!(perms.canViewHR || perms.canViewEmployees)) {
+  if (!(perms.canViewHR || perms.canViewEmployees)) {
     return (
       <div className="p-6">
         <h3 className="text-xl font-semibold mb-2">របាយការណ៍ ទំនេរគ្មានបៀវត្ស</h3>
-  <div className="p-3 border rounded bg-yellow-50 text-yellow-800">ត្រូវការ សិទ្ធិ: view:hr ឬ view:employees</div>
+        <div className="p-3 border rounded bg-yellow-50 text-yellow-800">ត្រូវការ សិទ្ធិ: view:hr ឬ view:employees</div>
       </div>
     );
   }
@@ -775,12 +1278,12 @@ export default function RetirementReportPage() {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-3">
-          <div>
+        <div>
           <h3 className="text-xl font-semibold text-gray-900">របាយការណ៍ ទំនេរគ្មានបៀវត្ស</h3>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <label className="text-sm">ស្វែងរក (ID ឬ ឈ្មោះ):</label>
-            <div style={{display:'inline-flex', alignItems:'center', gap:6}}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <input
               type="text"
               className="rounded-md bg-gray-50 px-3 py-2 w-56 text-sm placeholder-gray-400 border border-gray-200"
@@ -796,27 +1299,68 @@ export default function RetirementReportPage() {
             >
               Clear
             </button>
-                      </div>
-          
+          </div>
+
           <label className="text-sm">ចន្ទគតិ*:</label>
           <input
             type="text"
             className="border rounded px-2 py-1 w-72"
             placeholder="ឧ. ថ្ងៃសុក្រ ១៣កើត ខែភទ្របទ ឆ្នាំម្សាញ់ សប្តស័ក ព.ស. ២៥៦៩"
             value={lunarText}
-            onChange={(e)=> setLunarText(e.target.value)}
+            onChange={(e) => setLunarText(e.target.value)}
           />
           <label className="text-sm">ថ្ងៃខែឆ្នាំ:</label>
           <input
             type="date"
             className="border rounded px-2 py-1"
             value={footerDate}
-            onChange={(e)=> setFooterDate(e.target.value)}
+            onChange={(e) => setFooterDate(e.target.value)}
           />
-          
+
           {/* inline warnings */}
           {(!lunarText.trim()) && <span className="text-red-600 text-xs">សូមបំពេញចន្ទគតិ</span>}
           <button className={`border px-2 py-1 rounded ${loading ? 'bg-gray-100 text-gray-300' : 'bg-green-600 text-white border-green-600'}`} onClick={handleExportExcel} disabled={loading}>Export Excel</button>
+          <button
+            type="button"
+            className={`border px-2 py-1 rounded ml-2 ${importing || loading ? 'bg-gray-100 text-gray-300' : 'bg-orange-500 text-white border-orange-500'}`}
+            disabled={importing || loading}
+            onClick={() => importFileRef.current && importFileRef.current.click()}
+          >
+            Import Excel
+          </button>
+          <input
+            ref={importFileRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files && e.target.files[0];
+              if (file) handleImportExcel(file);
+            }}
+          />
+          <div style={{ position: 'relative' }}>
+            <button type="button" onClick={() => setShowColsPanel(s => !s)} title="ជ្រើសជួរឈរ" className="border px-2 py-1 rounded bg-white text-gray-700">Columns</button>
+            {showColsPanel && (
+              <div style={{ position: 'absolute', right: 0, top: '38px', background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 6px 12px rgba(0,0,0,0.08)', padding: 10, zIndex: 1200, minWidth: 220 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <strong>បង្ហាញជួរឈរ</strong>
+                  <button type="button" onClick={() => setShowColsPanel(false)} style={{ border: 'none', background: 'transparent' }}>×</button>
+                </div>
+                <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                  {(defaultCols || []).map(k => (
+                    <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <input type="checkbox" checked={!!visibleCols[k]} onChange={() => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }))} />
+                      <span>{colLabels[k] || k}</span>
+                    </label>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+                  <button type="button" onClick={() => setVisibleCols(() => { const o = {}; defaultCols.forEach(k => o[k] = true); return o; })} className="border rounded px-2 py-1 text-sm">Select all</button>
+                  <button type="button" onClick={() => setVisibleCols(() => { const o = {}; defaultCols.forEach(k => o[k] = false); return o; })} className="border rounded px-2 py-1 text-sm">Clear</button>
+                </div>
+              </div>
+            )}
+          </div>
           <button className={`border px-2 py-1 rounded ${(!lunarText.trim() || loading) ? 'bg-gray-100 text-gray-300' : 'bg-blue-600 text-white border-blue-600'}`} onClick={handlePrint} disabled={!lunarText.trim() || loading}>បោះពុម្ព</button>
         </div>
       </div>
@@ -825,21 +1369,21 @@ export default function RetirementReportPage() {
 
       <div ref={printRef} className="bg-white p-4 border rounded print-scope">
         <style dangerouslySetInnerHTML={{ __html: SCREEN_CSS }} />
-        <div style={{textAlign:'center', marginBottom: '8px'}}>
-            <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'16px'}}>ព្រះរាជាណាចក្រកម្ពុជា</div>
-          <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'14px'}}>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
-            <div style={{position:'relative', textAlign:'left', padding:'6px 0'}}>
-              {/* background image behind the text */}
-              <img src={headerBg} alt="" aria-hidden="true"
-                   style={{position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)', width:'150px', height:'auto', opacity:88, pointerEvents:'none'}} />
-              <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12.5px', position:'relative', zIndex:1}}>ក្រសួងសុខាភិបាល</div>
-            </div>
-            <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'left'}}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</div>
-          <div style={{fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'13px',marginTop:'4px', fontWeight:600}}>បញ្ជីឈ្មោះមន្រ្តី ទំនេរគ្មានបៀវត្សពី មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត ឆ្នាំ {toKhmerDigits(retireYear)}</div>
+        <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+          <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '16px' }}>ព្រះរាជាណាចក្រកម្ពុជា</div>
+          <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '14px' }}>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
+          <div style={{ position: 'relative', textAlign: 'left', padding: '6px 0' }}>
+            {/* background image behind the text */}
+            <img src={headerBg} alt="" aria-hidden="true"
+              style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '150px', height: 'auto', opacity: 88, pointerEvents: 'none' }} />
+            <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12.5px', position: 'relative', zIndex: 1 }}>ក្រសួងសុខាភិបាល</div>
+          </div>
+          <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'left' }}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</div>
+          <div style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '13px', marginTop: '4px', fontWeight: 600 }}>បញ្ជីឈ្មោះមន្រ្តី ទំនេរគ្មានបៀវត្សពី មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត ឆ្នាំ {toKhmerDigits(retireYear)}</div>
         </div>
         {/* Single flat table for unpaid leave listing */}
         <div className="no-print">
-            {(() => {
+          {(() => {
             const rows = derived.rows || [];
             if (rows.length === 0) return <div className="center text-gray-600">មិនមានទិន្នន័យ</div>;
             // Compute unpaid meta once per row to avoid repeated computation and make grouping explicit
@@ -879,14 +1423,18 @@ export default function RetirementReportPage() {
                     { title: 'បញ្ចប់ទំនេរគ្មានបៀវត្សលើស១ខែ', rows: g4 }
                   ];
                   const firstNonEmpty = groups.findIndex(g => g.rows && g.rows.length > 0);
-                  return groups.map((g, idx) => renderGroupTable(g.title, g.rows, idx === firstNonEmpty));
+                  return groups.map((g, idx) => (
+                    <React.Fragment key={g.title || idx}>
+                      {renderGroupTable(g.title, g.rows, idx === firstNonEmpty)}
+                    </React.Fragment>
+                  ));
                 })()}
               </div>
             );
           })()}
         </div>
         {/* Print-only simplified tables for printing (mirror Study page behavior) */}
-        <div className="print-only" style={{display:'none'}}>
+        <div className="print-only" style={{ display: 'none' }}>
           {(() => {
             const rowsAll = derived.rows || [];
             if (!rowsAll || rowsAll.length === 0) return <div className="center">មិនមានទិន្នន័យ</div>;
@@ -897,14 +1445,14 @@ export default function RetirementReportPage() {
 
             const renderSimpleTable = (title, rows) => {
               return (
-                <div style={{marginBottom:12}} key={title}>
-                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6}}>
+                <div style={{ marginBottom: 12 }} key={title}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     {(() => {
                       const totalN = rows.length || 0;
                       const maleN = rows.filter(r => r.hr && r.hr.gender === 'Male').length;
                       const femaleN = rows.filter(r => r.hr && r.hr.gender === 'Female').length;
                       return (
-                        <div style={{fontSize:12,fontWeight:700}}>{title} — {toKhmerDigits(totalN)} នាក់ ( ប្រុស: {toKhmerDigits(maleN)} — ស្រី: {toKhmerDigits(femaleN)} )</div>
+                        <div style={{ fontSize: 12, fontWeight: 700 }}>{title} — {toKhmerDigits(totalN)} នាក់ ( ប្រុស: {toKhmerDigits(maleN)} — ស្រី: {toKhmerDigits(femaleN)} )</div>
                       );
                     })()}
                   </div>
@@ -931,7 +1479,7 @@ export default function RetirementReportPage() {
                         const meta = computeUnpaidMeta(unpaid || {});
                         return (
                           <tr key={row.hr._id || idx}>
-                            <td className="center">{toKhmerDigits(idx+1)}</td>
+                            <td className="center">{toKhmerDigits(idx + 1)}</td>
                             <td className="center">{row.hr.staffId || row.hr.cardNumber || row.hr.cardNo || row.hr.no || ''}</td>
                             <td className="center">{row.hr.civilServantId || row.hr.officerId || row.hr.staffId || row.hr.no || ''}</td>
                             <td>{row.hr.khmerName || row.hr.name || ''}</td>
@@ -964,15 +1512,15 @@ export default function RetirementReportPage() {
         {/* Edit modal removed — this page is read-only */}
         {/* Edit modal for unpaid fields */}
         {showEdit && (
-          <div className="no-print" style={{position:'fixed', left:0, top:0, right:0, bottom:0, background:'rgba(0,0,0,0.35)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999}}>
-            <div style={{width:720, background:'#fff', borderRadius:6, padding:16, maxHeight:'90vh', overflow:'auto'}}>
-              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
-                <h4 style={{margin:0}}>កែប្រែ ទំនេរគ្មានបៀវត្ស</h4>
+          <div className="no-print" style={{ position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+            <div style={{ width: 720, background: '#fff', borderRadius: 6, padding: 16, maxHeight: '90vh', overflow: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <h4 style={{ margin: 0 }}>កែប្រែ ទំនេរគ្មានបៀវត្ស</h4>
                 <button onClick={closeEdit} className="text-gray-600">បិទ</button>
               </div>
 
               {/* Two-column layout like the screenshot — always show the common unpaid fields */}
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
                   <label className="text-sm">ចំនួនទំនេរ</label>
                   <input type="number" value={editingUnpaid.number || ''} onChange={(e) => handleEditChange('number', e.target.value)} className="w-full border rounded px-2 py-1" />
@@ -1005,26 +1553,60 @@ export default function RetirementReportPage() {
 
                 <div>
                   <label className="text-sm">ថ្ងៃចាប់ផ្ដើម</label>
-                  <input type="date" value={editingUnpaid.Start || editingUnpaid.start || ''} onChange={(e) => handleEditChange('Start', e.target.value)} className="w-full border rounded px-2 py-1" />
+                  <input
+                    type="date"
+                    value={toDateInputValue(editingUnpaid.Start || editingUnpaid.start || '')}
+                    onChange={(e) => handleEditChange('Start', e.target.value)}
+                    className="w-full border rounded px-2 py-1"
+                  />
                 </div>
 
                 <div>
                   <label className="text-sm">ថ្ងៃបញ្ចប់</label>
-                  <input type="date" value={editingUnpaid.End || editingUnpaid.end || ''} onChange={(e) => handleEditChange('End', e.target.value)} className="w-full border rounded px-2 py-1" />
+                  <input
+                    type="date"
+                    value={toDateInputValue(editingUnpaid.End || editingUnpaid.end || '')}
+                    onChange={(e) => handleEditChange('End', e.target.value)}
+                    className="w-full border rounded px-2 py-1"
+                  />
                 </div>
 
-                <div style={{gridColumn:'1 / -1'}}>
+                <div style={{ gridColumn: '1 / -1' }}>
                   <label className="text-sm">ឯកសារយោង (image/pdf)</label>
-                  <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <input ref={fileInputRef} type="file" onChange={(e) => handleFileSelect(e.target.files && e.target.files[0])} />
                     {selectedPreviewUrl && <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">Preview</a>}
                     {!selectedPreviewUrl && editingUnpaid.image && <a href={editingUnpaid.image} target="_blank" rel="noreferrer" className="text-blue-600 underline">Current file</a>}
-                    {editingUnpaid.image && <button type="button" onClick={handleDeleteReference} className="border rounded px-2 py-0.5 text-sm bg-red-50 text-red-700">Delete</button>}
+                    {editingUnpaid.image && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteReference}
+                        title="លុបឯកសារ"
+                        aria-label="Delete file"
+                        style={{
+                          background: '#ef4444',
+                          width: 28,
+                          height: 28,
+                          borderRadius: 6,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1px solid #ef4444',
+                          color: '#fff',
+                          padding: 0
+                        }}
+                        className="text-sm"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" fill="currentColor">
+                          <path d="M9 3v1H15V3H9zM7 7v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7H7zm3 3h2v8H10V10zm4 0h2v8h-2V10z" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <div style={{display:'flex', justifyContent:'flex-end', gap:8, marginTop:12}}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
                 <button type="button" onClick={closeEdit} className="border rounded px-3 py-1">បោះបង់</button>
                 <button type="button" onClick={handleSaveEdit} className="border rounded px-3 py-1 bg-green-600 text-white" disabled={saving || uploadingFile}>{saving ? 'កំពុងរក្សាទុក...' : 'រក្សាទុក'}</button>
               </div>
@@ -1032,8 +1614,8 @@ export default function RetirementReportPage() {
           </div>
         )}
         {/* footer/signature area */}
-        <div style={{display:'flex', justifyContent:'space-between', marginTop:'16px', fontSize:'12px'}}>
-          <div style={{width:'33%'}}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', fontSize: '12px' }}>
+          <div style={{ width: '33%' }}>
             <div className="no-print">
               {(() => {
                 const totalN = (Number.isFinite(derived.total) ? derived.total : (derived.rows ? derived.rows.length : 0));
@@ -1042,29 +1624,29 @@ export default function RetirementReportPage() {
                 return `សរុប: ${toKhmerDigits(totalN)} នាក់ ( ប្រុស: ${toKhmerDigits(maleN)} នាក់ — ស្រី: ${toKhmerDigits(femaleN)} នាក់ )`;
               })()}
             </div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>បានឃើញ</div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>នាយកមន្ទីរពេទ្យ</div>
-            <div style={{height:'64px'}}></div>
-            <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>បានឃើញ</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>នាយកមន្ទីរពេទ្យ</div>
+            <div style={{ height: '64px' }}></div>
+            <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
-          <div style={{width:'33%', textAlign:'center'}}>
-            <div style={{marginTop:'16px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>បានពិនិត្យត្រឹមត្រូវ</div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>ប្រធានការិយាល័យរដ្ឋបាលនិងបុគ្គលិក</div>
-            <div style={{height:'82px'}}></div>
-            <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
+          <div style={{ width: '33%', textAlign: 'center' }}>
+            <div style={{ marginTop: '16px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>បានពិនិត្យត្រឹមត្រូវ</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក</div>
+            <div style={{ height: '82px' }}></div>
+            <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
-          <div style={{width:'33%', textAlign:'right'}}>
-            <div style={{marginTop:'12px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center'}}>
+          <div style={{ width: '33%', textAlign: 'right' }}>
+            <div style={{ marginTop: '12px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>
               {lunarText && lunarText.trim()
                 ? lunarText
                 : `ថ្ងៃ${khWeekday(new Date())}  ព.ស. ${toKhmerDigits(buddhistEraYear(new Date()))}`}
             </div>
-            <div style={{marginTop:'2px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center'}}>
+            <div style={{ marginTop: '2px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>
               រាជធានីភ្នំពេញ {fmtKhmerLongDate(footerDate)}
             </div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}> អ្នកធ្វើតារាង</div>
-            <div style={{height:'82px'}}></div>
-            <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}> អ្នកធ្វើតារាង</div>
+            <div style={{ height: '82px' }}></div>
+            <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
         </div>
       </div>

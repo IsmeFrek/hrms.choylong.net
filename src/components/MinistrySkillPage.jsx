@@ -48,14 +48,14 @@ export default function MinistrySkillPage() {
 
   const onDragStart = (e, skill) => {
     setDraggingId(skill._id);
-    try { e.dataTransfer.setData('text/plain', skill._id); } catch (err) {}
+    try { e.dataTransfer.setData('text/plain', skill._id); } catch (err) { }
     e.dataTransfer.effectAllowed = 'move';
     if (e.dataTransfer.setDragImage && e.target) {
-      try { const img = document.createElement('canvas'); img.width = 1; img.height = 1; e.dataTransfer.setDragImage(img, 0, 0); } catch (err) {}
+      try { const img = document.createElement('canvas'); img.width = 1; img.height = 1; e.dataTransfer.setDragImage(img, 0, 0); } catch (err) { }
     }
   };
   const onDragEnter = (e, skill) => { e.preventDefault(); setDragOverId(skill._id); };
-  const onDragOver = (e) => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'move'; } catch (err) {} };
+  const onDragOver = (e) => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'move'; } catch (err) { } };
   const onDragLeave = (e) => { setDragOverId(null); };
   const onDrop = async (e, targetSkill) => {
     e.preventDefault();
@@ -68,7 +68,7 @@ export default function MinistrySkillPage() {
       if (!a || !b) return;
       const payloadA = { skills_Id: b.skills_Id, skills_Kh: b.skills_Kh, ministryFunction: b.ministryFunction, skills_En: b.skills_En, other: b.other, total: b.total ?? b.Total, male: b.male ?? b.Male, female: b.female ?? b.Female };
       const payloadB = { skills_Id: a.skills_Id, skills_Kh: a.skills_Kh, ministryFunction: a.ministryFunction, skills_En: a.skills_En, other: a.other, total: a.total ?? a.Total, male: a.male ?? a.Male, female: a.female ?? a.Female };
-      await Promise.all([ skillAPI.updateSkill(a._id, payloadA), skillAPI.updateSkill(b._id, payloadB) ]);
+      await Promise.all([skillAPI.updateSkill(a._id, payloadA), skillAPI.updateSkill(b._id, payloadB)]);
       await fetchSkills();
     } catch (err) { console.error('Drag swap failed', err); alert('Swap failed: ' + (err?.message || err)); }
     finally { setReordering(false); setDraggingId(null); setDragOverId(null); }
@@ -106,14 +106,14 @@ export default function MinistrySkillPage() {
       const a = full[idx]; const b = full[j];
       const payloadA = { skills_Id: b.skills_Id, skills_Kh: b.skills_Kh, ministryFunction: b.ministryFunction, skills_En: b.skills_En, other: b.other, total: b.total ?? b.Total, male: b.male ?? b.Male, female: b.female ?? b.Female };
       const payloadB = { skills_Id: a.skills_Id, skills_Kh: a.skills_Kh, ministryFunction: a.ministryFunction, skills_En: a.skills_En, other: a.other, total: a.total ?? a.Total, male: a.male ?? a.Male, female: a.female ?? a.Female };
-      await Promise.all([ skillAPI.updateSkill(a._id, payloadA), skillAPI.updateSkill(b._id, payloadB) ]);
+      await Promise.all([skillAPI.updateSkill(a._id, payloadA), skillAPI.updateSkill(b._id, payloadB)]);
       await fetchSkills();
     } catch (err) { console.error('Reorder (swap) failed', err); alert('Swap failed: ' + (err?.message || err)); }
     finally { setReordering(false); }
   };
 
   const handleExport = () => {
-    const csvRows = [ ['skills_Id', 'skills_Kh', 'ministryFunction', 'skills_En', 'other'], ...skills.map(skill => [skill.skills_Id, skill.skills_Kh, skill.ministryFunction || '', skill.skills_En, skill.other]) ];
+    const csvRows = [['skills_Id', 'skills_Kh', 'ministryFunction', 'skills_En', 'other'], ...skills.map(skill => [skill.skills_Id, skill.skills_Kh, skill.ministryFunction || '', skill.skills_En, skill.other])];
     const csvContent = '\uFEFF' + csvRows.map(row => row.map(val => `"${val || ''}"`).join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'ministry_skills.csv'; a.click(); URL.revokeObjectURL(url);
   };
@@ -166,58 +166,60 @@ export default function MinistrySkillPage() {
       </div>
       {loading ? (<div>កំពុងទាញ...</div>) : (
         <>
-        {reordering && <div className="mb-2 text-yellow-700 font-medium">កំពុងរៀបចំលំដាប់...</div>}
-        <table className="min-w-full border">
-          <thead>
-            <tr className="bg-gray-200">
-              <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('skills_Id')}>លេខសម្គាល់ {sortField==='skills_Id' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('skills_Kh')}>ឈ្មោះជំនាញ (ខ្មែរ) {sortField==='skills_Kh' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('ministryFunction')}>មុខងារក្រសួង {sortField==='ministryFunction' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('skills_En')}>ឈ្មោះជំនាញ (អង់គ្លេស) {sortField==='skills_En' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('total')}>សរុប {sortField==='total' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('male')}>ប្រុស {sortField==='male' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('female')}>ស្រី {sortField==='female' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('other')}>ព័ត៌មានផ្សេងៗ {sortField==='other' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2">សកម្មភាព</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagedSkills.map((skill) => (
-              <tr key={skill._id} draggable={perms.canEditSkills && !reordering} onDragStart={(e) => onDragStart(e, skill)} onDragEnter={(e) => onDragEnter(e, skill)} onDragOver={onDragOver} onDrop={(e) => onDrop(e, skill)} onDragLeave={onDragLeave} onDragEnd={onDragEnd} className={dragOverId === skill._id ? 'bg-yellow-50' : ''}>
-                <td className="border px-2 py-1">{skill.skills_Id}</td>
-                <td className="border px-2 py-1">{skill.skills_Kh}</td>
-                <td className="border px-2 py-1">{skill.ministryFunction || ''}</td>
-                <td className="border px-2 py-1">{skill.skills_En}</td>
-                <td className="border px-2 py-1">{skill.total ?? skill.Total ?? ''}</td>
-                <td className="border px-2 py-1">{skill.male ?? skill.Male ?? ''}</td>
-                <td className="border px-2 py-1">{skill.female ?? skill.Female ?? ''}</td>
-                <td className="border px-2 py-1">{skill.other}</td>
-                <td className="border px-2 py-1">
-                  {perms.canEditSkills && (
-                    <>
-                      {(() => { const globalIdx = sortedSkills.findIndex(s => s._id === skill._id); const isFirst = globalIdx === 0; const isLast = globalIdx === (sortedSkills.length - 1); return (
-                        <span style={{marginRight:8}}>
-                          <button type="button" onMouseDown={e => e.preventDefault()} onDragStart={e => e.preventDefault()} onPointerDown={e => e.preventDefault()} onClick={e => { e.stopPropagation(); moveSkill(skill, -1); }} disabled={isFirst || reordering} title="លើ" className={`px-0.5 py-1 border rounded mr-1 ${isFirst || reordering ? 'bg-gray-200 text-gray-400' : 'bg-gray-100'}`}>▲</button>
-                          <button type="button" onMouseDown={e => e.preventDefault()} onDragStart={e => e.preventDefault()} onPointerDown={e => e.preventDefault()} onClick={e => { e.stopPropagation(); moveSkill(skill, 1); }} disabled={isLast || reordering} title="ក្រោម" className={`px-0.5 py-1 border rounded mr-2 ${isLast || reordering ? 'bg-gray-200 text-gray-400' : 'bg-gray-100'}`}>▼</button>
-                        </span>
-                      ); })()}
-                      <button type="button" onMouseDown={e => e.preventDefault()} onDragStart={e => e.preventDefault()} onPointerDown={e => e.preventDefault()} onClick={e => { e.stopPropagation(); openEditModal(skill); }} disabled={reordering} className={`bg-green-600 text-white px-2 py-1 rounded mr-2 ${reordering ? 'opacity-60 cursor-not-allowed' : ''}`}>កែ</button>
-                      <button type="button" onMouseDown={e => e.preventDefault()} onDragStart={e => e.preventDefault()} onPointerDown={e => e.preventDefault()} onClick={e => { e.stopPropagation(); handleDeleteSkill(skill._id); }} disabled={reordering} className={`bg-red-700 text-white px-1 py-1 rounded ${reordering ? 'opacity-60 cursor-not-allowed' : ''}`}>លុប</button>
-                    </>
-                  )}
-                </td>
+          {reordering && <div className="mb-2 text-yellow-700 font-medium">កំពុងរៀបចំលំដាប់...</div>}
+          <table className="min-w-full border">
+            <thead>
+              <tr className="bg-gray-200">
+                <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('skills_Id')}>លេខសម្គាល់ {sortField === 'skills_Id' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('skills_Kh')}>ឈ្មោះជំនាញ (ខ្មែរ) {sortField === 'skills_Kh' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('ministryFunction')}>មុខងារក្រសួង {sortField === 'ministryFunction' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('skills_En')}>ឈ្មោះជំនាញ (អង់គ្លេស) {sortField === 'skills_En' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('total')}>សរុប {sortField === 'total' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('male')}>ប្រុស {sortField === 'male' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('female')}>ស្រី {sortField === 'female' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('other')}>ព័ត៌មានផ្សេងៗ {sortField === 'other' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2">សកម្មភាព</th>
               </tr>
-            ))}
-            {pagedSkills.length === 0 && (
-              <tr><td colSpan={9} className="py-6 text-center text-gray-500">មិនមានជំនាញក្រសួង</td></tr>
-            )}
-          </tbody>
-        </table>
-        <div className="flex justify-center items-center mt-4 gap-2">
-          <button onClick={() => setPage(page - 1)} disabled={page === 1} className={`px-3 py-1 border rounded ${page === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}>Prev</button>
-          <span className="px-4 py-1 rounded bg-blue-600 text-white font-bold">ទំព័រ {page} / {totalPages}</span>
-          <button onClick={() => setPage(page + 1)} disabled={page === totalPages} className={`px-3 py-1 border rounded ${page === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}>Next</button>
-        </div>
+            </thead>
+            <tbody>
+              {pagedSkills.map((skill) => (
+                <tr key={skill._id} draggable={perms.canEditSkills && !reordering} onDragStart={(e) => onDragStart(e, skill)} onDragEnter={(e) => onDragEnter(e, skill)} onDragOver={onDragOver} onDrop={(e) => onDrop(e, skill)} onDragLeave={onDragLeave} onDragEnd={onDragEnd} className={dragOverId === skill._id ? 'bg-yellow-50' : ''}>
+                  <td className="border px-2 py-1">{skill.skills_Id}</td>
+                  <td className="border px-2 py-1">{skill.skills_Kh}</td>
+                  <td className="border px-2 py-1">{skill.ministryFunction || ''}</td>
+                  <td className="border px-2 py-1">{skill.skills_En}</td>
+                  <td className="border px-2 py-1">{skill.total ?? skill.Total ?? ''}</td>
+                  <td className="border px-2 py-1">{skill.male ?? skill.Male ?? ''}</td>
+                  <td className="border px-2 py-1">{skill.female ?? skill.Female ?? ''}</td>
+                  <td className="border px-2 py-1">{skill.other}</td>
+                  <td className="border px-2 py-1">
+                    {perms.canEditSkills && (
+                      <>
+                        {(() => {
+                          const globalIdx = sortedSkills.findIndex(s => s._id === skill._id); const isFirst = globalIdx === 0; const isLast = globalIdx === (sortedSkills.length - 1); return (
+                            <span style={{ marginRight: 8 }}>
+                              <button type="button" onMouseDown={e => e.preventDefault()} onDragStart={e => e.preventDefault()} onPointerDown={e => e.preventDefault()} onClick={e => { e.stopPropagation(); moveSkill(skill, -1); }} disabled={isFirst || reordering} title="លើ" className={`px-0.5 py-1 border rounded mr-1 ${isFirst || reordering ? 'bg-gray-200 text-gray-400' : 'bg-gray-100'}`}>▲</button>
+                              <button type="button" onMouseDown={e => e.preventDefault()} onDragStart={e => e.preventDefault()} onPointerDown={e => e.preventDefault()} onClick={e => { e.stopPropagation(); moveSkill(skill, 1); }} disabled={isLast || reordering} title="ក្រោម" className={`px-0.5 py-1 border rounded mr-2 ${isLast || reordering ? 'bg-gray-200 text-gray-400' : 'bg-gray-100'}`}>▼</button>
+                            </span>
+                          );
+                        })()}
+                        <button type="button" onMouseDown={e => e.preventDefault()} onDragStart={e => e.preventDefault()} onPointerDown={e => e.preventDefault()} onClick={e => { e.stopPropagation(); openEditModal(skill); }} disabled={reordering} className={`bg-green-600 text-white px-2 py-1 rounded mr-2 ${reordering ? 'opacity-60 cursor-not-allowed' : ''}`}>កែ</button>
+                        <button type="button" onMouseDown={e => e.preventDefault()} onDragStart={e => e.preventDefault()} onPointerDown={e => e.preventDefault()} onClick={e => { e.stopPropagation(); handleDeleteSkill(skill._id); }} disabled={reordering} className={`bg-red-700 text-white px-1 py-1 rounded ${reordering ? 'opacity-60 cursor-not-allowed' : ''}`}>លុប</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {pagedSkills.length === 0 && (
+                <tr><td colSpan={9} className="py-6 text-center text-gray-500">មិនមានជំនាញក្រសួង</td></tr>
+              )}
+            </tbody>
+          </table>
+          <div className="flex justify-center items-center mt-4 gap-2">
+            <button onClick={() => setPage(page - 1)} disabled={page === 1} className={`px-3 py-1 border rounded ${page === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}>Prev</button>
+            <span className="px-4 py-1 rounded bg-blue-600 text-white font-bold">ទំព័រ {page} / {totalPages}</span>
+            <button onClick={() => setPage(page + 1)} disabled={page === totalPages} className={`px-3 py-1 border rounded ${page === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}>Next</button>
+          </div>
         </>
       )}
 

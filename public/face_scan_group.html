@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="km">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>ស្កេនមុខជាក្រុម (Group Face Scan)</title>
+  <style>
+    :root{font-size:16px;color-scheme:light}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0b1220;color:#e5e7eb}
+    header{position:sticky;top:0;background:rgba(11,18,32,0.92);backdrop-filter:blur(8px);border-bottom:1px solid rgba(148,163,184,0.18);padding:12px 14px;z-index:10}
+    header h1{font-size:1.05rem;margin:0;display:flex;align-items:center;gap:10px;justify-content:space-between}
+    header a{color:#93c5fd;text-decoration:none;font-size:0.95rem}
+    main{padding:14px;max-width:1000px;margin:0 auto}
+    .grid{display:grid;grid-template-columns:1fr;gap:15px}
+    .card{background:rgba(15,23,42,0.75);border:1px solid rgba(148,163,184,0.18);border-radius:12px;padding:12px}
+    label{display:block;font-size:0.9rem;color:#cbd5e1;margin-bottom:6px}
+    input,select,button{width:100%;border-radius:10px;border:1px solid rgba(148,163,184,0.25);background:#0b1220;color:#e5e7eb;padding:10px 12px;font-size:1rem}
+    button{border:0;cursor:pointer;font-weight:650}
+    button.primary{background:#22c55e;color:#04110a}
+    button.secondary{background:#111827;color:#e5e7eb;border:1px solid rgba(148,163,184,0.22)}
+    button:disabled{opacity:0.55;cursor:not-allowed}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .videoWrap{position:relative;border-radius:14px;overflow:hidden;background:#000;border:1px solid rgba(148,163,184,0.22)}
+    video{width:100%;height:auto;display:block;transform:scaleX(-1)}
+    canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;transform:scaleX(-1)}
+    .hint{color:#94a3b8;font-size:0.9rem;line-height:1.35}
+    .badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:0.75rem;border:1px solid rgba(148,163,184,0.22);background:rgba(2,6,23,0.6)}
+    .ok{color:#86efac}
+    .warn{color:#fde68a}
+    .err{color:#fecaca}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    
+    .list-container{margin-top:15px;max-height:400px;overflow-y:auto}
+    table{width:100%;border-collapse:collapse;font-size:0.9rem}
+    th{text-align:left;color:#94a3b8;font-weight:normal;padding:8px;border-bottom:1px solid rgba(148,163,184,0.1)}
+    td{padding:10px 8px;border-bottom:1px solid rgba(148,163,184,0.05)}
+    .status-ok{color:#4ade80}
+    .status-wait{color:#fbbf24}
+
+    @media (min-width:1000px){.grid{grid-template-columns:1.4fr 0.6fr}}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>
+      <span>ស្កេនមុខជាក្រុម (Multi-Face)</span>
+      <div class="row">
+        <a href="/face_scan.html">ស្កេនម្នាក់ៗ</a>
+        <a href="/face_enroll.html">Enroll មុខ</a>
+      </div>
+    </h1>
+  </header>
+
+  <main>
+    <div class="grid">
+      <section class="card">
+        <div class="row" style="margin-bottom:12px; gap:15px">
+          <div style="flex:1">
+            <label>របៀប</label>
+            <select id="mode">
+              <option value="checkIn">Check-in</option>
+              <option value="checkOut">Check-out</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <label>កាលបរិច្ឆេទ</label>
+            <input id="date" class="mono" readonly />
+          </div>
+          <div style="flex:0.5">
+            <label>Threshold</label>
+            <input id="threshold" class="mono" placeholder="0.52" value="0.52" />
+          </div>
+        </div>
+
+        <div class="videoWrap">
+          <video id="video" playsinline autoplay muted></video>
+          <canvas id="overlay"></canvas>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <button id="scanToggle" class="primary" type="button">ចាប់ផ្តើមស្កេនជាក្រុម</button>
+          <button id="stop" class="secondary" type="button" disabled>បិទកាមេរ៉ា</button>
+        </div>
+
+        <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center">
+          <span id="support" class="badge warn">កំពុងទាញ face models...</span>
+          <span id="scanCount" class="badge mono">Detecting: 0</span>
+        </div>
+      </section>
+
+      <aside class="card">
+        <label>បញ្ជីស្កេនជោគជ័យ (Success List)</label>
+        <div class="list-container">
+          <table>
+            <thead>
+              <tr>
+                <th>ឈ្មោះ / ID</th>
+                <th style="text-align:center">ម៉ោង</th>
+                <th style="text-align:right">ស្ថានភាព</th>
+              </tr>
+            </thead>
+            <tbody id="scanList">
+              <!-- Result rows here -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div id="status" style="margin-top:15px; font-size:0.85rem; color:#94a3b8; white-space:pre-wrap"></div>
+      </aside>
+    </div>
+
+    <script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="/face_scan_group.js"></script>
+  </main>
+</body>
+</html>

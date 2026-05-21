@@ -7,7 +7,7 @@ const toKhmerDigits = (v) => String(v ?? '').replace(/[0-9]/g, d => '០១២�
 // Format DOB to Khmer: ថ្ងៃទី២៦ ខែឧសភា ឆ្នាំ១៩៩២
 const formatDobKh = (input) => {
   if (!input) return '';
-  const months = ['មករា','កុម្ភៈ','មិនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
+  const months = ['មករា', 'កុម្ភៈ', 'មិនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
   let y, m, d;
   const m1 = String(input).match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (m1) {
@@ -26,7 +26,7 @@ const formatDobKh = (input) => {
 // Format DOB to English: 26 May 1992
 const formatDobEn = (input) => {
   if (!input) return '';
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   let y, m, d;
   const m1 = String(input).match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (m1) {
@@ -51,7 +51,7 @@ const khLabels = {
   skill: 'មុខជំនាញ',
   position: 'តួនាទី',
   civilServantId: 'អត្តលេខមន្ត្រីរាជការ',
- };
+};
 
 const enLabels = {
   khmerName: 'Name',
@@ -62,7 +62,7 @@ const enLabels = {
   skill: 'Skill',
   position: 'Position',
   civilServantId: 'Civil Servant ID',
- };
+};
 
 export default function HRReportView({ hr, onClose, isApprover = false }) {
   const printRef = useRef();
@@ -133,7 +133,7 @@ export default function HRReportView({ hr, onClose, isApprover = false }) {
     setDisplayEn(initialDisplayEn);
     setOfficerTypeText(hr?.officerType || '....................');
     setDepartmentText(hr?.Department_Kh || '....................');
-  setDepartmentTextEn(hr?.Department_En || hr?.Department_Kh || '....................');
+    setDepartmentTextEn(hr?.Department_En || hr?.Department_Kh || '....................');
   }, [initialDisplay, initialDisplayEn, hr]);
 
   // Reusable editable span (uncontrolled; commit onBlur)
@@ -189,7 +189,7 @@ export default function HRReportView({ hr, onClose, isApprover = false }) {
         .info-wrap { display: flex; align-items: flex-start; gap: 24px; }
         .info-grid { flex: 1 1 auto; display: grid; grid-template-columns: 175px 24px 1fr; row-gap: 8px; column-gap: 6px; font-size: 16px; line-height: 1.5; }
         .label { font-family: "Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer","Noto Sans Khmer",Arial,sans-serif; font-weight: normal; font-size: 13px; margin-bottom: 0px; text-align: left; }
-        .colon { font-family: "!Khmer OS Siemreap","Noto Serif Khmer","Noto Sans Khmer",Arial,sans-serif; font-weight: normal; font-size: 12px; margin: 0px 0 1px; text-align: center; }
+        .colon { font-family: "Khmer OS Siemreap","Noto Serif Khmer","Noto Sans Khmer",Arial,sans-serif; font-weight: normal; font-size: 12px; margin: 0px 0 1px; text-align: center; }
         .value { word-break: break-word; }
         .value.kh-name { font-family: "Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer","Noto Sans Khmer",Arial,sans-serif; font-size: 13px; font-weight: normal; }
         .photo-box { width: 125px; height: 160px; border: 0px solid #888; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #888; background: #fafbfc; margin-left: 12px; overflow: hidden; align-self: flex-start; margin-top: -120px; }
@@ -288,14 +288,14 @@ export default function HRReportView({ hr, onClose, isApprover = false }) {
   // Build payload to send for approval
   const buildProposedChanges = () => ({
     hrId: hrId,
-    titleText: lang==='km'?titleText:titleTextEn,
-    subText: lang==='km'?subText:subTextEn,
+    titleText: lang === 'km' ? titleText : titleTextEn,
+    subText: lang === 'km' ? subText : subTextEn,
     fields: {
-      ...(lang==='km'?display:displayEn), // language specific strings
+      ...(lang === 'km' ? display : displayEn), // language specific strings
     },
     notes: {
-      officerType: lang==='km'?officerTypeText:officerTypeTextEn,
-      department: lang==='km'?departmentText:departmentTextEn,
+      officerType: lang === 'km' ? officerTypeText : officerTypeTextEn,
+      department: lang === 'km' ? departmentText : departmentTextEn,
     },
     meta: {
       staffNo: hr?.no ?? null,
@@ -358,12 +358,12 @@ export default function HRReportView({ hr, onClose, isApprover = false }) {
     setSaving(true);
     setMessage('');
     try {
-    await api.post(`/hr/${hrId}/proposed-changes/${pendingId}/approve`);
+      await api.post(`/hr/${hrId}/proposed-changes/${pendingId}/approve`);
       setMessage('អនុម័តរួចរាល់');
       setPendingId(null);
     } catch (e) {
-  const msg = e?.response?.data?.message || e?.response?.data?.error || e?.message || 'បរាជ័យក្នុងការអនុម័ត';
-  setMessage(`បរាជ័យក្នុងការអនុម័ត: ${msg}`);
+      const msg = e?.response?.data?.message || e?.response?.data?.error || e?.message || 'បរាជ័យក្នុងការអនុម័ត';
+      setMessage(`បរាជ័យក្នុងការអនុម័ត: ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -415,7 +415,7 @@ export default function HRReportView({ hr, onClose, isApprover = false }) {
           .label { font-family: "Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer","Noto Sans Khmer",Arial,sans-serif;
             font-weight: ;font-size: 12px;
             margin: 1px 0 2px; text-align: left; }
-          .colon { font-family: "!Khmer OS Siemreap","Noto Serif Khmer","Noto Sans Khmer",Arial,sans-serif;
+          .colon { font-family: "Khmer OS Siemreap","Noto Serif Khmer","Noto Sans Khmer",Arial,sans-serif;
             font-weight: ;font-size: 12px;
             margin: 1px 0 2px;text-align: center; }
           .value { word-break: break-word; }
@@ -519,18 +519,18 @@ export default function HRReportView({ hr, onClose, isApprover = false }) {
             {/* Header */}
             <div className="header">
               <div className="title">
-                <EditableSpan value={lang==='km'?titleText:titleTextEn} onChange={lang==='km'?setTitleText:setTitleTextEn} className="" />
+                <EditableSpan value={lang === 'km' ? titleText : titleTextEn} onChange={lang === 'km' ? setTitleText : setTitleTextEn} className="" />
               </div>
               <div className="header-ornament">
                 <img src={ornamentImg} alt="ornament" />
               </div>
               <div className="sub">
-                <EditableSpan value={lang==='km'?subText:subTextEn} onChange={lang==='km'?setSubText:setSubTextEn} className="" />
+                <EditableSpan value={lang === 'km' ? subText : subTextEn} onChange={lang === 'km' ? setSubText : setSubTextEn} className="" />
               </div>
             </div>
 
             {/* Section title */}
-            <div className="section-title">{lang==='km' ? 'សូមបញ្ជាក់ថា : ' : 'This is to certify that:'}</div>
+            <div className="section-title">{lang === 'km' ? 'សូមបញ្ជាក់ថា : ' : 'This is to certify that:'}</div>
 
             {/* Info section */}
             <div className="info-wrap">
@@ -545,22 +545,22 @@ export default function HRReportView({ hr, onClose, isApprover = false }) {
                   'civilServantId',
                 ].map((k) => (
                   <React.Fragment key={k}>
-                    <div className="label">{(lang==='km'?khLabels:enLabels)[k]}</div>
+                    <div className="label">{(lang === 'km' ? khLabels : enLabels)[k]}</div>
                     <div className="colon">:</div>
                     <div
                       className={
-                        `value ${k === 'khmerName' ? (lang==='km'?'kh-name':'') : ''} ` +
+                        `value ${k === 'khmerName' ? (lang === 'km' ? 'kh-name' : '') : ''} ` +
                         `${(k === 'birthPlace' || k === 'currentPlace') ? 'nowrap' : ''}`
                       }
                     >
                       <EditableSpan
-                        value={(lang==='km'?display:displayEn)[k]}
-                        onChange={(v) => (lang==='km'?setDisplay:setDisplayEn)((prev) => ({ ...prev, [k]: v }))}
-                        className={k === 'khmerName' ? (lang==='km'?'kh-name':'') : ''}
+                        value={(lang === 'km' ? display : displayEn)[k]}
+                        onChange={(v) => (lang === 'km' ? setDisplay : setDisplayEn)((prev) => ({ ...prev, [k]: v }))}
+                        className={k === 'khmerName' ? (lang === 'km' ? 'kh-name' : '') : ''}
                       />
                       {k === 'khmerName' && (
                         <span className="inline-gender">
-                          {lang==='km' ? (
+                          {lang === 'km' ? (
                             <>
                               <span className="g-label">ភេទ</span>
                               <span className="g-colon">:</span>
@@ -587,7 +587,7 @@ export default function HRReportView({ hr, onClose, isApprover = false }) {
 
             {/* Notes */}
             <div className="notes">
-              {lang==='km' ? (
+              {lang === 'km' ? (
                 <>
                   <p>
                     ពិតជា{' '}
@@ -645,8 +645,8 @@ export default function HRReportView({ hr, onClose, isApprover = false }) {
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 mr-2">
               <span className="text-sm text-gray-600">Language:</span>
-              <button className={`px-2 py-1 rounded border text-sm ${lang==='km'?'bg-gray-800 text-white':'bg-white'}`} onClick={() => setLang('km')}>ខ្មែរ</button>
-              <button className={`px-2 py-1 rounded border text-sm ${lang==='en'?'bg-gray-800 text-white':'bg-white'}`} onClick={() => setLang('en')}>English</button>
+              <button className={`px-2 py-1 rounded border text-sm ${lang === 'km' ? 'bg-gray-800 text-white' : 'bg-white'}`} onClick={() => setLang('km')}>ខ្មែរ</button>
+              <button className={`px-2 py-1 rounded border text-sm ${lang === 'en' ? 'bg-gray-800 text-white' : 'bg-white'}`} onClick={() => setLang('en')}>English</button>
             </div>
             <button
               className="px-3 py-1 rounded bg-gray-200"
@@ -674,16 +674,16 @@ export default function HRReportView({ hr, onClose, isApprover = false }) {
             >
               {saving ? 'កំពុងស្នើសុំ...' : 'ស្នើសុំអនុម័ត'}
             </button>
-  {isApprover && pendingId && (
+            {isApprover && pendingId && (
               <button
                 className="px-3 py-1 rounded bg-green-700 text-white disabled:opacity-60"
                 onClick={approveChange}
-        disabled={saving}
-        title={'អនុម័ត និងរក្សាទុក'}
+                disabled={saving}
+                title={'អនុម័ត និងរក្សាទុក'}
               >
                 {saving ? 'កំពុងអនុម័ត...' : 'អនុម័ត និងរក្សាទុក'}
               </button>
-      )}
+            )}
           </div>
         </div>
 
@@ -723,7 +723,7 @@ export default function HRReportView({ hr, onClose, isApprover = false }) {
                 <ul className="list-disc pl-5 text-sm text-gray-700 mb-3 max-h-32 overflow-auto">
                   {files.map((f, i) => (
                     <li key={i} className="flex items-center justify-between gap-2">
-                      <span className="truncate">{f.name} <span className="text-gray-400">({(f.size/1024).toFixed(0)} KB)</span></span>
+                      <span className="truncate">{f.name} <span className="text-gray-400">({(f.size / 1024).toFixed(0)} KB)</span></span>
                       <button className="text-red-600 text-xs" onClick={() => setFiles(prev => prev.filter((_, idx) => idx !== i))}>ដកចេញ</button>
                     </li>
                   ))}

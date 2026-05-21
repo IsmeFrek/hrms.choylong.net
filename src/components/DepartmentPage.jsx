@@ -28,8 +28,8 @@ export default function DepartmentPage() {
   }, [perms.canViewDepartments]);
 
   const fetchDepartments = async () => {
-  if (!perms.canViewDepartments) return;
-  setLoading(true);
+    if (!perms.canViewDepartments) return;
+    setLoading(true);
     try {
       const res = await departmentAPI.getDepartments();
       setDepartments(Array.isArray(res.data) ? res.data : []);
@@ -194,10 +194,10 @@ export default function DepartmentPage() {
         </select>
         <button onClick={handleExport} className="bg-green-700 text-white px-7 py-1 rounded mr-5">នាំចេញ</button>
         {perms.canEditDepartments && (
-        <label className="bg-yellow-700 text-white px-7 py-1 rounded mr-5 cursor-pointer">
-          នាំចូល
-          <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleImport} />
-        </label>
+          <label className="bg-yellow-700 text-white px-7 py-1 rounded mr-5 cursor-pointer">
+            នាំចូល
+            <input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleImport} />
+          </label>
         )}
         {perms.canEditDepartments && (
           <button onClick={openAddModal} className="bg-blue-600 text-white px-7 py-1 rounded mr-5">បន្ថែម</button>
@@ -207,55 +207,55 @@ export default function DepartmentPage() {
         <div>កំពុងទាញ...</div>
       ) : (
         <>
-        <table className="min-w-full border">
-          <thead>
-            <tr className="bg-gray-200">
-              <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('Department_Id')}>លេខសម្គាល់ផ្នែក {sortField==='Department_Id' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('Department_Kh')}>ឈ្មោះផ្នែក (ខ្មែរ) {sortField==='Department_Kh' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('Department_En')}>ឈ្មោះផ្នែក (អង់គ្លេស) {sortField==='Department_En' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2">សរុប</th>
-              <th className="border px-4 py-2">ប្រុស</th>
-              <th className="border px-4 py-2">ស្រី</th>
-              <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('Other')}>ព័ត៌មានផ្សេងៗ {sortField==='Other' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-              <th className="border px-4 py-2">សកម្មភាព</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagedDepartments.map((dep) => (
-              <tr key={dep._id}>
-                <td className="border px-2 py-1">{dep.Department_Id}</td>
-                <td className="border px-2 py-1">{dep.Department_Kh}</td>
-                <td className="border px-2 py-1">{dep.Department_En}</td>
-                <td className="border px-2 py-1">{getTotal(dep)}</td>
-                <td className="border px-2 py-1">{getMale(dep)}</td>
-                <td className="border px-2 py-1">{getFemale(dep)}</td>
-                <td className="border px-2 py-1">{dep.Other}</td>
-                <td className="border px-2 py-1">
-                  {perms.canEditDepartments && (
-                    <>
-                      <button onClick={() => openEditModal(dep)} className="bg-green-600 text-white px-2 py-1 rounded mr-2">កែ</button>
-                      <button onClick={() => handleDelete(dep._id)} className="bg-red-700 text-white px-1 py-1 rounded">លុប</button>
-                    </>
-                  )}
-                </td>
+          <table className="min-w-full border">
+            <thead>
+              <tr className="bg-gray-200">
+                <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('Department_Id')}>លេខសម្គាល់ផ្នែក {sortField === 'Department_Id' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('Department_Kh')}>ឈ្មោះផ្នែក (ខ្មែរ) {sortField === 'Department_Kh' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('Department_En')}>ឈ្មោះផ្នែក (អង់គ្លេស) {sortField === 'Department_En' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2">សរុប</th>
+                <th className="border px-4 py-2">ប្រុស</th>
+                <th className="border px-4 py-2">ស្រី</th>
+                <th className="border px-4 py-2 cursor-pointer" onClick={() => handleSort('Other')}>ព័ត៌មានផ្សេងៗ {sortField === 'Other' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2">សកម្មភាព</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {/* Pagination */}
-        <div className="flex justify-center items-center mt-4 gap-2">
-          <button
-            onClick={() => setPage(page - 1)}
-            disabled={page === 1}
-            className={`px-3 py-1 border rounded ${page === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}
-          >Prev</button>
-          <span className="px-4 py-1 rounded bg-blue-600 text-white font-bold">ទំព័រ {page} / {totalPages}</span>
-          <button
-            onClick={() => setPage(page + 1)}
-            disabled={page === totalPages}
-            className={`px-3 py-1 border rounded ${page === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}
-          >Next</button>
-        </div>
+            </thead>
+            <tbody>
+              {pagedDepartments.map((dep) => (
+                <tr key={dep._id}>
+                  <td className="border px-2 py-1">{dep.Department_Id}</td>
+                  <td className="border px-2 py-1">{dep.Department_Kh}</td>
+                  <td className="border px-2 py-1">{dep.Department_En}</td>
+                  <td className="border px-2 py-1">{getTotal(dep)}</td>
+                  <td className="border px-2 py-1">{getMale(dep)}</td>
+                  <td className="border px-2 py-1">{getFemale(dep)}</td>
+                  <td className="border px-2 py-1">{dep.Other}</td>
+                  <td className="border px-2 py-1">
+                    {perms.canEditDepartments && (
+                      <>
+                        <button onClick={() => openEditModal(dep)} className="bg-green-600 text-white px-2 py-1 rounded mr-2">កែ</button>
+                        <button onClick={() => handleDelete(dep._id)} className="bg-red-700 text-white px-1 py-1 rounded">លុប</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {/* Pagination */}
+          <div className="flex justify-center items-center mt-4 gap-2">
+            <button
+              onClick={() => setPage(page - 1)}
+              disabled={page === 1}
+              className={`px-3 py-1 border rounded ${page === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}
+            >Prev</button>
+            <span className="px-4 py-1 rounded bg-blue-600 text-white font-bold">ទំព័រ {page} / {totalPages}</span>
+            <button
+              onClick={() => setPage(page + 1)}
+              disabled={page === totalPages}
+              className={`px-3 py-1 border rounded ${page === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}
+            >Next</button>
+          </div>
         </>
       )}
       {/* Modal Add */}

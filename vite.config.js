@@ -55,38 +55,67 @@ export default defineConfig({
     // Needed if you access dev server via ngrok or other external hostnames.
     allowedHosts: true,
     open: false,
+    cors: {
+      origin: (origin, callback) => {
+        // Allow all origins in development
+        return callback(null, true);
+      },
+      credentials: true,
+      methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+      allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
+    },
     proxy: {
       '/api': {
         // Allow overriding backend port/url when 5000 is occupied.
         // Examples:
         // - PowerShell: $env:BACKEND_PORT='5001'; npm run dev
         // - Or: $env:BACKEND_URL='http://localhost:5001'; npm run dev
-        target: process.env.BACKEND_URL || `http://localhost:${process.env.BACKEND_PORT || readBackendRuntimePort() || '5000'}`,
+        target: process.env.BACKEND_URL || `http://127.0.0.1:${process.env.BACKEND_PORT || readBackendRuntimePort() || '5000'}`,
         changeOrigin: true,
+        // Forward CORS headers from backend when proxying
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes, req) => {
+            const origin = req.headers['origin'] || '';
+            const allowed = [
+              /^https?:\/\/localhost(:\d+)?$/,
+              /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+              /^https?:\/\/192\.168\.\d+\.\d+(:\d+)?$/,
+              /^https?:\/\/172\.\d+\.\d+\.\d+(:\d+)?$/,
+              /^https?:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/,
+              /^https?:\/\/.*\.checkinme\.app$/,
+            ];
+            if (origin && allowed.some(r => r.test(origin))) {
+              proxyRes.headers['access-control-allow-origin'] = origin;
+              proxyRes.headers['access-control-allow-credentials'] = 'true';
+              proxyRes.headers['access-control-allow-methods'] = 'GET,POST,PUT,PATCH,DELETE,OPTIONS';
+              proxyRes.headers['access-control-allow-headers'] = 'Content-Type,Authorization,X-Requested-With';
+            }
+          });
+        },
       },
       // Rewrite legacy frontend requests that include an extra `/api` prefix
       // so they map to backend routes mounted at `/kshf_hospital_app` and `/Uploads`.
       '/api/kshf_hospital_app': {
-        target: process.env.BACKEND_URL || `http://localhost:${process.env.BACKEND_PORT || readBackendRuntimePort() || '5000'}`,
+        target: process.env.BACKEND_URL || `http://127.0.0.1:${process.env.BACKEND_PORT || readBackendRuntimePort() || '5000'}`,
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/api/Uploads': {
-        target: process.env.BACKEND_URL || `http://localhost:${process.env.BACKEND_PORT || readBackendRuntimePort() || '5000'}`,
+        target: process.env.BACKEND_URL || `http://127.0.0.1:${process.env.BACKEND_PORT || readBackendRuntimePort() || '5000'}`,
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       // Proxy legacy backend namespace used by the frontend
       '/kshf_hospital_app': {
-        target: process.env.BACKEND_URL || `http://localhost:${process.env.BACKEND_PORT || readBackendRuntimePort() || '5000'}`,
+        target: process.env.BACKEND_URL || `http://127.0.0.1:${process.env.BACKEND_PORT || readBackendRuntimePort() || '5000'}`,
         changeOrigin: true,
         secure: false,
       },
       // Proxy static uploads so <img src="/Uploads/..."> works in dev
       '/Uploads': {
-        target: process.env.BACKEND_URL || `http://localhost:${process.env.BACKEND_PORT || readBackendRuntimePort() || '5000'}`,
+        target: process.env.BACKEND_URL || `http://127.0.0.1:${process.env.BACKEND_PORT || readBackendRuntimePort() || '5000'}`,
         changeOrigin: true,
         secure: false,
       },

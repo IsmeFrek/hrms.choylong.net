@@ -5,6 +5,8 @@ export const PERMISSIONS = [
   // employees
   'view:employees',
   'edit:employees',
+  'view:employee-id-docs',
+  'edit:employee-id-docs',
   // HR certificate
   'view:hr',
   'edit:hr',
@@ -59,12 +61,15 @@ export const PERMISSIONS = [
   'view:report.transformation',
   'view:report.unpaidLeave',
   'view:report.officialDelisted',
+  'view:report.newEmployeesThisMonth',
   'view:report.attendanceMonthly',
   'view:report.attendanceMonthlyData',
   // staff self-profile (My HR)
   'view:my-hr',
   'view:selfservice',
   'view:attendance',
+  'attendance:edit',
+  'attendance:delete',
   'addattendance:approve',
   // Face recognition (biometric) - restrict carefully
   'face:match',
@@ -72,4 +77,27 @@ export const PERMISSIONS = [
   'face:delete',
   'view:settings',
   'view:roles',
+  // Leave Requests
+  'view:leaveRequests',
+  'edit:leaveRequests',
+  'approve:leaveRequests',
+  'delete:leaveRequests',
+  // Granular Scan & Attendance
+  'scan:qr',
+  'scan:face',
+  'scan:face_group',
+  'view:absence',
+  'view:attendance_report',
+  'view:attendance_monthly',
+  'view:attendance_daily',
+  'view:attendance_sum_day_report',
+  'view:work-schedule',
+  'edit:work-schedule',
+  'view:shifts',
+  'edit:shifts',
+  'view:shift-groups',
+  'edit:shift-groups',
+  'view:group-timetables',
+  'edit:group-timetables',
+  'view:dashboard',
 ];

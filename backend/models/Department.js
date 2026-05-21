@@ -8,6 +8,10 @@ const departmentSchema = new mongoose.Schema({
   Department_Kh: { type: String, required: true }, // ឈ្មោះផ្នែកជាភាសាខ្មែរ
   Department_En: { type: String, required: true }, // ឈ្មោះផ្នែកជាភាសាអង់គ្លេស
   Other: { type: String }, // ព័ត៌មានផ្សេងៗ
+  customPattern: { 
+    type: mongoose.Schema.Types.Mixed, 
+    default: null 
+  },
 }, { timestamps: true });
 
 const Department = mongoose.model('Department', departmentSchema);

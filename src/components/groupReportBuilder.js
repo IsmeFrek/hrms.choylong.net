@@ -37,7 +37,7 @@ export function buildGroupReportHtml({
     );
 
     const toKhmerDigits = (numStr) => {
-      const kh = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+      const kh = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
       return String(numStr).split('').map(ch =>
         (ch >= '0' && ch <= '9') ? kh[parseInt(ch, 10)] : ch
       ).join('');
@@ -56,26 +56,26 @@ export function buildGroupReportHtml({
       return s;
     };
 
-  const totalDays = (Number.isFinite(Number(displayTotalDays)) && Number(displayTotalDays) > 0) ? Number(displayTotalDays) : Number(monthDays || 0);
+    const totalDays = (Number.isFinite(Number(displayTotalDays)) && Number(displayTotalDays) > 0) ? Number(displayTotalDays) : Number(monthDays || 0);
 
-  const rowsData = groupRows.map((r, idx) => {
+    const rowsData = groupRows.map((r, idx) => {
       const emp = r.employee || null;
       const subgroup = r.groupName || (r.group && r.group.name) || '';
       const subgroupDisplay = formatSubgroupLabel(subgroup);
       // subgroupKey: prefer display label, otherwise use groupIndex if available
-      const subgroupKey = (subgroupDisplay && String(subgroupDisplay).trim()) || (typeof r.groupIndex === 'number' ? `ក្រុមទី${String(r.groupIndex+1)}` : (subgroup || ''));
+      const subgroupKey = (subgroupDisplay && String(subgroupDisplay).trim()) || (typeof r.groupIndex === 'number' ? `ក្រុមទី${String(r.groupIndex + 1)}` : (subgroup || ''));
       const name = emp ? (emp.khmerName || emp.fullName || emp.name || '') : String(r.employeeRef || '');
-  // Normalize phone: ensure a single leading zero (add if missing, collapse multiple zeros)
-  const _rawPhone = emp ? (emp.phone || emp.phoneNumber || emp.tel || r.mobile || r.contact || '') : '';
-  let phone = String(_rawPhone || '').trim();
-  // remove non-digit characters
-  phone = phone.replace(/\D/g, '');
-  // collapse multiple leading zeros to a single zero
-  phone = phone.replace(/^0+/, '0');
-  // ensure there's a leading zero when there's any digits
-  if (phone && !phone.startsWith('0')) phone = '0' + phone;
-  // if result is just a single '0' (no real digits), treat as empty
-  if (phone === '0') phone = '';
+      // Normalize phone: ensure a single leading zero (add if missing, collapse multiple zeros)
+      const _rawPhone = emp ? (emp.phone || emp.phoneNumber || emp.tel || r.mobile || r.contact || '') : '';
+      let phone = String(_rawPhone || '').trim();
+      // remove non-digit characters
+      phone = phone.replace(/\D/g, '');
+      // collapse multiple leading zeros to a single zero
+      phone = phone.replace(/^0+/, '0');
+      // ensure there's a leading zero when there's any digits
+      if (phone && !phone.startsWith('0')) phone = '0' + phone;
+      // if result is just a single '0' (no real digits), treat as empty
+      if (phone === '0') phone = '';
       const debugPerDay = [];
       const codes = Array.from({ length: totalDays }).map((_, di) => {
         // gather possible sources for debugging: group pattern, schedule snapshot, resolver
@@ -119,7 +119,7 @@ export function buildGroupReportHtml({
         if (scheduleByDay) {
           try {
             const date = new Date(monthMeta.year, monthMeta.month - 1, di + 1);
-            const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+            const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
             const list = scheduleByDay[iso] || [];
             snapshotObj = list.find(x => String(x.employeeRef) === String(r.employeeRef) || String(x.employeeId) === String((r.employee && (r.employee.staffId || r.employee.id)) || '')) || null;
           } catch (e) { snapshotObj = null; }
@@ -128,36 +128,36 @@ export function buildGroupReportHtml({
         let resolverObj = null;
         try { resolverObj = resolveShiftForDay(r, di); } catch (e) { resolverObj = null; }
 
-  // decide which source is considered "used" by the report:
-  // prefer group pattern only if it yields a meaningful short code or label; otherwise fall back to snapshot or resolver
-  // prefer the schedule snapshot (preview) when it contains usable data, otherwise fall back to group pattern, then resolver
-  const snapshotHasData = Boolean(snapshotObj && snapshotObj.shift && (shortCodeForShift(snapshotObj.shift) || (snapshotObj.shift.title || snapshotObj.shift.start || snapshotObj.shift.end)));
-  const groupHasData = Boolean(groupObj && (shortCodeForShift(groupObj) || (function(sh){ try{ return (sh && (sh.title || sh.start || sh.end)); }catch(e){return false;} })(groupObj)));
-  const usedSource = snapshotHasData ? 'snapshot' : (groupHasData ? 'group' : 'resolver');
-  const usedObj = (snapshotHasData ? (snapshotObj && snapshotObj.shift) : (groupHasData ? groupObj : resolverObj)) || null;
+        // decide which source is considered "used" by the report:
+        // prefer group pattern only if it yields a meaningful short code or label; otherwise fall back to snapshot or resolver
+        // prefer the schedule snapshot (preview) when it contains usable data, otherwise fall back to group pattern, then resolver
+        const snapshotHasData = Boolean(snapshotObj && snapshotObj.shift && (shortCodeForShift(snapshotObj.shift) || (snapshotObj.shift.title || snapshotObj.shift.start || snapshotObj.shift.end)));
+        const groupHasData = Boolean(groupObj && (shortCodeForShift(groupObj) || (function (sh) { try { return (sh && (sh.title || sh.start || sh.end)); } catch (e) { return false; } })(groupObj)));
+        const usedSource = snapshotHasData ? 'snapshot' : (groupHasData ? 'group' : 'resolver');
+        const usedObj = (snapshotHasData ? (snapshotObj && snapshotObj.shift) : (groupHasData ? groupObj : resolverObj)) || null;
 
-  // Prefer explicit `notes` from the shift object (Shift Group notes) for report badges,
-  // otherwise fall back to code/id or the shortCodeForShift mapper.
-  const groupCode = (groupObj && (groupObj.notes || groupObj.code || groupObj.id)) ? String(groupObj.notes || groupObj.code || groupObj.id) : (shortCodeForShift(groupObj) || '');
-  const snapshotCode = (snapshotObj && snapshotObj.shift && (snapshotObj.shift.notes || snapshotObj.shift.code || snapshotObj.shift.id)) ? String(snapshotObj.shift.notes || snapshotObj.shift.code || snapshotObj.shift.id) : (shortCodeForShift(snapshotObj && snapshotObj.shift) || '');
-  const resolverCode = (resolverObj && (resolverObj.notes || resolverObj.code || resolverObj.id)) ? String(resolverObj.notes || resolverObj.code || resolverObj.id) : (shortCodeForShift(resolverObj) || '');
-  let usedCode = (usedObj && (usedObj.notes || usedObj.code || usedObj.id)) ? String(usedObj.notes || usedObj.code || usedObj.id) : (shortCodeForShift(usedObj) || '');
-  // Detect Day Off similar to WorkCalendarPage logic: scheduledStart/End === 'OFF' or notes include 'day off',
-  // or explicit 'R' code/title. If detected, show 'R' in the report.
-  try {
-    const uc = String(usedCode || '').trim();
-    const title = usedObj && usedObj.title ? String(usedObj.title).trim() : '';
-    const notesLower = usedObj && usedObj.notes ? String(usedObj.notes).toLowerCase() : '';
-    const isDayOff = Boolean(
-      (usedObj && (usedObj.scheduledStart === 'OFF' || usedObj.scheduledEnd === 'OFF')) ||
-      (notesLower && notesLower.indexOf('day off') >= 0) ||
-      uc.toUpperCase() === 'R' ||
-      (title && String(title).toUpperCase() === 'R')
-    );
-    if (isDayOff) {
-      usedCode = 'R';
-    }
-  } catch (e) { /* ignore */ }
+        // Prefer explicit `notes` from the shift object (Shift Group notes) for report badges,
+        // otherwise fall back to code/id or the shortCodeForShift mapper.
+        const groupCode = (groupObj && (groupObj.notes || groupObj.code || groupObj.id)) ? String(groupObj.notes || groupObj.code || groupObj.id) : (shortCodeForShift(groupObj) || '');
+        const snapshotCode = (snapshotObj && snapshotObj.shift && (snapshotObj.shift.notes || snapshotObj.shift.code || snapshotObj.shift.id)) ? String(snapshotObj.shift.notes || snapshotObj.shift.code || snapshotObj.shift.id) : (shortCodeForShift(snapshotObj && snapshotObj.shift) || '');
+        const resolverCode = (resolverObj && (resolverObj.notes || resolverObj.code || resolverObj.id)) ? String(resolverObj.notes || resolverObj.code || resolverObj.id) : (shortCodeForShift(resolverObj) || '');
+        let usedCode = (usedObj && (usedObj.notes || usedObj.code || usedObj.id)) ? String(usedObj.notes || usedObj.code || usedObj.id) : (shortCodeForShift(usedObj) || '');
+        // Detect Day Off similar to WorkCalendarPage logic: scheduledStart/End === 'OFF' or notes include 'day off',
+        // or explicit 'R' code/title. If detected, show 'R' in the report.
+        try {
+          const uc = String(usedCode || '').trim();
+          const title = usedObj && usedObj.title ? String(usedObj.title).trim() : '';
+          const notesLower = usedObj && usedObj.notes ? String(usedObj.notes).toLowerCase() : '';
+          const isDayOff = Boolean(
+            (usedObj && (usedObj.scheduledStart === 'OFF' || usedObj.scheduledEnd === 'OFF')) ||
+            (notesLower && notesLower.indexOf('day off') >= 0) ||
+            uc.toUpperCase() === 'R' ||
+            (title && String(title).toUpperCase() === 'R')
+          );
+          if (isDayOff) {
+            usedCode = 'R';
+          }
+        } catch (e) { /* ignore */ }
         // build a human-readable label (time/title) for the used object
         const labelFor = (sh) => {
           try {
@@ -165,28 +165,28 @@ export function buildGroupReportHtml({
             if (sh.title && String(sh.title).trim() && !/^\s*$/.test(String(sh.title))) {
               // if title is a generic short code like 'R' prefer times if present
               if ((sh.start || sh.end) && !/^[A-Z]{1,3}$/.test(String(sh.title).trim())) return String(sh.title).trim();
-              if (sh.start || sh.end) return `${String(sh.start||'').trim()}-${String(sh.end||'').trim()}`.trim();
-              return String(sh.title||'').trim();
+              if (sh.start || sh.end) return `${String(sh.start || '').trim()}-${String(sh.end || '').trim()}`.trim();
+              return String(sh.title || '').trim();
             }
-            if (sh.start || sh.end) return `${String(sh.start||'').trim()}-${String(sh.end||'').trim()}`.trim();
+            if (sh.start || sh.end) return `${String(sh.start || '').trim()}-${String(sh.end || '').trim()}`.trim();
             return '';
           } catch (e) { return ''; }
         };
-    const groupLabel = labelFor(groupObj) || '';
-    const snapshotLabel = labelFor(snapshotObj && snapshotObj.shift) || '';
-    const resolverLabel = labelFor(resolverObj) || '';
-  const usedLabel = labelFor(usedObj) || usedCode || '';
-    // try to capture a short-title from the used shift object (various property names)
-    const usedShort = (usedObj && (usedObj.shortTitle || usedObj.short || usedObj.short_code || usedObj.shortTitle)) || '';
+        const groupLabel = labelFor(groupObj) || '';
+        const snapshotLabel = labelFor(snapshotObj && snapshotObj.shift) || '';
+        const resolverLabel = labelFor(resolverObj) || '';
+        const usedLabel = labelFor(usedObj) || usedCode || '';
+        // try to capture a short-title from the used shift object (various property names)
+        const usedShort = (usedObj && (usedObj.shortTitle || usedObj.short || usedObj.short_code || usedObj.shortTitle)) || '';
 
-    debugPerDay.push({ dayIndex: di, groupCode, groupLabel, snapshotCode, snapshotLabel, resolverCode, resolverLabel, usedSource, usedCode, usedLabel, usedShort });
+        debugPerDay.push({ dayIndex: di, groupCode, groupLabel, snapshotCode, snapshotLabel, resolverCode, resolverLabel, usedSource, usedCode, usedLabel, usedShort });
         return usedCode || '';
       });
       // compute displayLabels parallel to codes for rendering text by preference
       const displayLabels = (codes || []).map((c, i) => {
         const dd = debugPerDay[i] || {};
         if (displayShiftLabel === 'time') return dd.usedLabel || c || '';
-        if (displayShiftLabel === 'both') return (dd.usedCode ? `${dd.usedCode} / ${dd.usedLabel||''}` : dd.usedLabel||c||'');
+        if (displayShiftLabel === 'both') return (dd.usedCode ? `${dd.usedCode} / ${dd.usedLabel || ''}` : dd.usedLabel || c || '');
         return c || '';
       });
       return { idx: idx + 1, subgroup, subgroupDisplay, subgroupKey, name, phone, codes, displayLabels, debugPerDay };
@@ -222,23 +222,23 @@ export function buildGroupReportHtml({
       });
     })();
 
-    const weekdayShort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const weekdayShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const dayMeta = Array.from({ length: totalDays }).map((_, i) => {
       const d = new Date(monthMeta.year, monthMeta.month - 1, i + 1);
       const dow = d.getDay();
       const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const isHoliday = normalizedHolidaySet.has(iso);
       const bg = dow === 0 ? '#fde2e2' : (dow === 6 ? '#e9c8fcff' : (isHoliday ? '#fee2e2' : '#ffffff'));
-      return { label: String(i + 1).padStart(2,'0'), dowLabel: weekdayShort[dow], bg };
+      return { label: String(i + 1).padStart(2, '0'), dowLabel: weekdayShort[dow], bg };
     });
 
-      // Build subgroup summary (one row per subgroup showing codes per day)
+    // Build subgroup summary (one row per subgroup showing codes per day)
     const subgroupKeys = Array.from(new Set(rowsData.map(r => (r.subgroupKey || r.subgroupDisplay || r.subgroup || '').toString()))).filter(s => s && s !== '-');
-      const buildSummaryRows = () => {
-        if (!subgroupKeys.length) return '';
-        return subgroupKeys.map(sg => {
-          const left = `<td class="col-subgroup" style="text-align:left;font-weight:600">${sg}</td>`;
-          const cells = Array.from({ length: totalDays }).map((_, di) => {
+    const buildSummaryRows = () => {
+      if (!subgroupKeys.length) return '';
+      return subgroupKeys.map(sg => {
+        const left = `<td class="col-subgroup" style="text-align:left;font-weight:600">${sg}</td>`;
+        const cells = Array.from({ length: totalDays }).map((_, di) => {
           // collect all unique codes for this subgroup/day
           const codes = rowsData.reduce((acc, r) => {
             if ((r.subgroupKey || r.subgroupDisplay || r.subgroup || '') === sg) {
@@ -247,51 +247,51 @@ export function buildGroupReportHtml({
             }
             return acc;
           }, []);
-            const cellText = codes.join('/');
-            let bg = '#9ca3af';
-            let textColor = '#ffffff';
-            if (codes.length === 1) {
-              const codeKey = String(codes[0]);
-              // prefer explicit custom color map when provided by UI
-              const custom = (customColorMap && (customColorMap[codeKey] || customColorMap[String(codeKey).toUpperCase()] || customColorMap[String(codeKey).toLowerCase()]));
-              const legendItem = custom ? null : (legendItems || []).find(li => String(li.code) === codeKey);
-              bg = custom ? (custom) : (legendItem ? (legendItem.color || '#9ca3af') : '#9ca3af');
-              try { const cc = String(bg||'').replace('#',''); const rr = parseInt(cc.substring(0,2),16); const gg = parseInt(cc.substring(2,4),16); const bb = parseInt(cc.substring(4,6),16); const lum = (0.299*rr + 0.587*gg + 0.114*bb)/255; textColor = lum > 0.6 ? '#111827' : '#ffffff'; } catch(e) { textColor = '#ffffff'; }
-            } else if (codes.length > 1) {
-              // neutral background for multiple codes
-              bg = '#6b7280'; // gray
-              textColor = '#ffffff';
-            } else {
-              bg = '#ffffff';
-              textColor = '#111827';
-            }
-            return `<td class="col-day" style="text-align:center"><span data-code="${codes.length===1?String(codes[0]):''}" class="shift-badge" style="background:${bg};color:${textColor}">${String(cellText||'')}</span></td>`;
-          }).join('');
-          return `<tr>${left}${cells}</tr>`;
+          const cellText = codes.join('/');
+          let bg = '#9ca3af';
+          let textColor = '#ffffff';
+          if (codes.length === 1) {
+            const codeKey = String(codes[0]);
+            // prefer explicit custom color map when provided by UI
+            const custom = (customColorMap && (customColorMap[codeKey] || customColorMap[String(codeKey).toUpperCase()] || customColorMap[String(codeKey).toLowerCase()]));
+            const legendItem = custom ? null : (legendItems || []).find(li => String(li.code) === codeKey);
+            bg = custom ? (custom) : (legendItem ? (legendItem.color || '#9ca3af') : '#9ca3af');
+            try { const cc = String(bg || '').replace('#', ''); const rr = parseInt(cc.substring(0, 2), 16); const gg = parseInt(cc.substring(2, 4), 16); const bb = parseInt(cc.substring(4, 6), 16); const lum = (0.299 * rr + 0.587 * gg + 0.114 * bb) / 255; textColor = lum > 0.6 ? '#111827' : '#ffffff'; } catch (e) { textColor = '#ffffff'; }
+          } else if (codes.length > 1) {
+            // neutral background for multiple codes
+            bg = '#6b7280'; // gray
+            textColor = '#ffffff';
+          } else {
+            bg = '#ffffff';
+            textColor = '#111827';
+          }
+          return `<td class="col-day" style="text-align:center"><span data-code="${codes.length === 1 ? String(codes[0]) : ''}" class="shift-badge" style="background:${bg};color:${textColor}">${String(cellText || '')}</span></td>`;
         }).join('');
-      };
+        return `<tr>${left}${cells}</tr>`;
+      }).join('');
+    };
 
-      const summaryHtml = subgroupKeys.length ? (`<table class="summary" style="width:100%;border-collapse:collapse;margin-bottom:6px"><thead><tr><th style="width:160px;border:1px solid #bbb;background:#fff"></th>${dayMeta.map(d=>`<th style="border:1px solid #bbb;padding:2px 4px;background:#f3f4f6">${d.label}</th>`).join('')}</tr></thead><tbody>${buildSummaryRows()}</tbody></table>`) : '';
+    const summaryHtml = subgroupKeys.length ? (`<table class="summary" style="width:100%;border-collapse:collapse;margin-bottom:6px"><thead><tr><th style="width:160px;border:1px solid #bbb;background:#fff"></th>${dayMeta.map(d => `<th style="border:1px solid #bbb;padding:2px 4px;background:#f3f4f6">${d.label}</th>`).join('')}</tr></thead><tbody>${buildSummaryRows()}</tbody></table>`) : '';
 
-  
 
-  // Resolve display month label: prefer provided `displayMonthLabel`, otherwise build English + Khmer form
-  const engMonths = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const khMonths = ['មករា','កុម្ភៈ','មិនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
-  const monthIndex = Math.max(1, (monthMeta && monthMeta.month) || (new Date().getMonth()+1)) - 1;
-  const engMonth = engMonths[monthIndex] || 'Month';
-  const khMonth = khMonths[monthIndex] || '';
-  const resolvedDisplayMonthLabel = (displayMonthLabel && String(displayMonthLabel).trim()) ? String(displayMonthLabel) : `${engMonth} ${monthMeta.year} — ខែ ${khMonth} ឆ្នាំ ${toKhmerDigits(monthMeta.year)}`;
 
-  const khMonthName = khMonth || '';
-  const khYear = toKhmerDigits(monthMeta.year);
-  const groupLabel = (labelMap && labelMap[groupName]) ? labelMap[groupName] : (`ក្រុម ${groupName}`);
-  const previewRangeText = (previewRange && previewRange.start) ? ` ${previewRange.start} → ${previewRange.end}` : '';
-  const title = `តារាងវេនប្រចាំការ ${groupLabel} ប្រចាំខែ ${khMonthName} ឆ្នាំ ${khYear}`;
-  // simple location label 'H' that can be rendered below the title in the report
-  // Make the phone editable and persistable (saved per group in localStorage)
-  const hotlineDefault = '070839345';
-  const locationH = `លេខទូរស័ព្ទ Hotline ${groupLabel} ប្រចាំការ២៤ម៉ោង <span id="hotlineField" contenteditable="true" style="display:inline-block;min-width:80px;padding:0px 6px;border-bottom:1px dashed #222;font-weight:700;">${hotlineDefault}</span><span id="hotlineSaved" style="margin-left:6px;color:green;display:none;font-size:12px;">Saved</span>`;
+    // Resolve display month label: prefer provided `displayMonthLabel`, otherwise build English + Khmer form
+    const engMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const khMonths = ['មករា', 'កុម្ភៈ', 'មិនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
+    const monthIndex = Math.max(1, (monthMeta && monthMeta.month) || (new Date().getMonth() + 1)) - 1;
+    const engMonth = engMonths[monthIndex] || 'Month';
+    const khMonth = khMonths[monthIndex] || '';
+    const resolvedDisplayMonthLabel = (displayMonthLabel && String(displayMonthLabel).trim()) ? String(displayMonthLabel) : `${engMonth} ${monthMeta.year} — ខែ ${khMonth} ឆ្នាំ ${toKhmerDigits(monthMeta.year)}`;
+
+    const khMonthName = khMonth || '';
+    const khYear = toKhmerDigits(monthMeta.year);
+    const groupLabel = (labelMap && labelMap[groupName]) ? labelMap[groupName] : (`ក្រុម ${groupName}`);
+    const previewRangeText = (previewRange && previewRange.start) ? ` ${previewRange.start} → ${previewRange.end}` : '';
+    const title = `តារាងវេនប្រចាំការ ${groupLabel} ប្រចាំខែ ${khMonthName} ឆ្នាំ ${khYear}`;
+    // simple location label 'H' that can be rendered below the title in the report
+    // Make the phone editable and persistable (saved per group in localStorage)
+    const hotlineDefault = '070839345';
+    const locationH = `លេខទូរស័ព្ទ Hotline ${groupLabel} ប្រចាំការ២៤ម៉ោង <span id="hotlineField" contenteditable="true" style="display:inline-block;min-width:80px;padding:0px 6px;border-bottom:1px dashed #222;font-weight:700;">${hotlineDefault}</span><span id="hotlineSaved" style="margin-left:6px;color:green;display:none;font-size:12px;">Saved</span>`;
 
     // Left headers with default widths
     const leftHeaders = [
@@ -316,24 +316,24 @@ export function buildGroupReportHtml({
           const nameHtml = r.names.map(n => `<div>${String(n || '')}</div>`).join('');
           leftCells.push(`<td class="col-name" style="text-align:left">${nameHtml}</td>`);
           leftCells.push(`<td class="col-phone" style="text-align:center">${String(r.phone || '')}</td>`);
-            const dayCells = r.codes.map((c, idx) => {
+          const dayCells = r.codes.map((c, idx) => {
             // choose display text based on displayLabels (falls back to short code c)
             const displayText = (r.displayLabels && r.displayLabels[idx]) ? String(r.displayLabels[idx]) : String(c || '');
-              const codeKey = String(c || '');
-              const custom = (customColorMap && (customColorMap[codeKey] || customColorMap[String(codeKey).toUpperCase()] || customColorMap[String(codeKey).toLowerCase()]));
-              const legendItem = custom ? null : (legendItems || []).find(li => String(li.code) === String(c));
-              const bg = custom ? custom : (legendItem ? (legendItem.color || '#9ca3af') : '#9ca3af');
-              const textColor = (() => {
-                try {
-                  const cc = String(bg || '').replace('#','');
-                  const rr = parseInt(cc.substring(0,2),16);
-                  const gg = parseInt(cc.substring(2,4),16);
-                  const bb = parseInt(cc.substring(4,6),16);
-                  const lum = (0.299*rr + 0.587*gg + 0.114*bb)/255;
-                  return lum > 0.6 ? '#111827' : '#ffffff';
-                } catch (e) { return '#ffffff'; }
-              })();
-            return `<td class="col-day" style="text-align:center"><span data-code="${codeKey||''}" class="shift-badge" style="background:${bg};color:${textColor}">${String(displayText||'')}</span></td>`;
+            const codeKey = String(c || '');
+            const custom = (customColorMap && (customColorMap[codeKey] || customColorMap[String(codeKey).toUpperCase()] || customColorMap[String(codeKey).toLowerCase()]));
+            const legendItem = custom ? null : (legendItems || []).find(li => String(li.code) === String(c));
+            const bg = custom ? custom : (legendItem ? (legendItem.color || '#9ca3af') : '#9ca3af');
+            const textColor = (() => {
+              try {
+                const cc = String(bg || '').replace('#', '');
+                const rr = parseInt(cc.substring(0, 2), 16);
+                const gg = parseInt(cc.substring(2, 4), 16);
+                const bb = parseInt(cc.substring(4, 6), 16);
+                const lum = (0.299 * rr + 0.587 * gg + 0.114 * bb) / 255;
+                return lum > 0.6 ? '#111827' : '#ffffff';
+              } catch (e) { return '#ffffff'; }
+            })();
+            return `<td class="col-day" style="text-align:center"><span data-code="${codeKey || ''}" class="shift-badge" style="background:${bg};color:${textColor}">${String(displayText || '')}</span></td>`;
           }).join('');
           rows.push(`<tr>${leftCells.join('')}${dayCells}</tr>`);
         });
@@ -343,86 +343,86 @@ export function buildGroupReportHtml({
 
     const rowsHtml = buildRowsWithRowspan();
 
-  // Build legend HTML from actual codes used in the table. Prefer labels
-  // derived from the table's debug data (usedLabel) so codes like "NG"
-  // can show their time ranges (e.g. "07:30-07:30"). Fall back to
-  // customBadgeLabelMap, legendItems, or 'Day Off' for R.
-  const usedCodeSet = new Set();
-  const codeLabelMap = {}; // code -> label (from debugPerDay.usedLabel when available)
-  const codeShortMap = {}; // code -> shortTitle (from debugPerDay.usedShort when available)
-  (rowsData || []).forEach(r => {
-    (r.codes || []).forEach((c, idx) => { if (c !== undefined && c !== null && String(c).trim() !== '') usedCodeSet.add(String(c)); });
-    (r.debugPerDay || []).forEach(dp => {
-      try {
-        const code = String(dp.usedCode || '').trim();
-        const lab = String(dp.usedLabel || '').trim();
-        const short = String(dp.usedShort || '').trim();
-        if (code && lab && !codeLabelMap[code]) codeLabelMap[code] = lab;
-        if (code && short && !codeShortMap[code]) codeShortMap[code] = short;
-      } catch (e) { /* ignore */ }
+    // Build legend HTML from actual codes used in the table. Prefer labels
+    // derived from the table's debug data (usedLabel) so codes like "NG"
+    // can show their time ranges (e.g. "07:30-07:30"). Fall back to
+    // customBadgeLabelMap, legendItems, or 'Day Off' for R.
+    const usedCodeSet = new Set();
+    const codeLabelMap = {}; // code -> label (from debugPerDay.usedLabel when available)
+    const codeShortMap = {}; // code -> shortTitle (from debugPerDay.usedShort when available)
+    (rowsData || []).forEach(r => {
+      (r.codes || []).forEach((c, idx) => { if (c !== undefined && c !== null && String(c).trim() !== '') usedCodeSet.add(String(c)); });
+      (r.debugPerDay || []).forEach(dp => {
+        try {
+          const code = String(dp.usedCode || '').trim();
+          const lab = String(dp.usedLabel || '').trim();
+          const short = String(dp.usedShort || '').trim();
+          if (code && lab && !codeLabelMap[code]) codeLabelMap[code] = lab;
+          if (code && short && !codeShortMap[code]) codeShortMap[code] = short;
+        } catch (e) { /* ignore */ }
+      });
     });
-  });
-  const usedCodes = Array.from(usedCodeSet);
-  const legendHtml = (usedCodes.length ? usedCodes.map(codeKey => {
-    const custom = (customColorMap && (customColorMap[codeKey] || customColorMap[String(codeKey).toUpperCase()] || customColorMap[String(codeKey).toLowerCase()]));
-    const legendItem = (legendItems || []).find(li => String(li.code) === String(codeKey));
-    const bg = custom ? custom : (legendItem ? (legendItem.color || '#9ca3af') : '#9ca3af');
-    let text = '#fff';
-    try { const cc = String(bg||'').replace('#',''); const rr = parseInt(cc.substring(0,2),16); const gg = parseInt(cc.substring(2,4),16); const bb = parseInt(cc.substring(4,6),16); const lum = (0.299*rr + 0.587*gg + 0.114*bb)/255; text = lum > 0.6 ? '#111827' : '#ffffff'; } catch(e) { }
-    let labelFromDebug = codeLabelMap[codeKey];
-    const shortFromDebug = codeShortMap[codeKey];
-    if (labelFromDebug && shortFromDebug) labelFromDebug = `${labelFromDebug} ${shortFromDebug}`;
-    // For R, always show English + Khmer to avoid duplicate or missing translations
-    if (String(codeKey) === 'R') {
-      const label = 'Day Off / ថ្ងៃសម្រាក់';
-      var labelText = ` = ${label}`;
-    } else {
-      const label = (customBadgeLabelMap && (customBadgeLabelMap[codeKey] || customBadgeLabelMap[String(codeKey).toUpperCase()] || customBadgeLabelMap[String(codeKey).toLowerCase()])) || labelFromDebug || (legendItem && (legendItem.label || legendItem.name || legendItem.title || legendItem.description)) || '';
-      var labelText = label ? ` = ${label}` : '';
-    }
-    return `<span class="legend-entry">` +
-      `<span class="legend-swatch" data-code="${codeKey}" style="width:7mm;background:${bg};color:${text};font-weight:700;">${codeKey}</span>${labelText}` +
-      `</span>`;
-  }).join('') : ((legendItems || []).map(li => {
-    const bg = li.color || '#9ca3af';
-    const cc = String(bg||'').replace('#','');
-    let text = '#fff';
-    try { const rr = parseInt(cc.substring(0,2),16); const gg = parseInt(cc.substring(2,4),16); const bb = parseInt(cc.substring(4,6),16); const lum = (0.299*rr + 0.587*gg + 0.114*bb)/255; text = lum > 0.6 ? '#111827' : '#ffffff'; } catch(e) { }
-    const label = li.label || li.name || li.title || '';
-    const labelText = label ? ` = ${label}` : (li.code === 'R' ? ' = Day Off ថ្ងៃសម្រាក់' : '');
-    return `<span class="legend-entry">` +
-      `<span class="legend-swatch" data-code="${li.code}" style="width:7mm;background:${bg};color:${text};font-weight:700;">${li.code}</span>${labelText}` +
-      `</span>`;
-  }).join('')));
+    const usedCodes = Array.from(usedCodeSet);
+    const legendHtml = (usedCodes.length ? usedCodes.map(codeKey => {
+      const custom = (customColorMap && (customColorMap[codeKey] || customColorMap[String(codeKey).toUpperCase()] || customColorMap[String(codeKey).toLowerCase()]));
+      const legendItem = (legendItems || []).find(li => String(li.code) === String(codeKey));
+      const bg = custom ? custom : (legendItem ? (legendItem.color || '#9ca3af') : '#9ca3af');
+      let text = '#fff';
+      try { const cc = String(bg || '').replace('#', ''); const rr = parseInt(cc.substring(0, 2), 16); const gg = parseInt(cc.substring(2, 4), 16); const bb = parseInt(cc.substring(4, 6), 16); const lum = (0.299 * rr + 0.587 * gg + 0.114 * bb) / 255; text = lum > 0.6 ? '#111827' : '#ffffff'; } catch (e) { }
+      let labelFromDebug = codeLabelMap[codeKey];
+      const shortFromDebug = codeShortMap[codeKey];
+      if (labelFromDebug && shortFromDebug) labelFromDebug = `${labelFromDebug} ${shortFromDebug}`;
+      // For R, always show English + Khmer to avoid duplicate or missing translations
+      if (String(codeKey) === 'R') {
+        const label = 'Day Off / ថ្ងៃសម្រាក់';
+        var labelText = ` = ${label}`;
+      } else {
+        const label = (customBadgeLabelMap && (customBadgeLabelMap[codeKey] || customBadgeLabelMap[String(codeKey).toUpperCase()] || customBadgeLabelMap[String(codeKey).toLowerCase()])) || labelFromDebug || (legendItem && (legendItem.label || legendItem.name || legendItem.title || legendItem.description)) || '';
+        var labelText = label ? ` = ${label}` : '';
+      }
+      return `<span class="legend-entry">` +
+        `<span class="legend-swatch" data-code="${codeKey}" style="width:7mm;background:${bg};color:${text};font-weight:700;">${codeKey}</span>${labelText}` +
+        `</span>`;
+    }).join('') : ((legendItems || []).map(li => {
+      const bg = li.color || '#9ca3af';
+      const cc = String(bg || '').replace('#', '');
+      let text = '#fff';
+      try { const rr = parseInt(cc.substring(0, 2), 16); const gg = parseInt(cc.substring(2, 4), 16); const bb = parseInt(cc.substring(4, 6), 16); const lum = (0.299 * rr + 0.587 * gg + 0.114 * bb) / 255; text = lum > 0.6 ? '#111827' : '#ffffff'; } catch (e) { }
+      const label = li.label || li.name || li.title || '';
+      const labelText = label ? ` = ${label}` : (li.code === 'R' ? ' = Day Off ថ្ងៃសម្រាក់' : '');
+      return `<span class="legend-entry">` +
+        `<span class="legend-swatch" data-code="${li.code}" style="width:7mm;background:${bg};color:${text};font-weight:700;">${li.code}</span>${labelText}` +
+        `</span>`;
+    }).join('')));
 
-  const defaultFooterLeft = footerLeft || `បានឃើញ និងឯកភាព\nនាយករងមន្ទីរពេទ្យ`;
-  const defaultFooterCenter = footerCenter || `បានឃើញ និងពិនិត្យត្រឹមត្រូវ\nប្រធានការិយាល័យរដ្ឋបាលនិងបុគ្គលិក`;
-  // Format footer right as: រាជធានីភ្នំពេញ ថ្ងៃទី<#> ខែ<KhMonth> ឆ្នាំ <KhYear>
-  let defaultFooterRight;
-  try {
-    const _now = new Date();
-    const _khMonths = ['មករា','កុម្ភៈ','មិនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
-    const _day = _now.getDate();
-    const _monthName = _khMonths[_now.getMonth()] || '';
-    const _year = _now.getFullYear();
-    // derive role label from department prefix when possible
-    let _derivedRole = 'នាយផ្នែក';
+    const defaultFooterLeft = footerLeft || `បានឃើញ និងឯកភាព\nនាយករងមន្ទីរពេទ្យ`;
+    const defaultFooterCenter = footerCenter || `បានឃើញ និងពិនិត្យត្រឹមត្រូវ\nប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក`;
+    // Format footer right as: រាជធានីភ្នំពេញ ថ្ងៃទី<#> ខែ<KhMonth> ឆ្នាំ <KhYear>
+    let defaultFooterRight;
     try {
-      const _dep = String(department || '').trim();
-      if (/^\s*ផ្នែក/.test(_dep)) _derivedRole = 'នាយផ្នែក';
-      else if (/^\s*មណ្ឌល/.test(_dep)) _derivedRole = 'នាយមណ្ឌល';
-      else if (/^\s*ការិយាល័យ/.test(_dep)) _derivedRole = 'ប្រធាន/អនុ ការិយាល័យ';
-    } catch (e) { /* ignore */ }
-    defaultFooterRight = footerRight || `រាជធានីភ្នំពេញ ថ្ងៃទី${toKhmerDigits(_day)} ខែ${_monthName} ឆ្នាំ ${toKhmerDigits(_year)}\n${_derivedRole}`;
-  } catch (e) {
-    defaultFooterRight = footerRight || `រាជធានីភ្នំពេញ ${new Date().toLocaleDateString()}\nនាយផ្នែក`;
-  }
+      const _now = new Date();
+      const _khMonths = ['មករា', 'កុម្ភៈ', 'មិនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
+      const _day = _now.getDate();
+      const _monthName = _khMonths[_now.getMonth()] || '';
+      const _year = _now.getFullYear();
+      // derive role label from department prefix when possible
+      let _derivedRole = 'នាយផ្នែក';
+      try {
+        const _dep = String(department || '').trim();
+        if (/^\s*ផ្នែក/.test(_dep)) _derivedRole = 'នាយផ្នែក';
+        else if (/^\s*មណ្ឌល/.test(_dep)) _derivedRole = 'នាយមណ្ឌល';
+        else if (/^\s*ការិយាល័យ/.test(_dep)) _derivedRole = 'ប្រធាន/អនុ ការិយាល័យ';
+      } catch (e) { /* ignore */ }
+      defaultFooterRight = footerRight || `រាជធានីភ្នំពេញ ថ្ងៃទី${toKhmerDigits(_day)} ខែ${_monthName} ឆ្នាំ ${toKhmerDigits(_year)}\n${_derivedRole}`;
+    } catch (e) {
+      defaultFooterRight = footerRight || `រាជធានីភ្នំពេញ ${new Date().toLocaleDateString()}\nនាយផ្នែក`;
+    }
 
-  // Use the provided printable header as-is (trimmed). Removing the previous sanitization
-  // because caller may wish to include phone numbers or labels in the printable header.
-  const safeHeaderHtml = (printableHeaderHtml && String(printableHeaderHtml).trim()) ? String(printableHeaderHtml).trim() : '';
+    // Use the provided printable header as-is (trimmed). Removing the previous sanitization
+    // because caller may wish to include phone numbers or labels in the printable header.
+    const safeHeaderHtml = (printableHeaderHtml && String(printableHeaderHtml).trim()) ? String(printableHeaderHtml).trim() : '';
 
-  const html = `<!doctype html>
+    const html = `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8"/>
@@ -505,7 +505,7 @@ tr.resizable-row::after {
   /* Header image placed between top header and title (centered). */
   .header-image { text-align: center; margin: 4px 0 40px 0; }
   /* Fix decorative ornament to a consistent physical size so print matches view */
-  .header-image img { width: 38mm !important; max-width: none !important; height: auto; display: inline-block; border-radius: 1px; }
+  .header-image img { width: 45mm !important; max-width: none !important; height: auto; display: inline-block; border-radius: 1px; }
   /* Left columns: use Khmer OS seamreap at size 17 for Group / Name / Phone */
   th.col-0, th.col-1, th.col-2, td.col-card, td.col-name, td.col-phone {
     font-family: 'Khmer OS seamreap', 'Khmer OS System', 'Noto Sans Khmer', sans-serif;
@@ -522,7 +522,7 @@ tr.resizable-row::after {
   /* Slightly reduce spacing and font to help fit large tables on one page */
   .page { width: 100%; margin: 0; transform-origin: top center; }
   /* Ensure ornament prints at same physical size as screen view */
-  .header-image img { width: 12mm !important; max-width: none !important; }
+  .header-image img { width: 45mm !important; max-width: none !important; }
   table { page-break-inside: avoid; border-collapse: collapse; }
   thead { display: table-header-group; }
   tfoot { display: table-footer-group; }
@@ -534,7 +534,7 @@ tr.resizable-row::after {
   .legend-swatch { min-width:6mm !important; }
   /* If content still overflows, slightly scale down to try and keep everything on one page */
   @page { size: A4 landscape; margin: 6mm; }
-  body > .page { transform: scale(0.95); }
+  body > .page { transform: none; }
 }
 /* Hide floating color editor when printing */
 @media print {
@@ -618,7 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
   <div class="page">
   <div class="side-letters" aria-hidden="true"><div class="side-letter">ក្រសួងសុខាភិបាល</div><div class="side-letter">មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</div><div class="side-letter">${String(department)}</div></div>
   <div class="top-header">${safeHeaderHtml}</div>
-  <div class="header-image"><img src="${headerBg}" alt="" style={{position:'absolute', top:'0%', left:'30%', transform:'translate(-50%, 0%)', width:'60px', height:'auto', opacity:0.85, pointerEvents:'none'}} /></div>
+  <div class="header-image"><img src="${headerBg}" alt="" style="width:45mm; height:auto; opacity:0.85; pointer-events:none;" /></div>
 <div class="title" style="text-align: center;margin-top: 0px;font-family: 'Khmer OS seamreap';font-size: 17px;font-weight: 600;color: #050505ff;">${title}</div>
   <div class="location-h">${locationH}</div>
 <table>

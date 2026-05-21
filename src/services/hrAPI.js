@@ -7,6 +7,7 @@ const HRAPI = {
   update: (id, data) => api.put(`/hr/${id}`, data),
   delete: (id) => api.delete(`/hr/${id}`),
   resequence: () => api.post('/hr/resequence'),
+  reposition: (id, newNo) => api.post(`/hr/${id}/reposition`, { newNo }),
 };
 
 export default HRAPI;

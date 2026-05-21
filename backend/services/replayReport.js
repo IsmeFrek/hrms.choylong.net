@@ -83,7 +83,7 @@ function parsePreferLocalTime(raw, entryTime) {
       const now = new Date();
       d.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
     }
-  } catch (e) {}
+  } catch (e) { }
   return d;
 }
 
@@ -117,7 +117,7 @@ function resolveUploadsAbsPath(filePathValue) {
   try {
     if (fs.existsSync(a)) return a;
     if (fs.existsSync(b)) return b;
-  } catch (e) {}
+  } catch (e) { }
   return a;
 }
 
@@ -230,7 +230,7 @@ function computeVisibleBuckets(item) {
         const v = stages?.[k];
         if (v !== undefined && v !== null && String(v).trim() !== '') return true;
       }
-    } catch (e) {}
+    } catch (e) { }
     return false;
   };
 
@@ -301,7 +301,7 @@ function stageRoleLabel(meta, stageKey) {
     const roles = meta?.feedbackStageRoles;
     const key = String(stageKey || '').toLowerCase();
     if (roles && typeof roles === 'object' && roles[key]) return String(roles[key]);
-  } catch (e) {}
+  } catch (e) { }
 
   const map = {
     s: 'មន្រ្តីទទួលបន្ទុក',
@@ -348,7 +348,7 @@ function pickStageAssigned(meta, bucket) {
       const v = stages?.[k];
       if (v !== undefined && v !== null && String(v).trim() !== '') return v;
     }
-  } catch (e) {}
+  } catch (e) { }
   return null;
 }
 

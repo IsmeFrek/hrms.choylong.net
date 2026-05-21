@@ -1,10 +1,13 @@
 import express from 'express';
 import ShiftTemplate from '../models/ShiftTemplate.js';
+import { authRequired, requireAnyPermission } from '../middleware/auth.js';
 
 const router = express.Router();
 
+router.use(authRequired);
+
 // list
-router.get('/', async (req, res) => {
+router.get('/', requireAnyPermission(['view:shifts', 'edit:shifts']), async (req, res) => {
   try {
     const items = await ShiftTemplate.find({}).sort({ createdAt: 1 });
     res.json(items);
@@ -12,7 +15,7 @@ router.get('/', async (req, res) => {
 });
 
 // create
-router.post('/', async (req, res) => {
+router.post('/', requireAnyPermission(['edit:shifts']), async (req, res) => {
   try {
     const cur = new ShiftTemplate(req.body);
     await cur.save();
@@ -21,7 +24,7 @@ router.post('/', async (req, res) => {
 });
 
 // update
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAnyPermission(['edit:shifts']), async (req, res) => {
   try {
     const updated = await ShiftTemplate.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json(updated);
@@ -29,7 +32,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // delete
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAnyPermission(['edit:shifts']), async (req, res) => {
   try {
     await ShiftTemplate.findByIdAndDelete(req.params.id);
     res.json({ ok: true });

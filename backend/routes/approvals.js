@@ -105,17 +105,15 @@ router.post('/:id/approve', authRequired, requirePermission('approve:hr'), async
       if (user) {
         const fields = (cr.payload && cr.payload.fields && typeof cr.payload.fields === 'object') ? cr.payload.fields : {};
 
-        let userRole = await Role.findOne({ name: 'User' });
+        let userRole = await Role.findOne({ name: 'Viewer' });
+        const basePerms = ['view:my-hr', 'print:hr', 'view:fileTransfers', 'send:feedback', 'send:telegram', 'view:attendance'];
+        
         if (!userRole) {
-          userRole = await Role.create({ name: 'User', permissions: ['view:employees', 'view:hr', 'print:hr', 'view:fileTransfers', 'send:feedback', 'send:telegram'] });
+          userRole = await Role.create({ name: 'Viewer', permissions: basePerms });
         } else {
-          const basePerms = ['view:employees', 'view:hr', 'print:hr', 'view:fileTransfers', 'send:feedback', 'send:telegram'];
-          const existingPerms = Array.isArray(userRole.permissions) ? userRole.permissions : [];
-          const missing = basePerms.filter(p => !existingPerms.includes(p));
-          if (missing.length > 0) {
-            userRole.permissions = Array.from(new Set([...existingPerms, ...missing]));
-            await userRole.save();
-          }
+          // Force reset permissions to ensure view:hr and view:employees are removed
+          userRole.permissions = basePerms;
+          await userRole.save();
         }
         const pendingRole = await Role.findOne({ name: 'Pending' });
         const existing = (user.roles || []).map((r) => r._id?.toString?.() || r.toString());

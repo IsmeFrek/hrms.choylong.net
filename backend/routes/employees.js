@@ -8,8 +8,57 @@ const router = express.Router();
 // All employee routes require auth
 router.use(authRequired);
 
+// Lightweight metadata endpoints
+// ------------------------------
+
+// Distinct department names from employees, used by several reports.
+router.get('/meta/departments', requirePermission('view:employees'), async (req, res) => {
+  try {
+    const docs = await Employee.find({}, { department: 1, Department_Kh: 1, Department_En: 1 }).lean();
+    const set = new Set();
+    for (const d of docs || []) {
+      const name = (d.department || d.Department_Kh || d.Department_En || '').toString().trim();
+      if (name) set.add(name);
+    }
+    const list = Array.from(set).sort((a, b) => a.localeCompare(b, 'km'));
+    res.json(list);
+  } catch (error) {
+    console.error('Error in GET /api/employees/meta/departments:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Distinct positions from employees.
+router.get('/meta/positions', requirePermission('view:employees'), async (req, res) => {
+  try {
+    const docs = await Employee.find({}, { position: 1 }).lean();
+    const set = new Set();
+    for (const d of docs || []) {
+      const name = (d.position || '').toString().trim();
+      if (name) set.add(name);
+    }
+    const list = Array.from(set).sort((a, b) => a.localeCompare(b, 'km'));
+    res.json(list);
+  } catch (error) {
+    console.error('Error in GET /api/employees/meta/positions:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // GET all employees
-router.get('/', requirePermission('view:employees'), async (req, res) => {
+router.get('/', async (req, res) => {
+  const perms = req.auth?.permissions || [];
+  const roles = (req.auth?.user?.roles || []).map((r) => r.name);
+  const email = req.auth?.user?.email || '';
+  const cleanEmail = String(email).trim().toLowerCase();
+  const isAdmin = roles.includes('Admin') || roles.includes('Administrator') || cleanEmail === 'admin@hospital.com' || cleanEmail.includes('admin@hospital07.com');
+  const hasViewPerm = perms.includes('view:employees');
+  const hasDept = !!req.auth?.user?.department;
+  
+  if (!isAdmin && !hasViewPerm && !hasDept) {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+  
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -25,6 +74,24 @@ router.get('/', requirePermission('view:employees'), async (req, res) => {
         ]
       };
     }
+
+    if (!isAdmin && hasDept) {
+      const deptQuery = {
+        $or: [
+          { Department_Kh: req.auth.user.department },
+          { department: req.auth.user.department }
+        ]
+      };
+      if (query.$or) {
+        query = { $and: [query, deptQuery] };
+      } else {
+        query = deptQuery;
+      }
+    }
+
+    if (req.query.Department_Kh) query.Department_Kh = req.query.Department_Kh;
+    if (req.query.Department_Id) query.Department_Id = req.query.Department_Id;
+    if (req.query.status) query.status = req.query.status;
 
     console.log('[API] GET /api/employees');
     console.log('Query:', query);

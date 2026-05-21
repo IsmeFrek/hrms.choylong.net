@@ -9,7 +9,7 @@ import logo3 from '../assets/3.JPG';
 
 export default function ReplayfilePage() {
   const { user: currentUser } = useAuth() || {};
-    const perms = usePermission();
+  const perms = usePermission();
   const [searchParams] = useSearchParams();
   const recordId = searchParams.get('recordId');
   const [record, setRecord] = useState(null);
@@ -129,7 +129,7 @@ export default function ReplayfilePage() {
           // fallback to in-place print
           printPage();
         } finally {
-          try { newWin.close(); } catch (e) {}
+          try { newWin.close(); } catch (e) { }
           setIsPrinting(false);
         }
       };
@@ -171,6 +171,33 @@ export default function ReplayfilePage() {
     return map[key] || role;
   };
 
+  // Compute the name of the person responsible for the next incomplete/unticked stage.
+  const computeNextHandlerName = (currentMeta) => {
+    try {
+      const m = currentMeta || meta || {};
+      const order = ['S', 'S1', 'S2', 'SD', 'SDR', 'S3', 'S4', 'S5', 'S6'];
+      // Map stage variants to their meta note fields.
+      const sToMeta = {
+        S: 'CourseNote', S1: 'Course1Note', S2: 'Course2Note', SD: 'Course3Note', S3: 'Course3Note', SDR: 'Course4Note', S4: 'Course4Note', S5: 'Course5Note', DIR: 'Course5Note', SDIR: 'Course5Note', S6: 'Course6Note', HO: 'Course6Note'
+      };
+      for (const k of order) {
+        const metaKey = sToMeta[k];
+        const note = (m[metaKey] || '').trim();
+        const ticked = !!m[`${metaKey}_ticked`];
+        // If this stage is NOT yet finished (no note AND not ticked), it is the next active stage.
+        if (!note && !ticked) {
+          const sender = getStageSenderName(k);
+          if (sender) return sender;
+          // if no specific sender for this variant, try role label
+          const label = getRoleLabel(k);
+          if (label && label !== k) return label;
+        }
+      }
+      // If all stages are finished, fall back to owner or stay as is.
+      return record && record.owner || record && record.handler || '';
+    } catch (e) { return ''; }
+  };
+
   const [leftContent, setLeftContent] = useState(firstCourse1Note(meta) || '');
   const [s1Content, setS1Content] = useState((meta && meta.Course1Note) || '');
   const [centerContent, setCenterContent] = useState((meta && meta.centerNote) || '');
@@ -203,6 +230,74 @@ export default function ReplayfilePage() {
     }
   };
   const stageMessageFor = (stageKey) => (saveMessageStage === stageKey ? saveMessage : '');
+
+  const toggleStageTicked = async (metaKey, checked) => {
+    if (!record) return;
+    const stageKey = stageKeyByMeta(metaKey);
+    setSaving(true);
+    setStageMessage('កំពុងរក្សាទុក...', stageKey);
+
+    const newMeta = { ...(meta || {}), [`${metaKey}_ticked`]: checked };
+    const nextHandler = computeNextHandlerName(newMeta);
+    try {
+      const id = record && (record._id || record.id);
+      if (id) {
+        const res = await updateFileTransfer(id, { meta: newMeta, handler: nextHandler, current_handler: nextHandler });
+        const updated = (res && (res.item || res)) || null;
+        if (updated) {
+          setRecord(updated.item || updated);
+        } else {
+          setRecord(r => ({ ...r, meta: newMeta, handler: nextHandler, current_handler: nextHandler }));
+        }
+        setStageMessage('រក្សាទុកបានសម្រេច', stageKey);
+        // Clear message after a short delay
+        setTimeout(() => clearStageMessage(stageKey), 2000);
+      }
+    } catch (e) {
+      console.error('Failed to save ticked state', e);
+      setStageMessage('រក្សាទុកមិនបាន — សូមព្យាយាមម្ដងទៀត', stageKey);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // helper: return the local content for a given meta key
+  // so we can auto-tick if the stage has data
+  const getLocalNoteByMetaKey = (metaKey) => {
+    switch (metaKey) {
+      case 'CourseNote': return leftContent || '';
+      case 'Course1Note': return s1Content || '';
+      case 'Course2Note': return deptContent || '';
+      case 'Course3Note': return deputyContent || '';
+      case 'Course4Note': return deputyRightContent || '';
+      case 'Course5Note': return directorContent || '';
+      case 'Course6Note': return headOfficeContent || '';
+      default: return '';
+    }
+  };
+
+  // checkbox is auto-checked when the stage's note (local or saved) has data,
+  // OR when the user has manually ticked it.
+  const isStageChecked = (metaKey) => {
+    const localNote = getLocalNoteByMetaKey(metaKey);
+    const savedNote = (meta && meta[metaKey]) || '';
+    const hasData = String(localNote).trim() !== '' || String(savedNote).trim() !== '';
+    const manuallyTicked = !!(meta && meta[`${metaKey}_ticked`]);
+    return hasData || manuallyTicked;
+  };
+
+  const renderTickMarker = (metaKey) => (
+    <div style={{ position: 'absolute', right: 4, top: 2, zIndex: 10 }}>
+      <input
+        className="no-print"
+        type="checkbox"
+        checked={isStageChecked(metaKey)}
+        onChange={(e) => toggleStageTicked(metaKey, e.target.checked)}
+        title={isStageChecked(metaKey) ? 'វគ្គនេះមានទិន្នន័យ / This stage has data' : 'គូសចំណាំថាវគ្គនេះមានមតិ / Mark as has data'}
+        style={{ cursor: 'pointer', transform: 'scale(1.2)', accentColor: '#e53e3e' }}
+      />
+    </div>
+  );
   const [sendingStage, setSendingStage] = useState(null);
   const autosaveTimer = useRef(null);
   const autosaveTimerDept = useRef(null);
@@ -304,36 +399,43 @@ export default function ReplayfilePage() {
   const [showNameStages, setShowNameStages] = useState(() => loadStageSet('replayfile:showNameStages', STAGE_TOGGLE_KEYS));
 
   useEffect(() => {
-    try { localStorage.setItem('replayfile:showLetterNo', showLetterNo ? '1' : '0'); } catch (e) {}
+    try { localStorage.setItem('replayfile:showLetterNo', showLetterNo ? '1' : '0'); } catch (e) { }
   }, [showLetterNo]);
   useEffect(() => {
-    try { localStorage.setItem('replayfile:showCreatorName', showCreatorName ? '1' : '0'); } catch (e) {}
+    try { localStorage.setItem('replayfile:showCreatorName', showCreatorName ? '1' : '0'); } catch (e) { }
   }, [showCreatorName]);
   useEffect(() => {
-    try { localStorage.setItem('replayfile:showDoAtStages', Array.from(showDoAtStages || []).join(',')); } catch (e) {}
+    try { localStorage.setItem('replayfile:showDoAtStages', Array.from(showDoAtStages || []).join(',')); } catch (e) { }
   }, [showDoAtStages]);
   useEffect(() => {
-    try { localStorage.setItem('replayfile:showSignatureStages', Array.from(showSignatureStages || []).join(',')); } catch (e) {}
+    try { localStorage.setItem('replayfile:showSignatureStages', Array.from(showSignatureStages || []).join(',')); } catch (e) { }
   }, [showSignatureStages]);
   useEffect(() => {
-    try { localStorage.setItem('replayfile:showNameStages', Array.from(showNameStages || []).join(',')); } catch (e) {}
+    try { localStorage.setItem('replayfile:showNameStages', Array.from(showNameStages || []).join(',')); } catch (e) { }
   }, [showNameStages]);
 
+  const hasPopulated = useRef(false);
+
   useEffect(() => {
-    setLeftContent(firstCourse1Note(meta) || '');
-    setS1Content((meta && meta.Course1Note) || '');
-    setCenterContent((meta && meta.centerNote) || '');
-    setRightContent((meta && meta.rightNote) || '');
-    setDeptContent((meta && meta.Course2Note) || '');
-    setContent3((meta && meta.Course3Note) || '');
-    setContent4((meta && meta.Course4Note) || '');
-    setContent5((meta && meta.Course5Note) || '');
-    setDeputyContent((meta && meta.Course3Note) || '');
-    setDeputyRightContent((meta && meta.Course4Note) || '');
-    setHeadOfficeContent((meta && meta.Course6Note) || '');
-    setDirectorContent((meta && meta.Course5Note) || '');
-    // skip autosave for the initial population
-    initialLoad.current = false;
+    if (!record) return;
+    if (!hasPopulated.current) {
+      setLeftContent(firstCourse1Note(meta) || '');
+      setS1Content((meta && meta.Course1Note) || '');
+      setCenterContent((meta && meta.centerNote) || '');
+      setRightContent((meta && meta.rightNote) || '');
+      setDeptContent((meta && meta.Course2Note) || '');
+      setContent3((meta && meta.Course3Note) || '');
+      setContent4((meta && meta.Course4Note) || '');
+      setContent5((meta && meta.Course5Note) || '');
+      setDeputyContent((meta && meta.Course3Note) || '');
+      setDeputyRightContent((meta && meta.Course4Note) || '');
+      setHeadOfficeContent((meta && meta.Course6Note) || '');
+      setDirectorContent((meta && meta.Course5Note) || '');
+      // skip autosave for the initial population
+      initialLoad.current = false;
+      hasPopulated.current = true;
+    }
+
     // set captured date from record if available
     if (record && record.date) {
       try {
@@ -346,7 +448,7 @@ export default function ReplayfilePage() {
             if (/T00:00:00(?:\.000)?(?:Z|\+00:00)?$/.test(rawDateStr)) isDateOnly = true;
             if (/^\d{4}-\d{2}-\d{2}$/.test(rawDateStr)) isDateOnly = true;
           }
-        } catch (e) {}
+        } catch (e) { }
 
         if (isDateOnly || (parsed.getHours && parsed.getHours() === 0 && parsed.getMinutes && parsed.getMinutes() === 0)) {
           const now = new Date();
@@ -364,7 +466,7 @@ export default function ReplayfilePage() {
                 if (/T00:00:00(?:\.000)?(?:Z|\+00:00)?$/.test(rawM)) isMetaDateOnly = true;
                 if (/^\d{4}-\d{2}-\d{2}$/.test(rawM)) isMetaDateOnly = true;
               }
-            } catch (e) {}
+            } catch (e) { }
             if (isMetaDateOnly || (m.getHours && m.getHours() === 0 && m.getMinutes && m.getMinutes() === 0)) {
               const now2 = new Date();
               m.setHours(now2.getHours(), now2.getMinutes(), now2.getSeconds());
@@ -399,7 +501,7 @@ export default function ReplayfilePage() {
         } catch (e) {
           // ignore — not all createdBy values map to signatures
         }
-      } catch (e) {}
+      } catch (e) { }
     })();
     return () => { mounted = false; };
   }, [record && record.createdBy, signaturesMap]);
@@ -421,7 +523,7 @@ export default function ReplayfilePage() {
           }
         }
         if (!url) return;
-        items.push({ name: name || (typeof a === 'string' ? a : (a && (a.name || a.filename || a.url)) ) || url, url });
+        items.push({ name: name || (typeof a === 'string' ? a : (a && (a.name || a.filename || a.url))) || url, url });
       } catch (e) {
         // ignore
       }
@@ -495,7 +597,7 @@ export default function ReplayfilePage() {
     // log for debugging
     try {
       console.debug('Replay: found attachment URLs', uniq.map(u => u.url));
-    } catch (e) {}
+    } catch (e) { }
 
     setRefUrls(uniq);
     setSelectedRef(uniq.length ? uniq[0].url : null);
@@ -745,83 +847,51 @@ export default function ReplayfilePage() {
     // Course6 is handled by Head of Office (`headOfficeContent`) autosave
   }, []);
 
+  const safeResize = (el) => {
+    if (!el) return;
+    const MIN_H = 24;
+    // Don't shrink while focused so Khmer IME composition isn't interrupted
+    if (document.activeElement !== el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.max(el.scrollHeight, MIN_H)}px`;
+    } else if (el.scrollHeight > el.clientHeight || el.style.height === 'auto' || el.style.height === '') {
+      el.style.height = `${Math.max(el.scrollHeight, MIN_H)}px`;
+    }
+  };
+
   // Adjust textarea height to fit content (auto-resize) for CourseNote textarea
   useEffect(() => {
-    const el = courseNoteRef.current;
-    if (!el) return undefined;
-    // reset then set to scrollHeight to accommodate shrink & grow
-    el.style.height = 'auto';
-    // keep a small minimum so the textarea initially shows ~1 line
-    const MIN_H = 24; // px ~ one line
-    const h = Math.max(el.scrollHeight, MIN_H);
-    el.style.height = `${h}px`;
-    return undefined;
+    safeResize(courseNoteRef.current);
   }, [leftContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
 
   // autosize for S1 textarea (Stage 1)
   useEffect(() => {
-    const el = s1TextareaRef.current;
-    if (!el) return undefined;
-    el.style.height = 'auto';
-    const MIN_H = 24;
-    const h = Math.max(el.scrollHeight, MIN_H);
-    el.style.height = `${h}px`;
-    return undefined;
+    safeResize(s1TextareaRef.current);
   }, [s1Content, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
 
   // autosize for department textarea
   useEffect(() => {
-    const el = deptTextareaRef.current;
-    if (!el) return undefined;
-    el.style.height = 'auto';
-    const MIN_H_D = 24;
-    const h = Math.max(el.scrollHeight, MIN_H_D);
-    el.style.height = `${h}px`;
-    return undefined;
+    safeResize(deptTextareaRef.current);
   }, [deptContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
 
   // autosize for deputy textarea
   useEffect(() => {
-    const el = deputyTextareaRef.current;
-    if (!el) return undefined;
-    el.style.height = 'auto';
-    const MIN_H_D = 24;
-    const h = Math.max(el.scrollHeight, MIN_H_D);
-    el.style.height = `${h}px`;
-    return undefined;
+    safeResize(deputyTextareaRef.current);
   }, [deputyContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
 
   // autosize for deputy-right textarea
   useEffect(() => {
-    const el = deputyRightTextareaRef.current;
-    if (!el) return undefined;
-    el.style.height = 'auto';
-    const MIN_H_D = 24;
-    const h = Math.max(el.scrollHeight, MIN_H_D);
-    el.style.height = `${h}px`;
-    return undefined;
+    safeResize(deputyRightTextareaRef.current);
   }, [deputyRightContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
 
   // autosize for director textarea
   useEffect(() => {
-    const el = directorTextareaRef.current;
-    if (!el) return undefined;
-    el.style.height = 'auto';
-    const MIN_H_D = 24;
-    const h = Math.max(el.scrollHeight, MIN_H_D);
-    el.style.height = `${h}px`;
-    return undefined;
+    safeResize(directorTextareaRef.current);
   }, [directorContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
 
   // autosize for head office textarea
   useEffect(() => {
-    const el = headOfficeTextareaRef.current;
-    if (!el) return undefined;
-    el.style.height = 'auto';
-    const MIN_H_D = 24;
-    const h = Math.max(el.scrollHeight, MIN_H_D);
-    el.style.height = `${h}px`;
-    return undefined;
+    safeResize(headOfficeTextareaRef.current);
   }, [headOfficeContent, record, uiFontSize, uiLineHeight, uiParaBefore, uiParaAfter]);
 
   const printPage = () => window.print();
@@ -908,7 +978,7 @@ export default function ReplayfilePage() {
       console.log('Print already in progress');
       return;
     }
-    
+
     setIsPrinting(true);
     try {
       const el = document.querySelector('.sheet');
@@ -976,9 +1046,9 @@ export default function ReplayfilePage() {
               n.dataset._printHidden = '1';
               n.style.visibility = 'hidden';
             }
-          } catch (e) {}
+          } catch (e) { }
         });
-      } catch (e) {}
+      } catch (e) { }
 
       let styleEl = document.getElementById('print-sheet-style');
       if (!styleEl) {
@@ -1151,12 +1221,12 @@ export default function ReplayfilePage() {
         document.body.appendChild(iframe);
 
         const cleanup = () => {
-          try { if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (e) {}
-          try { URL.revokeObjectURL(url); } catch (e) {}
+          try { if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (e) { }
+          try { URL.revokeObjectURL(url); } catch (e) { }
           window.removeEventListener('message', msgHandler);
         };
 
-        const msgHandler = () => {};
+        const msgHandler = () => { };
 
         // when iframe loads, print it
         iframe.onload = () => {
@@ -1287,15 +1357,18 @@ export default function ReplayfilePage() {
       const id = record._id || record.id;
       const now = new Date();
       const newMeta = { ...(meta || {}), CourseNote: leftContent, CourseDate: now.toISOString() };
-      const res = await updateFileTransfer(id, { meta: newMeta });
+      const nextHandler = computeNextHandlerName(newMeta);
+      const res = await updateFileTransfer(id, {
+        meta: newMeta,
+        handler: nextHandler,
+        current_handler: nextHandler
+      });
       // update local record with returned item if available
       const updated = (res && (res.item || res)) || null;
       if (updated) {
-        // some endpoints return { item: updated }
         setRecord(updated.item || updated);
       } else {
-        // fallback: update meta locally
-        setRecord(r => ({ ...(r || {}), meta: newMeta }));
+        setRecord(r => ({ ...(r || {}), meta: newMeta, handler: nextHandler, current_handler: nextHandler }));
       }
       setStageMessage('រក្សាទុកបានសម្រេច', stageKey);
       // set captured date to now on successful save
@@ -1334,7 +1407,7 @@ export default function ReplayfilePage() {
     }
 
   };
- 
+
   // save deputy note (Deputy director)
   const saveCourse3Note = async () => {
     if (!record) return;
@@ -1452,12 +1525,17 @@ export default function ReplayfilePage() {
       const id = record._id || record.id;
       const dateKey = metaKey.replace('Note', 'Date');
       const newMeta = { ...(meta || {}), [metaKey]: content, [dateKey]: new Date().toISOString() };
-      const res = await updateFileTransfer(id, { meta: newMeta });
+      const nextHandler = computeNextHandlerName(newMeta);
+      const res = await updateFileTransfer(id, {
+        meta: newMeta,
+        handler: nextHandler,
+        current_handler: nextHandler
+      });
       const updated = (res && (res.item || res)) || null;
       if (updated) {
         setRecord(updated.item || updated);
       } else {
-        setRecord(r => ({ ...(r || {}), meta: newMeta }));
+        setRecord(r => ({ ...(r || {}), meta: newMeta, handler: nextHandler, current_handler: nextHandler }));
       }
       setStageMessage('រក្សាទុកបានសម្រេច', stageKey);
       setCapturedDate(new Date());
@@ -1561,8 +1639,8 @@ export default function ReplayfilePage() {
   };
 
   // Khmer date formatting helpers
-  const KHMER_DIGITS = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
-  const KHMER_MONTHS = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
+  const KHMER_DIGITS = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
+  const KHMER_MONTHS = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
   const toKhmerDigits = (num) => {
     if (num === null || num === undefined) return '';
     const s = String(num);
@@ -1631,7 +1709,7 @@ export default function ReplayfilePage() {
         const now = new Date();
         d.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
       }
-    } catch (e) {}
+    } catch (e) { }
     return d;
   };
 
@@ -1649,7 +1727,7 @@ export default function ReplayfilePage() {
         try {
           const sig = signaturesMap && signaturesMap[cb];
           if (sig) return sig.fullNameKh || sig.fullName || sig.name || String(cb);
-        } catch (e) {}
+        } catch (e) { }
       }
       // next prefer explicit createdByName or reporterName in meta
       if (record.createdByName) return record.createdByName;
@@ -1678,7 +1756,7 @@ export default function ReplayfilePage() {
   };
 
   // recipient signature from feedbackStages.S1
-  
+
   const sigS = sigFor && sigFor('S');
   const sig1 = sigFor && sigFor('S1');
   const sig2 = sigFor && sigFor('S2');
@@ -1775,8 +1853,8 @@ export default function ReplayfilePage() {
     return () => {
       mounted = false;
       window.removeEventListener('resize', onResize);
-      try { if (ro) ro.disconnect(); } catch (e) {}
-      try { clearInterval(poll); } catch (e) {}
+      try { if (ro) ro.disconnect(); } catch (e) { }
+      try { clearInterval(poll); } catch (e) { }
     };
   }, [sheetRef, refPreviewWrapper, uiFontSize, uiLineHeight, uiPaddingTop, selectedRef]);
 
@@ -1902,7 +1980,7 @@ export default function ReplayfilePage() {
 
     return () => {
       mounted = false;
-      try { if (loadingTask && loadingTask.destroy) loadingTask.destroy(); } catch (e) {}
+      try { if (loadingTask && loadingTask.destroy) loadingTask.destroy(); } catch (e) { }
     };
   }, [selectedRef]);
 
@@ -1949,10 +2027,10 @@ export default function ReplayfilePage() {
         { key: 'S', variants: ['S'], metaKey: 'CourseNote', local: leftContent },
         { key: 'S1', variants: ['S1'], metaKey: 'Course1Note', local: s1Content },
         { key: 'S2', variants: ['S2'], metaKey: 'Course2Note', local: deptContent },
-        { key: 'S3', variants: ['SD','S3'], metaKey: 'Course3Note', local: deputyContent },
-        { key: 'S4', variants: ['SDR','S4'], metaKey: 'Course4Note', local: deputyRightContent },
-        { key: 'S5', variants: ['S5','DIR','SDIR'], metaKey: 'Course5Note', local: directorContent },
-        { key: 'S6', variants: ['S6','HO'], metaKey: 'Course6Note', local: headOfficeContent }
+        { key: 'S3', variants: ['SD', 'S3'], metaKey: 'Course3Note', local: deputyContent },
+        { key: 'S4', variants: ['SDR', 'S4'], metaKey: 'Course4Note', local: deputyRightContent },
+        { key: 'S5', variants: ['S5', 'DIR', 'SDIR'], metaKey: 'Course5Note', local: directorContent },
+        { key: 'S6', variants: ['S6', 'HO'], metaKey: 'Course6Note', local: headOfficeContent }
       ];
 
       const variantSelected = (variants) => {
@@ -1961,7 +2039,7 @@ export default function ReplayfilePage() {
             const raw = normalizedStages && normalizedStages[k];
             if (raw !== undefined && raw !== null && raw !== '') return true;
           }
-        } catch (e) {}
+        } catch (e) { }
         return false;
       };
 
@@ -1970,14 +2048,16 @@ export default function ReplayfilePage() {
           if (localVal && String(localVal).trim() !== '') return true;
           const v = meta && meta[metaKey];
           if (v && String(v).trim() !== '') return true;
-        } catch (e) {}
+          // treat as having a note if it's manually ticked
+          if (meta && meta[`${metaKey}_ticked`]) return true;
+        } catch (e) { }
         return false;
       };
 
       // present buckets are those that are assigned OR have a note
       const present = buckets.map(b => ({ bucket: b, present: variantSelected(b.variants) || localHasNote(b.metaKey, b.local) }))
-                           .filter(x => x.present)
-                           .map(x => x.bucket);
+        .filter(x => x.present)
+        .map(x => x.bucket);
 
       if (!present || present.length === 0) return new Set();
 
@@ -2042,18 +2122,22 @@ export default function ReplayfilePage() {
     } catch (e) { return new Set(); }
   }, [normalizedStages, leftContent, s1Content, deptContent, deputyContent, deputyRightContent, directorContent, headOfficeContent, signaturesMap, meta]);
 
-  // Stages that have actually sent feedback (note exists)
+  // Stages that have actually sent feedback (note exists or ticked)
   const stagesWithFeedback = useMemo(() => {
     try {
       const hasText = (v) => v !== null && v !== undefined && String(v).trim() !== '';
+      const isSet = (metaKey, localVal) => {
+        if (hasText(localVal) || hasText(meta && meta[metaKey])) return true;
+        return !!(meta && meta[`${metaKey}_ticked`]);
+      };
       const sent = new Set();
-      if (hasText(leftContent) || hasText(meta && meta.CourseNote)) sent.add('S');
-      if (hasText(s1Content) || hasText(meta && meta.Course1Note)) sent.add('S1');
-      if (hasText(deptContent) || hasText(meta && meta.Course2Note)) sent.add('S2');
-      if (hasText(deputyContent) || hasText(meta && meta.Course3Note)) sent.add('S3');
-      if (hasText(deputyRightContent) || hasText(meta && meta.Course4Note)) sent.add('S4');
-      if (hasText(directorContent) || hasText(meta && meta.Course5Note)) sent.add('S5');
-      if (hasText(headOfficeContent) || hasText(meta && meta.Course6Note)) sent.add('S6');
+      if (isSet('CourseNote', leftContent)) sent.add('S');
+      if (isSet('Course1Note', s1Content)) sent.add('S1');
+      if (isSet('Course2Note', deptContent)) sent.add('S2');
+      if (isSet('Course3Note', deputyContent)) sent.add('S3');
+      if (isSet('Course4Note', deputyRightContent)) sent.add('S4');
+      if (isSet('Course5Note', directorContent)) sent.add('S5');
+      if (isSet('Course6Note', headOfficeContent)) sent.add('S6');
       return sent;
     } catch (e) {
       return new Set();
@@ -2074,7 +2158,7 @@ export default function ReplayfilePage() {
   const waitingStageSender = useMemo(() => {
     try {
       if (!normalizedStages) return null;
-      const order = ['S','S1','S2','SD','SDR','S3','S4','S5','S6'];
+      const order = ['S', 'S1', 'S2', 'SD', 'SDR', 'S3', 'S4', 'S5', 'S6'];
       for (const k of order) {
         const raw = normalizedStages[k];
         if (!raw) continue;
@@ -2088,9 +2172,10 @@ export default function ReplayfilePage() {
         else if (metaKey === 'Course3Note') local = deputyContent || '';
         else if (metaKey === 'Course4Note') local = deputyRightContent || '';
         else if (metaKey === 'Course6Note') local = headOfficeContent || '';
-        else if (metaKey === 'Course6Note') local = directorContent || '';
+        else if (metaKey === 'Course5Note') local = directorContent || '';
 
-        if (String(metaVal || '').trim() === '' && String(local || '').trim() === '') {
+        const manuallyTicked = !!(meta && meta[`${metaKey}_ticked`]);
+        if (String(metaVal || '').trim() === '' && String(local || '').trim() === '' && !manuallyTicked) {
           // this stage is waiting for a note
           // if raw is object, try senderName
           if (typeof raw === 'object') {
@@ -2107,7 +2192,7 @@ export default function ReplayfilePage() {
           return `Stage ${k}`;
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return null;
   }, [normalizedStages, meta, leftContent, deptContent, deputyContent, deputyRightContent, directorContent, headOfficeContent, signaturesMap]);
 
@@ -2121,12 +2206,12 @@ export default function ReplayfilePage() {
 
   // helper: check whether the current logged-in user is the assigned sender for any of the given stage keys
   const isAssignedToStage = (keys) => {
-        // Admin users may edit all stages
-        try {
-          if (perms && perms.canEditDocuments) return true;
-        } catch (e) {
-          // ignore
-        }
+    // Admin users may edit all stages
+    try {
+      if (perms && perms.canEditDocuments) return true;
+    } catch (e) {
+      // ignore
+    }
     try {
       if (!normalizedStages || !currentUser) return false;
       const normalize = (v) => (v || '').toString().normalize ? v.toString().normalize('NFKD').replace(/\p{Diacritic}/gu, '') : (v || '').toString();
@@ -2158,7 +2243,7 @@ export default function ReplayfilePage() {
     return false;
   };
 
-  
+
   // When true, show placeholder stage boxes even if no stage assignments or notes exist
   // Set to false so placeholders only appear when feedback stages/notes exist
   // helper: check whether any of the stage dropdowns were actually selected
@@ -2186,14 +2271,14 @@ export default function ReplayfilePage() {
   const alwaysShowPlaceholders = false;
   // Only show blocks for stages that have saved notes — hide placeholders for empty/assigned-only stages
   // Show deputy left when either a note exists or the stage was selected/sent
-  const showDeputyLeft = hasNote('Course3Note', deputyContent) || stageSelected(['SD','S3']);
+  const showDeputyLeft = hasNote('Course3Note', deputyContent) || stageSelected(['SD', 'S3']);
 
   // Right deputy should be shown when it has a saved note or was selected
-  const showDeputyRight = hasNote('Course4Note', deputyRightContent) || stageSelected(['SDR','S4']);
+  const showDeputyRight = hasNote('Course4Note', deputyRightContent) || stageSelected(['SDR', 'S4']);
   // Show HeadOffice when Course6Note exists or S6 was selected
   const showHeadOffice = hasNote('Course6Note', headOfficeContent) || stageSelected(['S6']);
   // Show director block when Course5Note exists or director stage was selected
-  const showDirector = hasNote('Course5Note', directorContent) || stageSelected(['DIR','SDIR','S5']);
+  const showDirector = hasNote('Course5Note', directorContent) || stageSelected(['DIR', 'SDIR', 'S5']);
   // Show department head when Course2Note exists or S2 was selected
   const showDept = hasNote('Course2Note', deptContent) || stageSelected(['S2']);
 
@@ -2212,19 +2297,20 @@ export default function ReplayfilePage() {
     const deputyMessage = stageMessageFor('S3');
     const deputyRightMessage = stageMessageFor('S4');
     const leftJSX = (
-      <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
+      <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5, position: 'relative' }}>
+        {renderTickMarker('Course3Note')}
         <div style={{ padding: 1 }}>
-                      <div className="role-label" style={{ textAlign: 'center', marginTop: 2, fontFamily: 'Khmer OS Muol Light' }}>
-                        {(meta && meta.feedbackStageRoles && meta.feedbackStageRoles.s3) || getRoleLabel('s3')}
-                      </div>
-                      <textarea
-                        rows={1}
-                        ref={deputyTextareaRef}
-                        value={deputyContent}
-                        onChange={(e) => { setDeputyContent(e.target.value); clearStageMessage('S3'); }}
-                        placeholder="...................."
-                        style={{ width: '100%', height: 'auto', minHeight: '24px', lineHeight: uiLineHeight, textAlign: 'justify', margin: 0, padding: 5, resize: 'none', overflow: 'hidden', fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", boxSizing: 'border-box', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', textIndent: '30px' }} disabled={!isAssignedToStage(['SD','S3'])} />
-            <div style={{ textAlign: 'center', marginTop: 0 }}>
+          <div className="role-label" style={{ textAlign: 'center', marginTop: 2, fontFamily: 'Khmer OS Muol Light' }}>
+            {(meta && meta.feedbackStageRoles && meta.feedbackStageRoles.s3) || getRoleLabel('s3')}
+          </div>
+          <textarea
+            rows={1}
+            ref={deputyTextareaRef}
+            value={deputyContent}
+            onChange={(e) => { setDeputyContent(e.target.value); clearStageMessage('S3'); }}
+            placeholder="...................."
+            style={{ width: '100%', height: 'auto', minHeight: '24px', lineHeight: uiLineHeight, textAlign: 'justify', margin: 0, padding: 5, resize: 'none', overflow: 'hidden', fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", boxSizing: 'border-box', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', textIndent: '30px' }} disabled={!isAssignedToStage(['SD', 'S3'])} />
+          <div style={{ textAlign: 'center', marginTop: 0 }}>
             {hasDeputy ? (
               <>
                 {showDoAtStages && showDoAtStages.has('S3') ? (
@@ -2238,7 +2324,7 @@ export default function ReplayfilePage() {
               </>
             ) : null}
             {(showNameStages && showNameStages.has('S3')) ? (
-              <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['SD','S3']) || ''}</div>
+              <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['SD', 'S3']) || ''}</div>
             ) : null}
           </div>
           {/* --- Telegram Feedback Section --- */}
@@ -2305,7 +2391,8 @@ export default function ReplayfilePage() {
     );
 
     const rightJSX = (
-      <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
+      <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5, position: 'relative' }}>
+        {renderTickMarker('Course4Note')}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, padding: 1 }}>
           <div>
             <div className="role-label" style={{ textAlign: 'center', marginTop: 2, fontFamily: 'Khmer OS Muol Light' }}>{(meta && meta.feedbackStageRoles && meta.feedbackStageRoles.s4) || getRoleLabel('s4')}</div>
@@ -2315,25 +2402,27 @@ export default function ReplayfilePage() {
               value={deputyRightContent}
               onChange={(e) => { setDeputyRightContent(e.target.value); clearStageMessage('S4'); }}
               placeholder="...................."
-              style={{ width: '100%', 
-                height: 'auto', 
-                minHeight: '24px', 
-                lineHeight: uiLineHeight, 
-                textAlign: 'justify', 
-                margin: 0, 
-                padding: 5, 
-                resize: 'none', 
-                overflow: 'hidden', 
-                fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", 
-                boxSizing: 'border-box', 
-                whiteSpace: 'pre-wrap', 
-                overflowWrap: 'anywhere', 
-                wordBreak: 'break-word', 
-                textIndent: '30px' }}
-              disabled={!isAssignedToStage(['SDR','S4'])}
+              style={{
+                width: '100%',
+                height: 'auto',
+                minHeight: '24px',
+                lineHeight: uiLineHeight,
+                textAlign: 'justify',
+                margin: 0,
+                padding: 5,
+                resize: 'none',
+                overflow: 'hidden',
+                fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                boxSizing: 'border-box',
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'anywhere',
+                wordBreak: 'break-word',
+                textIndent: '30px'
+              }}
+              disabled={!isAssignedToStage(['SDR', 'S4'])}
             />
-                <div style={{ textAlign: 'center', marginTop: 0 }}>
-                {hasDeputyRight ? (
+            <div style={{ textAlign: 'center', marginTop: 0 }}>
+              {hasDeputyRight ? (
                 <>
                   {showDoAtStages && showDoAtStages.has('S4') ? (
                     <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course4Date') || capturedDate)}</div>
@@ -2346,7 +2435,7 @@ export default function ReplayfilePage() {
                 </>
               ) : null}
               {(showNameStages && showNameStages.has('S4')) ? (
-                <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['SDR','S4','S3']) || ''}</div>
+                <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['SDR', 'S4', 'S3']) || ''}</div>
               ) : null}
             </div>
           </div>
@@ -2374,7 +2463,7 @@ export default function ReplayfilePage() {
       </div>
     );
 
-    
+
 
     if (leftVisible && rightVisible) {
       // When director isn't present but both deputy left (S3/SD) and deputy right (SDR/S4)
@@ -2442,7 +2531,7 @@ export default function ReplayfilePage() {
             const nodes = Array.from(document.querySelectorAll(s));
             for (const n of nodes) {
               // save original display so we can restore
-              try { n.dataset.__replayOrigDisplay = (n.style && n.style.display) ? n.style.display : ''; } catch (e) {}
+              try { n.dataset.__replayOrigDisplay = (n.style && n.style.display) ? n.style.display : ''; } catch (e) { }
               try { n.style.setProperty('display', 'none', 'important'); } catch (e) { n.style.display = 'none'; }
               added.push(n);
             }
@@ -2457,15 +2546,15 @@ export default function ReplayfilePage() {
       try {
         const contentCandidates = Array.from(document.querySelectorAll('.ant-layout-content, .main-content, .content, .site-layout-content, .app-root'));
         for (const c of contentCandidates) {
-          try { c.dataset.__replayOrigPaddingLeft = c.style && c.style.paddingLeft ? c.style.paddingLeft : ''; } catch (e) {}
+          try { c.dataset.__replayOrigPaddingLeft = c.style && c.style.paddingLeft ? c.style.paddingLeft : ''; } catch (e) { }
           try { c.style.setProperty('padding-left', '0px', 'important'); } catch (e) { c.style.paddingLeft = '0px'; }
-          try { c.dataset.__replayOrigMarginLeft = c.style && c.style.marginLeft ? c.style.marginLeft : ''; } catch (e) {}
+          try { c.dataset.__replayOrigMarginLeft = c.style && c.style.marginLeft ? c.style.marginLeft : ''; } catch (e) { }
           try { c.style.setProperty('margin-left', '0px', 'important'); } catch (e) { c.style.marginLeft = '0px'; }
           added.push(c);
         }
-      } catch (e) {}
+      } catch (e) { }
 
-    } catch (e) {}
+    } catch (e) { }
 
     return () => {
       try {
@@ -2486,10 +2575,10 @@ export default function ReplayfilePage() {
                 delete n.dataset.__replayOrigMarginLeft;
               }
             }
-          } catch (e) {}
+          } catch (e) { }
         }
-      } catch (e) {}
-      try { document && document.body && document.body.classList && document.body.classList.remove('replay-hide-sidebar'); } catch (e) {}
+      } catch (e) { }
+      try { document && document.body && document.body.classList && document.body.classList.remove('replay-hide-sidebar'); } catch (e) { }
     };
   }, []);
 
@@ -2568,14 +2657,14 @@ export default function ReplayfilePage() {
               {'ផ្ញើមតិ'}
             </button>
           ) : null}
-          <button 
-            onClick={printSheetDirect} 
+          <button
+            onClick={printSheetDirect}
             disabled={isPrinting}
-            style={{ 
-              padding: '6px 10px', 
-              background: isPrinting ? '#9ca3af' : '#4f46e5', 
-              color: '#fff', 
-              borderRadius: 4, 
+            style={{
+              padding: '6px 10px',
+              background: isPrinting ? '#9ca3af' : '#4f46e5',
+              color: '#fff',
+              borderRadius: 4,
               marginRight: 100,
               cursor: isPrinting ? 'not-allowed' : 'pointer',
               opacity: isPrinting ? 0.6 : 1
@@ -2676,384 +2765,446 @@ export default function ReplayfilePage() {
         <div style={{ position: 'relative', display: 'flex', gap: 12, alignItems: 'flex-start', width: '100%', justifyContent: 'center', paddingTop: 16, paddingLeft: 24, paddingRight: 24, background: '#646a6dff', flexWrap: 'wrap', overflowX: 'auto' }}>
           <div className="sheet" ref={sheetRef} style={{ width: '210mm', minWidth: '210mm', height: '297mm', flexShrink: 0, margin: '24px 12px 24px 24px', background: '#fff', boxShadow: '0 6px 6px rgba(179, 159, 159, 0.12)', boxSizing: 'border-box', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
             <div className="page" style={{ padding: '10mm', fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", color: '#000', height: '100%', overflow: 'auto', boxSizing: 'border-box' }}>
-            <div style={{ textAlign: 'center', fontWeight: 300, marginBottom: 6, fontFamily:'Khmer OS Muol Light', fontSize: 18 }}>
-              ព្រះរាជាណាចក្រកម្ពុជា
-            </div>
+              <div style={{ textAlign: 'center', fontWeight: 300, marginBottom: 6, fontFamily: 'Khmer OS Muol Light', fontSize: 18 }}>
+                ព្រះរាជាណាចក្រកម្ពុជា
+              </div>
 
-            <div style={{ textAlign: 'center', fontWeight: 300, marginBottom: 5, fontFamily:'Khmer OS Muol Light', fontSize: 1}}>
-              ជាតិ សាសនា ព្រះមហាក្សត្រ
-            </div>
+              <div style={{ textAlign: 'center', fontWeight: 300, marginBottom: 5, fontFamily: 'Khmer OS Muol Light', fontSize: 1 }}>
+                ជាតិ សាសនា ព្រះមហាក្សត្រ
+              </div>
 
-            <div style={{ position: 'relative', textAlign: 'center', margin: '10px 0' }}>
-              {true ? (
-                <img
-                  src={logo3} // or a URL like `${API_BASE}${signature.filePath}`
-                  alt=""
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: 100,
-                    height: 'auto',
-                    opacity: 98,
-                    pointerEvents: 'none',
-                    zIndex: 1
-                  }}
-                />
-              ) : null}
-            </div>
+              <div style={{ position: 'relative', textAlign: 'center', margin: '10px 0' }}>
+                {true ? (
+                  <img
+                    src={logo3} // or a URL like `${API_BASE}${signature.filePath}`
+                    alt=""
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: 100,
+                      height: 'auto',
+                      opacity: 98,
+                      pointerEvents: 'none',
+                      zIndex: 1
+                    }}
+                  />
+                ) : null}
+              </div>
 
-            <div style={{ textAlign: 'left', padding: '0mm 0', fontFamily:'Khmer OS Muol Light', fontSize: 16 }}>
-              ក្រសួងសុខាភិបាល
-            </div>
+              <div style={{ textAlign: 'left', padding: '0mm 0', fontFamily: 'Khmer OS Muol Light', fontSize: 16 }}>
+                ក្រសួងសុខាភិបាល
+              </div>
 
-            <div style={{ textAlign: 'left', padding: '1mm 0', fontFamily:'Khmer OS Muol Light', fontSize: 15 }}>
-              មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត
-            </div>
+              <div style={{ textAlign: 'left', padding: '1mm 0', fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>
+                មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត
+              </div>
 
-            <div style={{ textAlign: 'center', fontFamily:'Khmer OS Muol Light', fontSize: 15, marginTop: 0 }}>
-              កំណត់បង្ហាញ
-            </div>
-            
-                
+              <div style={{ textAlign: 'center', fontFamily: 'Khmer OS Muol Light', fontSize: 15, marginTop: 0 }}>
+                កំណត់បង្ហាញ
+              </div>
+
+
               <div className="field" style={{ marginTop: 5, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
-              <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>លេខលិខិតចូល:</span>
-              <span className="value" style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ lineHeight: 1 }}>{record?.entryNo ? toKhmerDigits(record.entryNo) : ''} ម.ម.ខ.ស</div>
-                  <div style={{ fontSize: 14, color: '#000' }}>{(() => {
-                    const raw = (record && (record.entryDate || record.date)) || capturedDate;
-                    if (!raw) return '';
-                    const entryTime = (record && (record.entryTime || record.entry_time)) || '';
-                    const dt = applyEntryTime(parsePreferLocalTime(raw, entryTime), entryTime);
-                    return `ចុះ ${formatKhmerDateTime(dt)}`;
-                  })()}</div>
-                </div>
-              </span>
-            </div>
-            {showLetterNo ? (
-              <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
-                <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>លិខិតលេខ:</span>
+                <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>លេខលិខិតចូល:</span>
                 <span className="value" style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div>{record?.letterNo ? toKhmerDigits(record.letterNo) : ''}</div>
-                    <div style={{ fontSize: 12, color: '#070707ff' }}>{(() => {
-                      const raw = (record && record.date) || capturedDate;
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ lineHeight: 1 }}>{record?.entryNo ? toKhmerDigits(record.entryNo) : ''} ម.ម.ខ.ស</div>
+                    <div style={{ fontSize: 14, color: '#000' }}>{(() => {
+                      const raw = (record && (record.entryDate || record.date)) || capturedDate;
                       if (!raw) return '';
-                      const dt = (raw instanceof Date) ? raw : new Date(raw);
-                      return `ចុះ ${formatKhmerDate(dt)}`;
+                      const entryTime = (record && (record.entryTime || record.entry_time)) || '';
+                      const dt = applyEntryTime(parsePreferLocalTime(raw, entryTime), entryTime);
+                      return `ចុះ ${formatKhmerDateTime(dt)}`;
                     })()}</div>
                   </div>
                 </span>
               </div>
-            ) : null}
-            <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
-              <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>មកពី:</span>
-              <span className="value" style={{ flex: 1 }}>{record?.source || ''}</span>
-            </div>
-
-            <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
-              <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>កម្មវត្ថុ:</span>
-              <span className="value-plain" style={{ flex: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{record?.content || ''}</span>
-            </div>
-
-           
-
-            {showCreatorName ? (
+              {showLetterNo ? (
+                <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
+                  <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>លិខិតលេខ:</span>
+                  <span className="value" style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div>{record?.letterNo ? toKhmerDigits(record.letterNo) : ''}</div>
+                      <div style={{ fontSize: 12, color: '#070707ff' }}>{(() => {
+                        const raw = (record && record.date) || capturedDate;
+                        if (!raw) return '';
+                        const dt = (raw instanceof Date) ? raw : new Date(raw);
+                        return `ចុះ ${formatKhmerDate(dt)}`;
+                      })()}</div>
+                    </div>
+                  </span>
+                </div>
+              ) : null}
               <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
-                <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>បញ្ចូលលិខិតដោយ:</span>
-                <span className="value" style={{ flex: 1 }}>{record?.creatorName || ''}</span>
+                <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>មកពី:</span>
+                <span className="value" style={{ flex: 1 }}>{record?.source || ''}</span>
               </div>
-            ) : null}
 
-           
+              <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
+                <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>កម្មវត្ថុ:</span>
+                <span className="value-plain" style={{ flex: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{record?.content || ''}</span>
+              </div>
 
-            {visibleStages && visibleStages.has('S') && (
-              <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '50fr', gap: 12 }}>
-                  <div style={{ padding: 1 }}>
-                   <div className="role-label" style={{ textAlign: 'center', marginTop: 2, fontFamily: 'Khmer OS Muol Light', fontSize: 10 }}>
-                      {(meta && meta.feedbackStageRoles && meta.feedbackStageRoles.s) || getRoleLabel('s') || (meta && meta.reporterName)}
-                    </div>
-                    <textarea
-                      rows={1}
-                      ref={courseNoteRef}
-                      value={leftContent}
-                      onChange={(e) => { setLeftContent(e.target.value); clearStageMessage('S'); }}
-                      placeholder="...................."
-                      disabled={!isAssignedToStage(['S'])}
-                      style={{
-                        width: '100%',
-                        height: 'auto',
-                        minHeight: '24px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'justify',
-                        margin: 0,
-                        padding: 5,
-                        resize: 'none',
-                        overflow: 'hidden',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
-                      }}
-                    />
 
-                    <div style={{ textAlign: 'center', marginTop: 0 }}>
-                      {hasCourseNote ? (
-                        <>
-                          {showDoAtStages && showDoAtStages.has('S') ? (
-                            <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('CourseDate') || capturedDate)}</div>
-                          ) : null}
-                          {(showSignatureStages && showSignatureStages.has('S') && sigSUrl) ? (
-                            <div style={{ marginTop: 0 }}>
-                              <img src={sigSUrl} alt="sig-s" style={{ maxWidth: 100, maxHeight: 80, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
-                            </div>
-                          ) : null}
-                        </>
-                      ) : null}
-                      {(showNameStages && showNameStages.has('S')) ? (
-                      <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>
-                          {(() => {
-                          try {
-                            // If S already has a CourseNote, prefer the actual S sender
-                            // and do not attempt to resolve other stage keys from the
-                            // waitingStageSender text. This prevents showing a different
-                            // stage's name when S has a comment/signature.
-                            if (hasCourseNote) {
-                              return (getStageSenderName('S') || '').toString();
-                            }
 
-                            if (waitingStageSender) {
-                              const s = String(waitingStageSender || '');
-                              // try to extract stage key in parentheses like "Name (S3)"
-                              const m = s.match(/\(([^)]+)\)\s*$/);
-                              if (m && m[1]) {
-                                const key = m[1].trim();
-                                // prefer the signature fullNameKh for that stage when available
-                                try {
-                                  const rawStage = normalizedStages && normalizedStages[key];
-                                  const id = resolveStageId(rawStage);
-                                  if (id && signaturesMap && signaturesMap[id]) {
-                                    const sig = signaturesMap[id];
-                                    return (sig && (sig.fullNameKh || sig.fullName || sig.name)) || (getRoleLabel(key) || s.replace(/\s*\([^)]+\)\s*$/, '').trim());
-                                  }
-                                } catch (e) {}
-                                const label = getRoleLabel(key);
-                                if (label) return label;
-                              }
-                              // if waitingStageSender itself is (or contains) a stage key, try that
-                              const keyOnly = (s.match(/(S\d|S|SDR|SD|DIR|SDIR|HO)/i) || [])[0];
-                              if (keyOnly) {
-                                try {
-                                  const rawStage = normalizedStages && normalizedStages[keyOnly];
-                                  const id = resolveStageId(rawStage);
-                                  if (id && signaturesMap && signaturesMap[id]) {
-                                    const sig = signaturesMap[id];
-                                    return (sig && (sig.fullNameKh || sig.fullName || sig.name)) || (getRoleLabel(keyOnly) || keyOnly);
-                                  }
-                                } catch (e) {}
-                                const label = getRoleLabel(keyOnly);
-                                if (label) return label;
-                              }
-                              // otherwise return the name portion without the trailing "(S)" part
-                              return s.replace(/\s*\([^)]+\)\s*$/, '').trim();
-                            }
-                          } catch (e) {}
-                          return getStageSenderName('S') || '';
-                        })()}
-                      </div>
-                      ) : null}
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: hasCourseNote ? 'space-between' : 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
-                      <div style={{ color: stageMessageFor('S') ? '#0b6623' : '#e53333ff', minHeight: 0 }}>{stageMessageFor('S')}</div>
-                      {/* In-sheet Send Feedback button removed; toolbar and print-only buttons used instead */}
-                    </div>
-                  </div>
+              {showCreatorName ? (
+                <div className="field" style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 0 }}>
+                  <span className="label" style={{ width: 140, minWidth: 140, fontFamily: 'Khmer OS Muol Light', fontSize: 15 }}>បញ្ចូលលិខិតដោយ:</span>
+                  <span className="value" style={{ flex: 1 }}>{record?.creatorName || ''}</span>
                 </div>
+              ) : null}
 
-              </div>
-            )}
 
-            
-            <div style={{ marginTop: '0mm' }} />
 
-            {/* Stage 1 (S1) - Office box: show when S1 assigned or has a value */}
-            {visibleStages && visibleStages.has('S1') && (
-              <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-                  <div style={{ padding: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 }}>
-                      <div className="role-label" style={{ textAlign: 'center', fontFamily: 'Khmer OS Muol Light', flex: 1 }}>{getRoleLabel('S1')}</div>
-                    </div>
-                    <textarea
-                      rows={1}
-                      ref={s1TextareaRef}
-                      value={s1Content}
-                      onChange={(e) => { setS1Content(e.target.value); clearStageMessage('S1'); }}
-                      placeholder="...................."
-                      disabled={!isAssignedToStage(['S1'])}
-                      style={{
-                        width: '100%',
-                        height: 'auto',
-                        minHeight: '24px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'justify',
-                        margin: 0,
-                        padding: 5,
-                        resize: 'none',
-                        overflow: 'hidden',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
-                      }}
-                    />
-
-                    <div style={{ textAlign: 'center', marginTop: 0 }}>
-                      {hasCourse1Note ? (
-                        <>
-                              {showDoAtStages && showDoAtStages.has('S1') ? (
-                                <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course1Date') || capturedDate)}</div>
-                              ) : null}
-                          {(showSignatureStages && showSignatureStages.has('S1') && sig1Url) ? (
-                            <div style={{ marginTop: 0 }}>
-                              <img src={sig1Url} alt="sig-s1" style={{ maxWidth: 120, maxHeight: 80, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
-                            </div>
-                          ) : null}
-                        </>
-                      ) : null}
-
-                      {(showNameStages && showNameStages.has('S1')) ? (
-                        <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName('S1') || waitingStageSender || ''}</div>
-                      ) : null}
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: hasCourse1Note ? 'space-between' : 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
-                      <div style={{ color: stageMessageFor('S1') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S1')}</div>
-                      {/* in-sheet send button removed; use toolbar/print-only controls instead */}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {/* Department Head block similar UI to the recipient block */}
-            {/** Department head note block: textarea + signature/date like Course1Note */}
-            {visibleStages && visibleStages.has('S2') && (
-              <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-                  <div style={{ padding: 1 }}>
-                    <div className="role-s2 role-label" style={{ textAlign: 'center', marginTop: 5, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S2')}</div>
-                    <textarea
-                      rows={1}
-                      ref={deptTextareaRef}
-                      value={deptContent}
-                      onChange={(e) => { setDeptContent(e.target.value); clearStageMessage('S2'); }}
-                      placeholder="...................."
-                      disabled={!isAssignedToStage(['S2'])}
-                      style={{
-                        width: '100%',
-                        height: 'auto',
-                        minHeight: '24px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'justify',
-                        margin: 0,
-                        padding: 5,
-                        resize: 'none',
-                        overflow: 'hidden',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
-                      }}
-                    />
-
-                    <div style={{ textAlign: 'center', marginTop: 0 }}>
-                      {hasDeptNote ? (
-                        <>
-                          {showDoAtStages && showDoAtStages.has('S2') ? (
-                            <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course2Date') || capturedDate)}</div>
-                          ) : null}
-                          {(showSignatureStages && showSignatureStages.has('S2') && sig2Url) ? (
-                            <div style={{ marginTop: 6 }}>
-                              <img src={sig2Url} alt="sig-head" style={{ maxWidth: 120, maxHeight: 60, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
-                            </div>
-                          ) : null}
-                        </>
-                      ) : null}
-                      {(showNameStages && showNameStages.has('S2')) ? (
-                        <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 5, fontWeight: 100 }}>{getStageSenderName('S2') || ''}</div>
-                      ) : null}
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: hasDeptNote ? 'space-between' : 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
-                      <div style={{ color: stageMessageFor('S2') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S2')}</div>
-                      {/* in-sheet send button removed; use toolbar/print-only controls instead */}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          
-            {/* Stage area end — Deputy Director block matching recipient UI វគ្គទី4 ទី5 */}
-            {(visibleStages && (visibleStages.has('S3') || visibleStages.has('S4'))) ? deputyBlock : null}
-
-            {visibleStages && visibleStages.has('S5') && (
-              (visibleStages && visibleStages.has('S4')) ? (
-                // Side-by-side S4 (deputy right) and S5 (director)
-                <div style={{ marginTop: 5, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div style={{ border: '1px dashed #161616ff', padding: 5 }}>
+              {visibleStages && visibleStages.has('S') && (
+                <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5, position: 'relative' }}>
+                  {renderTickMarker('CourseNote')}
+                  <div style={{ display: 'grid', gridTemplateColumns: '50fr', gap: 12 }}>
                     <div style={{ padding: 1 }}>
-                      <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S4')}</div>
-                      <textarea rows={1} ref={deputyRightTextareaRef} value={deputyRightContent} onChange={(e) => { setDeputyRightContent(e.target.value); clearStageMessage('S4'); }}
-                        placeholder="...................." style={{ width: '100%', height: 'auto', minHeight: '24px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'justify',
-                        margin: 0,
-                        padding: 5,
-                        resize: 'none',
-                        overflow: 'hidden',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
-                    }}
-                       disabled={!isAssignedToStage(['SDR','S4'])} />
+                      <div className="role-label" style={{ textAlign: 'center', marginTop: 2, fontFamily: 'Khmer OS Muol Light', fontSize: 10 }}>
+                        {(meta && meta.feedbackStageRoles && meta.feedbackStageRoles.s) || getRoleLabel('s') || (meta && meta.reporterName)}
+                      </div>
+                      <textarea
+                        rows={1}
+                        ref={courseNoteRef}
+                        value={leftContent}
+                        onChange={(e) => { setLeftContent(e.target.value); clearStageMessage('S'); }}
+                        placeholder="...................."
+                        disabled={!isAssignedToStage(['S'])}
+                        style={{
+                          width: '100%',
+                          height: 'auto',
+                          minHeight: '24px',
+                          lineHeight: uiLineHeight,
+                          textAlign: 'justify',
+                          margin: 0,
+                          padding: 5,
+                          resize: 'none',
+                          overflow: 'hidden',
+                          fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                          boxSizing: 'border-box',
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          textIndent: '30px'
+                        }}
+                      />
+
                       <div style={{ textAlign: 'center', marginTop: 0 }}>
-                        {hasDeputyRight ? (
+                        {hasCourseNote ? (
                           <>
-                            {showDoAtStages && showDoAtStages.has('S4') ? (
-                              <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course4Date') || capturedDate)}</div>
+                            {showDoAtStages && showDoAtStages.has('S') ? (
+                              <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('CourseDate') || capturedDate)}</div>
                             ) : null}
-                            {(showSignatureStages && showSignatureStages.has('S4') && sigDeputyRightUrl) ? (
+                            {(showSignatureStages && showSignatureStages.has('S') && sigSUrl) ? (
                               <div style={{ marginTop: 0 }}>
-                                <img src={sigDeputyRightUrl} alt="sig-deputy-right" style={{ maxWidth: 100,maxHeight: 80, objectFit: 'contain',display: 'block',margin: '0 auto' }} />
+                                <img src={sigSUrl} alt="sig-s" style={{ maxWidth: 100, maxHeight: 80, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
                               </div>
                             ) : null}
                           </>
                         ) : null}
-                        {(showNameStages && showNameStages.has('S4')) ? (
-                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", 
-                            marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['SDR','S4','S3']) || ''}</div>
+                        {(showNameStages && showNameStages.has('S')) ? (
+                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>
+                            {(() => {
+                              try {
+                                // If S already has a CourseNote, prefer the actual S sender
+                                // and do not attempt to resolve other stage keys from the
+                                // waitingStageSender text. This prevents showing a different
+                                // stage's name when S has a comment/signature.
+                                if (hasCourseNote) {
+                                  return (getStageSenderName('S') || '').toString();
+                                }
+
+                                if (waitingStageSender) {
+                                  const s = String(waitingStageSender || '');
+                                  // try to extract stage key in parentheses like "Name (S3)"
+                                  const m = s.match(/\(([^)]+)\)\s*$/);
+                                  if (m && m[1]) {
+                                    const key = m[1].trim();
+                                    // prefer the signature fullNameKh for that stage when available
+                                    try {
+                                      const rawStage = normalizedStages && normalizedStages[key];
+                                      const id = resolveStageId(rawStage);
+                                      if (id && signaturesMap && signaturesMap[id]) {
+                                        const sig = signaturesMap[id];
+                                        return (sig && (sig.fullNameKh || sig.fullName || sig.name)) || (getRoleLabel(key) || s.replace(/\s*\([^)]+\)\s*$/, '').trim());
+                                      }
+                                    } catch (e) { }
+                                    const label = getRoleLabel(key);
+                                    if (label) return label;
+                                  }
+                                  // if waitingStageSender itself is (or contains) a stage key, try that
+                                  const keyOnly = (s.match(/(S\d|S|SDR|SD|DIR|SDIR|HO)/i) || [])[0];
+                                  if (keyOnly) {
+                                    try {
+                                      const rawStage = normalizedStages && normalizedStages[keyOnly];
+                                      const id = resolveStageId(rawStage);
+                                      if (id && signaturesMap && signaturesMap[id]) {
+                                        const sig = signaturesMap[id];
+                                        return (sig && (sig.fullNameKh || sig.fullName || sig.name)) || (getRoleLabel(keyOnly) || keyOnly);
+                                      }
+                                    } catch (e) { }
+                                    const label = getRoleLabel(keyOnly);
+                                    if (label) return label;
+                                  }
+                                  // otherwise return the name portion without the trailing "(S)" part
+                                  return s.replace(/\s*\([^)]+\)\s*$/, '').trim();
+                                }
+                              } catch (e) { }
+                              return getStageSenderName('S') || '';
+                            })()}
+                          </div>
                         ) : null}
                       </div>
+
+                      <div style={{ display: 'flex', justifyContent: hasCourseNote ? 'space-between' : 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
+                        <div style={{ color: stageMessageFor('S') ? '#0b6623' : '#e53333ff', minHeight: 0 }}>{stageMessageFor('S')}</div>
+                        {/* In-sheet Send Feedback button removed; toolbar and print-only buttons used instead */}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+
+              <div style={{ marginTop: '0mm' }} />
+
+              {/* Stage 1 (S1) - Office box: show when S1 assigned or has a value */}
+              {visibleStages && visibleStages.has('S1') && (
+                <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5, position: 'relative' }}>
+                  {renderTickMarker('Course1Note')}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                    <div style={{ padding: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 }}>
+                        <div className="role-label" style={{ textAlign: 'center', fontFamily: 'Khmer OS Muol Light', flex: 1 }}>{getRoleLabel('S1')}</div>
+                      </div>
+                      <textarea
+                        rows={1}
+                        ref={s1TextareaRef}
+                        value={s1Content}
+                        onChange={(e) => { setS1Content(e.target.value); clearStageMessage('S1'); }}
+                        placeholder="...................."
+                        disabled={!isAssignedToStage(['S1'])}
+                        style={{
+                          width: '100%',
+                          height: 'auto',
+                          minHeight: '24px',
+                          lineHeight: uiLineHeight,
+                          textAlign: 'justify',
+                          margin: 0,
+                          padding: 5,
+                          resize: 'none',
+                          overflow: 'hidden',
+                          fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                          boxSizing: 'border-box',
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          textIndent: '30px'
+                        }}
+                      />
+
+                      <div style={{ textAlign: 'center', marginTop: 0 }}>
+                        {hasCourse1Note ? (
+                          <>
+                            {showDoAtStages && showDoAtStages.has('S1') ? (
+                              <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course1Date') || capturedDate)}</div>
+                            ) : null}
+                            {(showSignatureStages && showSignatureStages.has('S1') && sig1Url) ? (
+                              <div style={{ marginTop: 0 }}>
+                                <img src={sig1Url} alt="sig-s1" style={{ maxWidth: 120, maxHeight: 80, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                              </div>
+                            ) : null}
+                          </>
+                        ) : null}
+
+                        {(showNameStages && showNameStages.has('S1')) ? (
+                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName('S1') || waitingStageSender || ''}</div>
+                        ) : null}
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: hasCourse1Note ? 'space-between' : 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
+                        <div style={{ color: stageMessageFor('S1') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S1')}</div>
+                        {/* in-sheet send button removed; use toolbar/print-only controls instead */}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Department Head block similar UI to the recipient block */}
+              {/** Department head note block: textarea + signature/date like Course1Note */}
+              {visibleStages && visibleStages.has('S2') && (
+                <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5, position: 'relative' }}>
+                  {renderTickMarker('Course2Note')}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                    <div style={{ padding: 1 }}>
+                      <div className="role-s2 role-label" style={{ textAlign: 'center', marginTop: 5, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S2')}</div>
+                      <textarea
+                        rows={1}
+                        ref={deptTextareaRef}
+                        value={deptContent}
+                        onChange={(e) => { setDeptContent(e.target.value); clearStageMessage('S2'); }}
+                        placeholder="...................."
+                        disabled={!isAssignedToStage(['S2'])}
+                        style={{
+                          width: '100%',
+                          height: 'auto',
+                          minHeight: '24px',
+                          lineHeight: uiLineHeight,
+                          textAlign: 'justify',
+                          margin: 0,
+                          padding: 5,
+                          resize: 'none',
+                          overflow: 'hidden',
+                          fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                          boxSizing: 'border-box',
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          textIndent: '30px'
+                        }}
+                      />
+
+                      <div style={{ textAlign: 'center', marginTop: 0 }}>
+                        {hasDeptNote ? (
+                          <>
+                            {showDoAtStages && showDoAtStages.has('S2') ? (
+                              <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course2Date') || capturedDate)}</div>
+                            ) : null}
+                            {(showSignatureStages && showSignatureStages.has('S2') && sig2Url) ? (
+                              <div style={{ marginTop: 6 }}>
+                                <img src={sig2Url} alt="sig-head" style={{ maxWidth: 120, maxHeight: 60, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                              </div>
+                            ) : null}
+                          </>
+                        ) : null}
+                        {(showNameStages && showNameStages.has('S2')) ? (
+                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 5, fontWeight: 100 }}>{getStageSenderName('S2') || ''}</div>
+                        ) : null}
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: hasDeptNote ? 'space-between' : 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
+                        <div style={{ color: stageMessageFor('S2') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S2')}</div>
+                        {/* in-sheet send button removed; use toolbar/print-only controls instead */}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Stage area end — Deputy Director block matching recipient UI វគ្គទី4 ទី5 */}
+              {(visibleStages && (visibleStages.has('S3') || visibleStages.has('S4'))) ? deputyBlock : null}
+
+              {visibleStages && visibleStages.has('S5') && (
+                (visibleStages && visibleStages.has('S4')) ? (
+                  // Side-by-side S4 (deputy right) and S5 (director)
+                  <div style={{ marginTop: 5, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div style={{ border: '1px dashed #161616ff', padding: 5, position: 'relative' }}>
+                      {renderTickMarker('Course4Note')}
+                      <div style={{ padding: 1 }}>
+                        <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S4')}</div>
+                        <textarea rows={1} ref={deputyRightTextareaRef} value={deputyRightContent} onChange={(e) => { setDeputyRightContent(e.target.value); clearStageMessage('S4'); }}
+                          placeholder="...................." style={{
+                            width: '100%', height: 'auto', minHeight: '24px',
+                            lineHeight: uiLineHeight,
+                            textAlign: 'justify',
+                            margin: 0,
+                            padding: 5,
+                            resize: 'none',
+                            overflow: 'hidden',
+                            fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                            boxSizing: 'border-box',
+                            whiteSpace: 'pre-wrap',
+                            overflowWrap: 'anywhere',
+                            wordBreak: 'break-word',
+                            textIndent: '30px'
+                          }}
+                          disabled={!isAssignedToStage(['SDR', 'S4'])} />
+                        <div style={{ textAlign: 'center', marginTop: 0 }}>
+                          {hasDeputyRight ? (
+                            <>
+                              {showDoAtStages && showDoAtStages.has('S4') ? (
+                                <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course4Date') || capturedDate)}</div>
+                              ) : null}
+                              {(showSignatureStages && showSignatureStages.has('S4') && sigDeputyRightUrl) ? (
+                                <div style={{ marginTop: 0 }}>
+                                  <img src={sigDeputyRightUrl} alt="sig-deputy-right" style={{ maxWidth: 100, maxHeight: 80, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                                </div>
+                              ) : null}
+                            </>
+                          ) : null}
+                          {(showNameStages && showNameStages.has('S4')) ? (
+                            <div className="sender-name" style={{
+                              fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                              marginTop: 0, fontWeight: 100
+                            }}>{getStageSenderName(['SDR', 'S4', 'S3']) || ''}</div>
+                          ) : null}
+                        </div>
                         <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
                           <div style={{ color: stageMessageFor('S4') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S4')}</div>
                         </div>
+                      </div>
+                    </div>
+                    <div style={{ border: '1px dashed #161616ff', padding: 5, position: 'relative' }}>
+                      {renderTickMarker('Course5Note')}
+                      <div style={{ padding: 1 }}>
+                        <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S5')}</div>
+                        <textarea
+                          rows={1}
+                          ref={directorTextareaRef}
+                          value={directorContent}
+                          onChange={(e) => { setDirectorContent(e.target.value); clearStageMessage('S5'); }}
+                          placeholder="...................."
+                          disabled={!isAssignedToStage(['DIR', 'SDIR', 'S5'])}
+                          style={{
+                            width: '100%',
+                            height: 'auto',
+                            minHeight: '24px',
+                            lineHeight: uiLineHeight,
+                            textAlign: 'justify',
+                            margin: 0,
+                            padding: 5,
+                            resize: 'none',
+                            overflow: 'hidden',
+                            fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                            boxSizing: 'border-box',
+                            whiteSpace: 'pre-wrap',
+                            overflowWrap: 'anywhere',
+                            wordBreak: 'break-word',
+                            textIndent: '30px'
+                          }}
+                        />
+
+                        <div style={{ textAlign: 'center', marginTop: 0 }}>
+                          {hasDirector ? (
+                            <>
+                              {showDoAtStages && showDoAtStages.has('S5') ? (
+                                <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course5Date') || capturedDate)}</div>
+                              ) : null}
+                              {(showSignatureStages && showSignatureStages.has('S5') && sigDirectorUrl) ? (
+                                <div style={{ marginTop: 0 }}>
+                                  <img src={sigDirectorUrl} alt="sig-director" style={{ maxWidth: 100, maxHeight: 70, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                                </div>
+                              ) : null}
+                            </>
+                          ) : null}
+                          {(showNameStages && showNameStages.has('S5')) ? (
+                            <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['DIR', 'SDIR', 'S5']) || ''}</div>
+                          ) : null}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
+                          <div style={{ color: stageMessageFor('S5') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S5')}</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div style={{ border: '1px dashed #161616ff', padding: 5 }}>
+                ) : (
+                  <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5, position: 'relative' }}>
+                    {renderTickMarker('Course5Note')}
                     <div style={{ padding: 1 }}>
                       <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S5')}</div>
                       <textarea
@@ -3062,23 +3213,23 @@ export default function ReplayfilePage() {
                         value={directorContent}
                         onChange={(e) => { setDirectorContent(e.target.value); clearStageMessage('S5'); }}
                         placeholder="...................."
-                        disabled={!isAssignedToStage(['DIR','SDIR','S5'])}
+                        disabled={!isAssignedToStage(['DIR', 'SDIR', 'S5'])}
                         style={{
                           width: '100%',
-                        height: 'auto',
-                        minHeight: '24px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'justify',
-                        margin: 0,
-                        padding: 5,
-                        resize: 'none',
-                        overflow: 'hidden',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
+                          height: 'auto',
+                          minHeight: '24px',
+                          lineHeight: uiLineHeight,
+                          textAlign: 'justify',
+                          margin: 0,
+                          padding: 5,
+                          resize: 'none',
+                          overflow: 'hidden',
+                          fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                          boxSizing: 'border-box',
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          textIndent: '30px'
                         }}
                       />
 
@@ -3090,13 +3241,13 @@ export default function ReplayfilePage() {
                             ) : null}
                             {(showSignatureStages && showSignatureStages.has('S5') && sigDirectorUrl) ? (
                               <div style={{ marginTop: 0 }}>
-                                <img src={sigDirectorUrl} alt="sig-director" style={{ maxWidth: 100, maxHeight: 70, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                                <img src={sigDirectorUrl} alt="sig-director" style={{ maxWidth: 50, maxHeight: 50, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
                               </div>
                             ) : null}
                           </>
                         ) : null}
                         {(showNameStages && showNameStages.has('S5')) ? (
-                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['DIR','SDIR','S5']) || ''}</div>
+                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['DIR', 'SDIR', 'S5']) || ''}</div>
                         ) : null}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
@@ -3104,143 +3255,91 @@ export default function ReplayfilePage() {
                       </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
-                  <div style={{ padding: 1 }}>
-                    <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S5')}</div>
-                    <textarea
-                      rows={1}
-                      ref={directorTextareaRef}
-                      value={directorContent}
-                      onChange={(e) => { setDirectorContent(e.target.value); clearStageMessage('S5'); }}
-                      placeholder="...................."
-                      disabled={!isAssignedToStage(['DIR','SDIR','S5'])}
-                      style={{
-                        width: '100%',
-                        height: 'auto',
-                        minHeight: '24px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'justify',
-                        margin: 0,
-                        padding: 5,
-                        resize: 'none',
-                        overflow: 'hidden',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
-                      }}
-                    />
+                )
+              )}
 
-                    <div style={{ textAlign: 'center', marginTop: 0 }}>
-                      {hasDirector ? (
-                        <>
-                          {showDoAtStages && showDoAtStages.has('S5') ? (
-                            <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course5Date') || capturedDate)}</div>
-                          ) : null}
-                          {(showSignatureStages && showSignatureStages.has('S5') && sigDirectorUrl) ? (
-                            <div style={{ marginTop: 0 }}>
-                              <img src={sigDirectorUrl} alt="sig-director" style={{ maxWidth: 50, maxHeight: 50, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
-                            </div>
-                          ) : null}
-                        </>
-                      ) : null}
-                      {(showNameStages && showNameStages.has('S5')) ? (
-                        <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 0, fontWeight: 100 }}>{getStageSenderName(['DIR','SDIR','S5']) || ''}</div>
-                      ) : null}
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 6, padding: '0px' }}>
-                      <div style={{ color: stageMessageFor('S5') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S5')}</div>
-                    </div>
-                  </div>
-                </div>
-              )
-            )}
+              {visibleStages && visibleStages.has('S6') && (
+                <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5, position: 'relative' }}>
+                  {renderTickMarker('Course6Note')}
+                  <div style={{ display: 'grid', gridTemplateColumns: '50fr', gap: 12 }}>
+                    <div style={{ padding: 1 }}>
+                      <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S6')}</div>
+                      <textarea
+                        rows={1}
+                        ref={headOfficeTextareaRef}
+                        value={headOfficeContent}
+                        onChange={(e) => { setHeadOfficeContent(e.target.value); clearStageMessage('S6'); }}
+                        placeholder="...................."
+                        disabled={!isAssignedToStage(['S6'])}
+                        style={{
+                          width: '100%',
+                          height: 'auto',
+                          minHeight: '24px',
+                          lineHeight: uiLineHeight,
+                          textAlign: 'center',
+                          margin: 0,
+                          padding: 5,
+                          resize: 'none',
+                          overflow: 'hidden',
+                          fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
+                          boxSizing: 'border-box',
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          textIndent: '30px'
+                        }}
+                      />
 
-            {visibleStages && visibleStages.has('S6') && (
-              <div style={{ border: '1px dashed #161616ff', padding: 1, marginTop: 5 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '50fr', gap: 12 }}>
-                  <div style={{ padding: 1 }}>
-                    <div className="role-label" style={{ textAlign: 'center', marginTop: 0, fontFamily: 'Khmer OS Muol Light' }}>{getRoleLabel('S6')}</div>
-                    <textarea
-                      rows={1}
-                      ref={headOfficeTextareaRef}
-                      value={headOfficeContent}
-                      onChange={(e) => { setHeadOfficeContent(e.target.value); clearStageMessage('S6'); }}
-                      placeholder="...................."
-                      disabled={!isAssignedToStage(['S6'])}
-                      style={{
-                        width: '100%',
-                      height: 'auto',
-                        minHeight: '24px',
-                        lineHeight: uiLineHeight,
-                        textAlign: 'center',
-                        margin: 0,
-                        padding: 5,
-                        resize: 'none',
-                        overflow: 'hidden',
-                        fontFamily: "'Khmer OS Siemreap','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'",
-                        boxSizing: 'border-box',
-                        whiteSpace: 'pre-wrap',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        textIndent: '30px'
-                      }}
-                    />
+                      <div style={{ textAlign: 'center', marginTop: 0 }}>
+                        {hasHeadOffice ? (
+                          <>
+                            {showDoAtStages && showDoAtStages.has('S6') ? (
+                              <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course6Date') || capturedDate)}</div>
+                            ) : null}
+                            {(showSignatureStages && showSignatureStages.has('S6') && sigHeadOfficeUrl) ? (
+                              <div style={{ marginTop: 5 }}>
+                                <img src={sigHeadOfficeUrl} alt="sig-headoffice" style={{ maxWidth: 160, maxHeight: 90, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                              </div>
+                            ) : null}
+                          </>
+                        ) : null}
 
-                    <div style={{ textAlign: 'center', marginTop: 0 }}>
-                      {hasHeadOffice ? (
-                        <>
-                          {showDoAtStages && showDoAtStages.has('S6') ? (
-                            <div>ធ្វើនៅ {formatKhmerDateTime(dateForMetaKey('Course6Date') || capturedDate)}</div>
-                          ) : null}
-                          {(showSignatureStages && showSignatureStages.has('S6') && sigHeadOfficeUrl) ? (
-                            <div style={{ marginTop: 5 }}>
-                              <img src={sigHeadOfficeUrl} alt="sig-headoffice" style={{ maxWidth: 160, maxHeight: 90, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
-                            </div>
-                          ) : null}
-                        </>
-                      ) : null}
-
-                      {(showNameStages && showNameStages.has('S6')) ? (
-                        <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 5, fontWeight: 100 }}>{getStageSenderName(['HO','S6','S4','S3']) || ''}</div>
-                      ) : null}
+                        {(showNameStages && showNameStages.has('S6')) ? (
+                          <div className="sender-name" style={{ fontFamily: "'Khmer OS muol light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", marginTop: 5, fontWeight: 100 }}>{getStageSenderName(['HO', 'S6', 'S4', 'S3']) || ''}</div>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 0, padding: '0 px' }}>
+                    <div style={{ color: stageMessageFor('S6') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S6')}</div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 0, padding: '0 px' }}>
-                  <div style={{ color: stageMessageFor('S6') ? '#0b6623' : '#666', minHeight: 0 }}>{stageMessageFor('S6')}</div>
+              )}
+
+            </div>
+            {/* Right-side reference panel placed as a sibling so heights match */}
+            <div className="ref-panel" style={{ position: 'relative', boxSizing: 'border-box', zIndex: 100, overflow: 'visible', background: 'transparent', width: '210mm', margin: '5mm auto 0', alignSelf: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', height: 'auto', border: '1px solid #ebe5eaff', borderRadius: 1, background: '#fff' }}>
+                {/* header / toolbar */}
+                <div style={{ padding: '0px 12px', borderBottom: '1px solid #eef2f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, background: '#ffffff' }}>
+                  <div style={{ fontWeight: 100, fontFamily: "'Khmer OS Muol Light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", fontSize: 14 }}>ឯកសារយោង</div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {refUrls && refUrls.length ? (
+                      <div style={{ fontSize: 13, color: '#333' }}>{refUrls[0] && (refUrls[0].name || refUrls[0].url)}</div>
+                    ) : null}
+                    {selectedRef ? (
+                      <a href={selectedRef} target="_blank" rel="noreferrer" style={{ fontSize: 16, marginLeft: 8 }}>Open</a>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            )}
 
-          </div>
-          {/* Right-side reference panel placed as a sibling so heights match */}
-          <div className="ref-panel" style={{ position: 'relative', boxSizing: 'border-box', zIndex: 100, overflow: 'visible', background: 'transparent', width: '210mm', margin: '5mm auto 0', alignSelf: 'center' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', height: 'auto', border: '1px solid #ebe5eaff', borderRadius: 1, background: '#fff' }}>
-              {/* header / toolbar */}
-              <div style={{ padding: '0px 12px', borderBottom: '1px solid #eef2f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, background: '#ffffff' }}>
-                <div style={{ fontWeight: 100, fontFamily: "'Khmer OS Muol Light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'", fontSize: 14 }}>ឯកសារយោង</div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  {refUrls && refUrls.length ? (
-                    <div style={{ fontSize: 13, color: '#333' }}>{refUrls[0] && (refUrls[0].name || refUrls[0].url)}</div>
-                  ) : null}
-                  {selectedRef ? (
-                    <a href={selectedRef} target="_blank" rel="noreferrer" style={{ fontSize: 16, marginLeft: 8 }}>Open</a>
-                  ) : null}
-                </div>
-              </div>
+                <div style={{ padding: 0, paddingTop: '0mm', overflow: 'visible', display: 'block' }}>
 
-              <div style={{ padding: 0, paddingTop: '0mm', overflow: 'visible', display: 'block' }}>
-                
 
-                <div style={{ flex: 1, minHeight: 80, overflow: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 8 }}>
-                  {selectedRef ? (
-                    // render preview filling the ref-panel area (use full-height container)
-                    <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <div style={{ flex: 1, minHeight: 80, overflow: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 8 }}>
+                    {selectedRef ? (
+                      // render preview filling the ref-panel area (use full-height container)
+                      <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                         <div ref={refPreviewWrapper} style={{ width: '210mm', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'visible', background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 2px 6px rgba(0,0,0,0.12)', padding: 8 }}>
                           {(String(selectedRef).toLowerCase().endsWith('.pdf')) ? (
                             // PDF.js renders canvases into this container; let it expand to show all pages
@@ -3249,38 +3348,38 @@ export default function ReplayfilePage() {
                             <img src={selectedRef} alt="reference" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                           )}
                         </div>
-                    </div>
-                  ) : (
-                    <div style={{ padding: 1, color: '#666', fontFamily: "'Khmer OS Muol Light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'" }}>
-                      <div style={{ marginBottom: 8 }}>មិនមានឯកសារយោង
-                        <div style={{ fontSize: 12, color: '#999' }}> (debug hints shown below)</div>
                       </div>
-                      <div style={{ fontSize: 13, color: '#444' }}>
-                        <div style={{ marginBottom: 6 }}>កំណត់ត្រា exposed to console as <code>window.__REPLAY_RECORD</code></div>
-                        <div style={{ fontWeight: 600, marginBottom: 6 }}>Attachment hints:</div>
-                        {(() => {
-                          const hints = getAttachmentHints(record);
-                          if (!hints || hints.length === 0) return (<div style={{ color: '#999' }}>No obvious attachment-like fields found in record (check console).</div>);
-                          return (
-                            <div style={{ maxHeight: 220, overflow: 'auto', border: '1px dashed #eee', padding: 8, background: '#fafafa' }}>
-                              {hints.map((h, i) => (
-                                <div key={i} style={{ marginBottom: 8 }}>
-                                  <div style={{ fontSize: 12, color: '#333', fontWeight: 600 }}>{h.path}</div>
-                                  <div style={{ fontSize: 12, color: '#555', wordBreak: 'break-all' }}>{h.excerpt}</div>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
+                    ) : (
+                      <div style={{ padding: 1, color: '#666', fontFamily: "'Khmer OS Muol Light','Noto Sans Khmer','Khmer OS','Hanuman',Arial,'sans-serif'" }}>
+                        <div style={{ marginBottom: 8 }}>មិនមានឯកសារយោង
+                          <div style={{ fontSize: 12, color: '#999' }}> (debug hints shown below)</div>
+                        </div>
+                        <div style={{ fontSize: 13, color: '#444' }}>
+                          <div style={{ marginBottom: 6 }}>កំណត់ត្រា exposed to console as <code>window.__REPLAY_RECORD</code></div>
+                          <div style={{ fontWeight: 600, marginBottom: 6 }}>Attachment hints:</div>
+                          {(() => {
+                            const hints = getAttachmentHints(record);
+                            if (!hints || hints.length === 0) return (<div style={{ color: '#999' }}>No obvious attachment-like fields found in record (check console).</div>);
+                            return (
+                              <div style={{ maxHeight: 220, overflow: 'auto', border: '1px dashed #eee', padding: 8, background: '#fafafa' }}>
+                                {hints.map((h, i) => (
+                                  <div key={i} style={{ marginBottom: 8 }}>
+                                    <div style={{ fontSize: 12, color: '#333', fontWeight: 600 }}>{h.path}</div>
+                                    <div style={{ fontSize: 12, color: '#555', wordBreak: 'break-all' }}>{h.excerpt}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
       )}
       {/* Floating send-to-Telegram button (visible when there's a saved primary note) */}
       {record && ((meta && meta.CourseNote) || (leftContent && leftContent.trim() !== '')) && perms && perms.canSendTelegram && (
@@ -3323,7 +3422,7 @@ if (typeof window !== 'undefined' && window.__REPLAY_DEBUG__) {
     try {
       const meta = window.__REPLAY_RECORD && window.__REPLAY_RECORD.meta;
       if (meta) console.log('REPLAY record meta:', meta);
-    } catch (e) {}
+    } catch (e) { }
     // list dashed boxes and first 200 chars of their text (best-effort)
     try {
       const els = document ? [...document.querySelectorAll('[style*="dashed"]')] : [];

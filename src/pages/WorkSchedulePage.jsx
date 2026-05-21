@@ -3,8 +3,11 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import api from '../services/api';
+import usePermission from '../hooks/usePermission';
+import { isCountedActive } from '../utils/hrFilters';
 
 export default function WorkSchedulePage() {
+  const perms = usePermission();
   // Export summary report to Excel (for modal)
   const exportSummaryExcel = () => {
     // Prepare summary data
@@ -43,120 +46,72 @@ export default function WorkSchedulePage() {
 
     // Helper to get employees by category
     function getEmployeesByCategory(type) {
-      switch(type) {
+      switch (type) {
         case 'morning':
           return filteredEmployees.filter(emp => {
-            const schedule = schedules.find(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              if (scheduleEmployeeId !== emp._id || schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return false;
-              if (!s.shiftStart || !s.shiftEnd) return false;
-              try {
-                const startParts = s.shiftStart.split(':');
-                const endParts = s.shiftEnd.split(':');
-                const startHour = parseInt(startParts[0]);
-                const endHour = parseInt(endParts[0]);
-                if (startHour < 12 && endHour >= 12) return true;
-                if (startHour < 12 && endHour < 12) {
-                  const startMinutes = startHour * 60 + parseInt(startParts[1] || 0);
-                  const endMinutes = endHour * 60 + parseInt(endParts[1] || 0);
-                  let duration = endMinutes - startMinutes;
-                  if (duration <= 0) duration += 24 * 60;
-                  return duration < 20 * 60;
-                }
-                if (startHour >= 12 && endHour >= 12) return true;
-                return false;
-              } catch (err) {
-                return false;
+            const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+            if (!s || s.shiftTitle === 'Day Off' || !s.shiftStart || !s.shiftEnd) return false;
+            try {
+              const startParts = s.shiftStart.split(':');
+              const endParts = s.shiftEnd.split(':');
+              const startHour = parseInt(startParts[0]);
+              const endHour = parseInt(endParts[0]);
+              if (startHour < 12 && endHour >= 12) return true;
+              if (startHour < 12 && endHour < 12) {
+                const startMinutes = startHour * 60 + parseInt(startParts[1] || 0);
+                const endMinutes = endHour * 60 + parseInt(endParts[1] || 0);
+                let duration = endMinutes - startMinutes;
+                if (duration <= 0) duration += 24 * 60;
+                return duration < 20 * 60;
               }
-            });
-            return schedule !== undefined;
+              if (startHour >= 12 && endHour >= 12) return true;
+              return false;
+            } catch (err) { return false; }
           });
         case 'night':
           return filteredEmployees.filter(emp => {
-            const schedule = schedules.find(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              if (scheduleEmployeeId !== emp._id || schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return false;
-              if (!s.shiftStart || !s.shiftEnd) return false;
+            const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+            if (!s || s.shiftTitle === 'Day Off' || !s.shiftStart || !s.shiftEnd) return false;
+            try {
               const startHour = parseInt(s.shiftStart.split(':')[0]);
               const endHour = parseInt(s.shiftEnd.split(':')[0]);
               return startHour >= 12 && endHour < 12;
-            });
-            return schedule !== undefined;
+            } catch (err) { return false; }
           });
         case '24hour':
           return filteredEmployees.filter(emp => {
-            const schedule = schedules.find(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              if (scheduleEmployeeId !== emp._id || schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return false;
-              if (!s.shiftStart || !s.shiftEnd) return false;
-              try {
-                const startParts = s.shiftStart.split(':');
-                const endParts = s.shiftEnd.split(':');
-                const startHour = parseInt(startParts[0]);
-                const endHour = parseInt(endParts[0]);
-                if (startHour < 12 && endHour < 12) {
-                  const startMinutes = startHour * 60 + parseInt(startParts[1] || 0);
-                  const endMinutes = endHour * 60 + parseInt(endParts[1] || 0);
-                  let duration = endMinutes - startMinutes;
-                  if (duration <= 0) duration += 24 * 60;
-                  return duration >= 20 * 60;
-                }
-                return false;
-              } catch (err) {
-                return false;
+            const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+            if (!s || s.shiftTitle === 'Day Off' || !s.shiftStart || !s.shiftEnd) return false;
+            try {
+              const startParts = s.shiftStart.split(':');
+              const endParts = s.shiftEnd.split(':');
+              const startHour = parseInt(startParts[0]);
+              const endHour = parseInt(endParts[0]);
+              if (startHour < 12 && endHour < 12) {
+                const startMinutes = startHour * 60 + parseInt(startParts[1] || 0);
+                const endMinutes = endHour * 60 + parseInt(endParts[1] || 0);
+                let duration = endMinutes - startMinutes;
+                if (duration <= 0) duration += 24 * 60;
+                return duration >= 20 * 60;
               }
-            });
-            return schedule !== undefined;
+              return false;
+            } catch (err) { return false; }
           });
         case 'dayoff':
           return filteredEmployees.filter(emp => {
-            const schedule = schedules.find(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              return scheduleEmployeeId === emp._id && schedDate === selectedDayStats && s.shiftTitle === 'Day Off';
-            });
-            return schedule !== undefined;
+            const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+            return s && s.shiftTitle === 'Day Off';
           });
         case 'noschedule':
           return filteredEmployees.filter(emp => {
-            const hasSchedule = schedules.some(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              return scheduleEmployeeId === emp._id && schedDate === selectedDayStats;
-            });
-            return !hasSchedule;
+            return !scheduleMap.has(`${String(emp._id)}_${selectedDayStats}`);
           });
         default:
           return [];
       }
     }
 
-    // Add sheets for each category
-    const categories = [
-      { key: 'morning', title: 'ចូលពេលព្រឹក' },
-      { key: 'night', title: 'ចូលវេនល្ងាច' },
-      { key: '24hour', title: 'ប្រចាំ24ម៉ោង' },
-      { key: 'dayoff', title: 'ឈប់សម្រាក' },
-      { key: 'noschedule', title: 'មិនបានកំណត់ម៉ោង' }
-    ];
-    categories.forEach(cat => {
-      const emps = getEmployeesByCategory(cat.key);
-      const sheetData = [
-        ['ល.រ', 'លេខកាត', 'ឈ្មោះ']
-      ];
-      emps.forEach((emp, idx) => {
-        sheetData.push([
-          idx + 1,
-          emp.staffId || emp.cardNumber || '-',
-          emp.khmerName || emp.name || '-'
-        ]);
-      });
-      const wsCat = XLSX.utils.aoa_to_sheet(sheetData);
-      XLSX.utils.book_append_sheet(wb, wsCat, cat.title);
-    });
+    // (Removed sheets for each category to keep report summary only as per user request)
 
     // Save file
     const dateFormatted = selectedDayStats.replace(/-/g, '');
@@ -167,41 +122,51 @@ export default function WorkSchedulePage() {
   const [employees, setEmployees] = useState([]);
   const [hrData, setHrData] = useState([]);
   const [departmentData, setDepartmentData] = useState([]);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM format
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [autoSyncing, setAutoSyncing] = useState(false);
+  const [holidays, setHolidays] = useState([]);
   const [importData, setImportData] = useState({ employees: [], schedules: [] });
   const [selectedDayStats, setSelectedDayStats] = useState(new Date().toISOString().slice(0, 10));
   const fileInputRef = useRef(null);
-  
+
   // Stats detail modal states
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [statsModalData, setStatsModalData] = useState({ title: '', employees: [], type: '' });
   const [isExportingPDF, setIsExportingPDF] = useState(false);
-  
+  const [syncingId, setSyncingId] = useState(null);
+  const [shiftGroups, setShiftGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState('all');
+  const [showHolidayModal, setShowHolidayModal] = useState(false);
+  const [editingHoliday, setEditingHoliday] = useState(null);
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  
+
   // Month navigation functions
 
   // Modal for summary report
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const navigateToPreviousMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number);
-    const prevMonth = month === 1 ? 12 : month - 1;
-    const prevYear = month === 1 ? year - 1 : year;
-    const newMonth = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-    setSelectedMonth(newMonth);
+    const d = new Date(startDate);
+    d.setMonth(d.getMonth() - 1);
+    const newStart = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+    const newEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
+    setStartDate(newStart);
+    setEndDate(newEnd);
   };
 
   const navigateToNextMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number);
-    const nextMonth = month === 12 ? 1 : month + 1;
-    const nextYear = month === 12 ? year + 1 : year;
-    const newMonth = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
-    setSelectedMonth(newMonth);
+    const d = new Date(startDate);
+    d.setMonth(d.getMonth() + 1);
+    const newStart = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+    const newEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
+    setStartDate(newStart);
+    setEndDate(newEnd);
   };
 
   // Format month display in Khmer
@@ -218,7 +183,7 @@ export default function WorkSchedulePage() {
   const toKhmerNumerals = (number) => {
     const arabicToKhmer = {
       '0': '០',
-      '1': '១', 
+      '1': '១',
       '2': '២',
       '3': '៣',
       '4': '៤',
@@ -228,27 +193,40 @@ export default function WorkSchedulePage() {
       '8': '៨',
       '9': '៩'
     };
-    
+
     return number.toString().replace(/[0-9]/g, (digit) => arabicToKhmer[digit] || digit);
   };
-  
+
   // Search states
   const [searchTerm, setSearchTerm] = useState('');
   const [searchBy, setSearchBy] = useState('all'); // 'all', 'name', 'cardNumber'
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState('all');
-  
+  const [scheduleFilter, setScheduleFilter] = useState('all'); // 'all', 'has_schedule', 'no_schedule'
+
   // Function to format time to AM/PM
   const formatTimeToAMPM = (time24) => {
     if (!time24) return '';
     const [hours, minutes] = time24.split(':');
     const hour = parseInt(hours);
     const min = minutes || '00';
-    
+
     if (hour === 0) return `12:${min}AM`;
     if (hour < 12) return `${hour}:${min}AM`;
     if (hour === 12) return `12:${min}PM`;
     return `${hour - 12}:${min}PM`;
+  };
+
+  const getContrastColor = (hex) => {
+    if (!hex) return '#374151';
+    try {
+      const c = hex.replace('#', '');
+      const r = parseInt(c.substring(0, 2), 16);
+      const g = parseInt(c.substring(2, 4), 16);
+      const b = parseInt(c.substring(4, 6), 16);
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      return luminance > 0.6 ? '#111827' : '#ffffff';
+    } catch (e) { return '#374151'; }
   };
   const [formData, setFormData] = useState({
     employeeId: '',
@@ -259,14 +237,20 @@ export default function WorkSchedulePage() {
     notes: ''
   });
 
-  // Get days in month
-  const getDaysInMonth = (yearMonth) => {
-    const [year, month] = yearMonth.split('-').map(Number);
-    return new Date(year, month, 0).getDate();
+  // Get array of dates in range
+  const getDatesInRange = (start, end) => {
+    const dates = [];
+    let current = new Date(start);
+    const stopAt = new Date(end);
+    while (current <= stopAt) {
+      dates.push(new Date(current).toISOString().slice(0, 10));
+      current.setDate(current.getDate() + 1);
+    }
+    return dates;
   };
 
-  const daysInMonth = getDaysInMonth(selectedMonth);
-  
+  const datesInRange = getDatesInRange(startDate, endDate);
+
   // Create HR lookup map
   const hrLookup = {};
   hrData.forEach(hr => {
@@ -293,16 +277,16 @@ export default function WorkSchedulePage() {
     return depts.sort((a, b) => {
       const numA = extractDepartmentNumber(a);
       const numB = extractDepartmentNumber(b);
-      
+
       // If both have numbers, sort by number
       if (numA !== 999 && numB !== 999) {
         return numA - numB;
       }
-      
+
       // If only one has number, put numbered one first
       if (numA !== 999 && numB === 999) return -1;
       if (numA === 999 && numB !== 999) return 1;
-      
+
       // If neither has numbers, sort alphabetically
       return a.localeCompare(b, 'km');
     });
@@ -310,7 +294,7 @@ export default function WorkSchedulePage() {
 
   // Get departments from Department table first, then fallback to employee data
   let departments = [];
-  
+
   if (departmentData.length > 0) {
     // Sort departments by Department_Id (numeric order)
     const sortedDepts = departmentData.sort((a, b) => {
@@ -318,7 +302,7 @@ export default function WorkSchedulePage() {
       const numB = parseInt(b.Department_Id) || 999;
       return numA - numB;
     });
-    
+
     // Use Department_Kh names from the department table
     departments = [
       ...sortedDepts.map(dept => dept.Department_Kh).filter(Boolean),
@@ -328,7 +312,7 @@ export default function WorkSchedulePage() {
     // Fallback to employee-based departments
     departments = [...new Set(employees.map(emp => getEmployeeDepartment(emp)))];
     departments = sortDepartmentsByNumber(departments);
-    
+
     // If still no departments, use default list organized according to names shown in print document
     if (departments.length === 0 || (departments.length === 1 && departments[0] === 'មិនបានកំណត់')) {
       departments = [
@@ -351,98 +335,185 @@ export default function WorkSchedulePage() {
       ];
     }
   }
-  
+
   // Debug: log departments
   console.log('Available departments:', departments);
   console.log('HR lookup keys:', Object.keys(hrLookup));
   console.log('Employees count:', employees.length);
-  
-  // Filter employees based on department and search
-  const filteredEmployees = employees.filter(employee => {
-    // Department filter
-    const employeeDepartment = getEmployeeDepartment(employee);
-    const departmentMatch = selectedDepartment === 'all' || employeeDepartment === selectedDepartment;
-    
-    // Search filter
-    let searchMatch = true;
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      const name = (employee.khmerName || employee.fullName || employee.name || employee.staffName || '').toLowerCase();
-      const cardNumber = (employee.staffId || employee.cardNumber || '').toLowerCase();
-      const phone = (employee.phoneNumber || employee.phone || '').toLowerCase();
-      const position = (employee.position || employee.Position_Kh || '').toLowerCase();
-      
-      switch (searchBy) {
-        case 'name':
-          searchMatch = name.includes(searchLower);
-          break;
-        case 'cardNumber':
-          searchMatch = cardNumber.includes(searchLower);
-          break;
-        case 'phone':
-          searchMatch = phone.includes(searchLower);
-          break;
-        case 'position':
-          searchMatch = position.includes(searchLower);
-          break;
-        default: // 'all'
-          searchMatch = name.includes(searchLower) || 
-                       cardNumber.includes(searchLower) || 
-                       phone.includes(searchLower) || 
-                       position.includes(searchLower);
+
+  // Performance Optimization: Index schedules for O(1) lookup
+  const scheduleMap = React.useMemo(() => {
+    const map = new Map();
+    schedules.forEach(s => {
+      const eid = s.employeeId?._id || s.employeeId;
+      if (!eid || !s.date) return;
+      try {
+        const d = new Date(s.date);
+        const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        map.set(`${String(eid)}_${dateKey}`, s);
+      } catch (e) {}
+    });
+    return map;
+  }, [schedules]);
+
+  const hrMap = React.useMemo(() => {
+    const map = new Map();
+    hrData.forEach(hr => {
+      const sid = String(hr.staffId || hr.cardNumber || '');
+      if (sid) map.set(sid, hr);
+    });
+    return map;
+  }, [hrData]);
+
+  // Performance Optimization: Index all employees for O(1) lookup
+  const empMap = React.useMemo(() => {
+    const map = new Map();
+    employees.forEach(emp => {
+      if (emp._id) map.set(String(emp._id), emp);
+    });
+    return map;
+  }, [employees]);
+
+  // Create a Set of employee IDs that have at least one schedule this month for fast filtering
+  const employeesWithSchedule = React.useMemo(() => {
+    const set = new Set();
+    schedules.forEach(s => {
+      const id = s.employeeId?._id || s.employeeId;
+      if (id) set.add(String(id));
+    });
+    return set;
+  }, [schedules]);
+
+  const employeeShiftGroupMap = React.useMemo(() => {
+    const map = new Map();
+    shiftGroups.forEach(sg => {
+      (sg.subgroups || []).forEach(sub => {
+        (sub.employees || []).forEach(emp => {
+          if (!emp) return;
+          // Handle both string IDs and employee objects
+          const id = typeof emp === 'string' ? emp : (emp.staffId || emp.cardNumber || emp.card_no || emp.staff_id || emp.id || emp._id || emp.name);
+          const key = String(id).trim();
+          if (key) map.set(key, { subgroup: sub, shiftGroup: sg });
+        });
+      });
+    });
+    return map;
+  }, [shiftGroups]);
+
+  const getEmployeeGroup = React.useCallback((employee) => {
+    const staffId = String(employee.staffId || employee.cardNumber || '').trim();
+    const id = String(employee._id || '').trim();
+    const mapping = employeeShiftGroupMap.get(staffId) || (id && employeeShiftGroupMap.get(id));
+    return mapping ? mapping.subgroup.name : '-';
+  }, [employeeShiftGroupMap]);
+
+  // Filter employees based on department, group and search
+  const filteredEmployees = React.useMemo(() => {
+    return employees.filter(employee => {
+      // Schedule filter
+      if (scheduleFilter === 'no_schedule') {
+        if (employeesWithSchedule.has(String(employee._id))) return false;
+      } else if (scheduleFilter === 'has_schedule') {
+        if (!employeesWithSchedule.has(String(employee._id))) return false;
       }
-    }
-    
-    return departmentMatch && searchMatch;
-  });
-  
+
+      // Department filter
+      const employeeDepartment = getEmployeeDepartment(employee);
+      const departmentMatch = selectedDepartment === 'all' || employeeDepartment === selectedDepartment;
+
+      // Group filter
+      const groupMatch = selectedGroup === 'all' || getEmployeeGroup(employee) === selectedGroup;
+
+      // Search filter
+      let searchMatch = true;
+      if (searchTerm) {
+        const searchLower = searchTerm.trim().toLowerCase();
+        const searchDigits = searchLower.replace(/\D/g, ''); // For phone number matching
+
+        const name = String(employee.khmerName || employee.fullName || employee.name || employee.staffName || '').toLowerCase();
+        const cardNumber = String(employee.staffId || employee.cardNumber || '').toLowerCase();
+        const phone = String(employee.phoneNumber || employee.phone || '');
+        const phoneDigits = phone.replace(/\D/g, '');
+        const position = String(employee.position || employee.Position_Kh || '').toLowerCase();
+        const department = String(employeeDepartment).toLowerCase();
+        const group = String(getEmployeeGroup(employee)).toLowerCase();
+
+        switch (searchBy) {
+          case 'name':
+            searchMatch = name.includes(searchLower);
+            break;
+          case 'cardNumber':
+            searchMatch = cardNumber.includes(searchLower);
+            break;
+          case 'phone':
+            // Match by string or by digits-only fallback
+            searchMatch = phone.toLowerCase().includes(searchLower) || (searchDigits && phoneDigits.includes(searchDigits));
+            break;
+          case 'position':
+            searchMatch = position.includes(searchLower);
+            break;
+          default: // 'all'
+            searchMatch = name.includes(searchLower) ||
+              cardNumber.includes(searchLower) ||
+              (searchDigits && phoneDigits.includes(searchDigits)) ||
+              phone.toLowerCase().includes(searchLower) ||
+              position.includes(searchLower) ||
+              department.includes(searchLower) ||
+              group.includes(searchLower);
+        }
+      }
+
+      return departmentMatch && groupMatch && searchMatch;
+    });
+  }, [employees, searchTerm, searchBy, selectedDepartment, selectedGroup, scheduleFilter, employeesWithSchedule, getEmployeeGroup]);
+
   // Pagination calculations
   const totalEmployees = filteredEmployees.length;
   const totalPages = Math.ceil(totalEmployees / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedEmployees = filteredEmployees.slice(startIndex, endIndex);
-  
+
   // Reset to first page when itemsPerPage changes or search changes
   const handleItemsPerPageChange = (newItemsPerPage) => {
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   };
-  
+
   const handleSearchChange = (newSearchTerm) => {
     setSearchTerm(newSearchTerm);
     setCurrentPage(1);
     setSelectedEmployees([]); // Clear selection when search changes
   };
-  
+
   const handleSearchByChange = (newSearchBy) => {
     setSearchBy(newSearchBy);
     setCurrentPage(1);
     setSelectedEmployees([]); // Clear selection when search type changes
   };
-  
+
   const handleDepartmentChange = (newDepartment) => {
     setSelectedDepartment(newDepartment);
     setCurrentPage(1);
     setSelectedEmployees([]); // Clear selection when department changes
   };
-  
+
   // Delete employee function
   const handleDeleteEmployee = async (employeeId, employeeName) => {
     if (!confirm(`តើអ្នកប្រាកដថាចង់លុបបុគ្គលិក "${employeeName}" មែនទេ?\n\nការលុបនេះនឹងលុបទាំងតារាងការងាររបស់គេផងដែរ។`)) {
       return;
     }
-    
+
     setLoading(true);
     try {
       // Delete employee schedules first
       await api.delete(`/work-schedules/employee/${employeeId}`);
-      
+
       // Delete employee
       await api.delete(`/work-schedule-employees/${employeeId}`);
-      
+
       alert('លុបបុគ្គលិកបានជោគជ័យ!');
-      
+
       // Reload data
       await loadEmployees();
       await loadSchedules();
@@ -453,18 +524,18 @@ export default function WorkSchedulePage() {
       setLoading(false);
     }
   };
-  
+
   // Bulk delete function
   const handleBulkDelete = async () => {
     if (selectedEmployees.length === 0) {
       alert('សូមជ្រើសរើសបុគ្គលិកដែលចង់លុប');
       return;
     }
-    
+
     if (!confirm(`តើអ្នកប្រាកដថាចង់លុបបុគ្គលិកចំនួន ${selectedEmployees.length} នាក់មែនទេ?\n\nការលុបនេះនឹងលុបទាំងតារាងការងាររបស់គេផងដែរ។`)) {
       return;
     }
-    
+
     setLoading(true);
     try {
       // Delete all selected employees
@@ -474,12 +545,12 @@ export default function WorkSchedulePage() {
         // Delete employee
         await api.delete(`/work-schedule-employees/${employeeId}`);
       }
-      
+
       alert(`លុបបុគ្គលិកចំនួន ${selectedEmployees.length} នាក់បានជោគជ័យ!`);
-      
+
       // Clear selection
       setSelectedEmployees([]);
-      
+
       // Reload data
       await loadEmployees();
       await loadSchedules();
@@ -490,7 +561,7 @@ export default function WorkSchedulePage() {
       setLoading(false);
     }
   };
-  
+
   // Handle select all
   const handleSelectAll = () => {
     if (selectedEmployees.length === filteredEmployees.length) {
@@ -499,7 +570,7 @@ export default function WorkSchedulePage() {
       setSelectedEmployees(filteredEmployees.map(emp => emp._id));
     }
   };
-  
+
   // Handle individual selection
   const handleSelectEmployee = (employeeId) => {
     setSelectedEmployees(prev => {
@@ -512,141 +583,96 @@ export default function WorkSchedulePage() {
   };
 
   // Calculate statistics
-  const stats = {
-    totalEmployees: employees.length,
-    totalSchedules: schedules.length,
-    totalWorkDays: schedules.filter(s => s.shiftTitle !== 'Day Off').length,
-    totalDayOffs: schedules.filter(s => s.shiftTitle === 'Day Off').length,
-    monthDayShift: 0,
-    monthNightShift: 0,
-    monthShift24Hours: 0
-  };
+  const stats = React.useMemo(() => {
+    const s = {
+      totalEmployees: employees.length,
+      totalSchedules: schedules.length,
+      totalWorkDays: 0,
+      totalDayOffs: 0,
+      monthDayShift: 0,
+      monthNightShift: 0,
+      monthShift24Hours: 0
+    };
 
-  // Calculate monthly shift statistics
-  schedules.forEach(s => {
-    if (!s.shiftStart || !s.shiftEnd || s.shiftTitle === 'Day Off') return;
+    schedules.forEach(item => {
+      if (item.shiftTitle === 'Day Off') {
+        s.totalDayOffs++;
+      } else {
+        s.totalWorkDays++;
+        if (!item.shiftStart || !item.shiftEnd) return;
+        try {
+          const startParts = item.shiftStart.split(':');
+          const endParts = item.shiftEnd.split(':');
+          const startHour = parseInt(startParts[0]);
+          const endHour = parseInt(endParts[0]);
 
-    try {
-      const startParts = s.shiftStart.split(':');
-      const endParts = s.shiftEnd.split(':');
-      const startHour = parseInt(startParts[0]);
-      const endHour = parseInt(endParts[0]);
-
-      // Day shift: AM → PM
-      if (startHour < 12 && endHour >= 12) {
-        stats.monthDayShift++;
+          if (startHour < 12 && endHour >= 12) {
+            s.monthDayShift++;
+          } else if (startHour >= 12 && endHour < 12) {
+            s.monthNightShift++;
+          } else if (startHour < 12 && endHour < 12) {
+            const startMin = startHour * 60 + parseInt(startParts[1] || 0);
+            const endMin = endHour * 60 + parseInt(endParts[1] || 0);
+            let dur = endMin - startMin;
+            if (dur <= 0) dur += 24 * 60;
+            if (dur >= 20 * 60) s.monthShift24Hours++;
+            else s.monthDayShift++;
+          } else {
+            s.monthDayShift++;
+          }
+        } catch (e) {}
       }
-      // Night shift: PM → AM
-      else if (startHour >= 12 && endHour < 12) {
-        stats.monthNightShift++;
-      }
-      // 24-hour shift: AM → AM (≥20 hours)
-      else if (startHour < 12 && endHour < 12) {
-        const startMinutes = startHour * 60 + parseInt(startParts[1] || 0);
-        const endMinutes = endHour * 60 + parseInt(endParts[1] || 0);
-        let duration = endMinutes - startMinutes;
-        if (duration <= 0) duration += 24 * 60;
-        
-        if (duration >= 20 * 60) {
-          stats.monthShift24Hours++;
-        } else {
-          stats.monthDayShift++;
-        }
-      }
-      // PM to PM shift
-      else if (startHour >= 12 && endHour >= 12) {
-        stats.monthDayShift++;
-      }
-    } catch (err) {
-      // Skip invalid time format
-    }
-  });
+    });
+    return s;
+  }, [employees.length, schedules]);
 
   // Calculate daily statistics based on filtered employees (department selection)
-  const dailyStats = {
-    totalEmployees: filteredEmployees.length,
-    workingToday: schedules.filter(s => {
-      if (!s.date || !s.shiftStart || !s.shiftEnd) return false;
-      const schedDate = new Date(s.date).toISOString().slice(0, 10);
-      if (schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return false;
-      
-      // Check if this schedule belongs to a filtered employee
-      const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-      const employee = filteredEmployees.find(emp => emp._id === scheduleEmployeeId);
-      
-      return !!employee;
-    }).length,
-    dayOffToday: schedules.filter(s => {
-      if (!s.date) return false;
-      const schedDate = new Date(s.date).toISOString().slice(0, 10);
-      if (schedDate !== selectedDayStats || s.shiftTitle !== 'Day Off') return false;
-      
-      // Check if this schedule belongs to a filtered employee
-      const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-      const employee = filteredEmployees.find(emp => emp._id === scheduleEmployeeId);
-      return !!employee;
-    }).length,
-    dayShift: 0,      // AM → PM (វេនថ្ងៃ)
-    nightShift: 0,    // PM → AM (វេនល្ងាច)
-    shift24Hours: 0,  // AM → AM (វេន 24 ម៉ោង)
-    noSchedule: 0
-  };
+  const dailyStats = React.useMemo(() => {
+    const ds = {
+      totalEmployees: filteredEmployees.length,
+      workingToday: 0,
+      dayOffToday: 0,
+      dayShift: 0,
+      nightShift: 0,
+      shift24Hours: 0,
+      noSchedule: 0
+    };
 
-  // Calculate day shift, night shift and 24-hour shift
-  schedules.forEach(s => {
-    if (!s.date || !s.shiftStart || !s.shiftEnd) return;
-    const schedDate = new Date(s.date).toISOString().slice(0, 10);
-    if (schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return;
+    filteredEmployees.forEach(emp => {
+      const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+      if (!s) {
+        ds.noSchedule++;
+        return;
+      }
 
-    // Check if this schedule belongs to a filtered employee
-    const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-    const employee = filteredEmployees.find(emp => emp._id === scheduleEmployeeId);
-    if (!employee) return;
+      if (s.shiftTitle === 'Day Off') {
+        ds.dayOffToday++;
+      } else {
+        ds.workingToday++;
+        if (!s.shiftStart || !s.shiftEnd) return;
+        try {
+          const startParts = s.shiftStart.split(':');
+          const endParts = s.shiftEnd.split(':');
+          const startHour = parseInt(startParts[0]);
+          const endHour = parseInt(endParts[0]);
 
-    try {
-      const startParts = s.shiftStart.split(':');
-      const endParts = s.shiftEnd.split(':');
-      const startHour = parseInt(startParts[0]);
-      const endHour = parseInt(endParts[0]);
-
-      // Day shift: starts AM (0-11) and ends PM (12-23)
-      if (startHour < 12 && endHour >= 12) {
-        dailyStats.dayShift++;
+          if (startHour < 12 && endHour >= 12) ds.dayShift++;
+          else if (startHour >= 12 && endHour < 12) ds.nightShift++;
+          else if (startHour < 12 && endHour < 12) {
+            const startMin = startHour * 60 + parseInt(startParts[1] || 0);
+            const endMin = endHour * 60 + parseInt(endParts[1] || 0);
+            let dur = endMin - startMin;
+            if (dur <= 0) dur += 24 * 60;
+            if (dur >= 20 * 60) ds.shift24Hours++;
+            else ds.dayShift++;
+          } else {
+            ds.dayShift++;
+          }
+        } catch (e) {}
       }
-      // Night shift: starts PM (12-23) and ends AM (0-11)
-      else if (startHour >= 12 && endHour < 12) {
-        dailyStats.nightShift++;
-      }
-      // 24-hour shift: starts AM and ends AM next day (span >= 20 hours)
-      else if (startHour < 12 && endHour < 12) {
-        // Calculate duration
-        const startMinutes = startHour * 60 + parseInt(startParts[1] || 0);
-        const endMinutes = endHour * 60 + parseInt(endParts[1] || 0);
-        let duration = endMinutes - startMinutes;
-        if (duration <= 0) duration += 24 * 60; // Next day
-        
-        // If duration >= 20 hours, consider it 24-hour shift
-        if (duration >= 20 * 60) {
-          dailyStats.shift24Hours++;
-        } else {
-          // Short AM-AM shift (not 24h), count as day shift
-          dailyStats.dayShift++;
-        }
-      }
-      // PM to PM shift (rare case) - count as day shift
-      else if (startHour >= 12 && endHour >= 12) {
-        dailyStats.dayShift++;
-      }
-      // Any other pattern - count as day shift by default
-      else {
-        dailyStats.dayShift++;
-      }
-    } catch (err) {
-      // Skip invalid time format
-    }
-  });
-
-  dailyStats.noSchedule = dailyStats.totalEmployees - dailyStats.workingToday - dailyStats.dayOffToday;
+    });
+    return ds;
+  }, [filteredEmployees, scheduleMap, selectedDayStats]);
 
   // Function to test basic PDF generation
   const testBasicPDF = () => {
@@ -665,7 +691,7 @@ export default function WorkSchedulePage() {
   const convertToEnglishEquivalent = (khmerText) => {
     const translations = {
       'បុគ្គលិកសរុប': 'Total Employees',
-      'ធ្វើការសរុប': 'Working Today', 
+      'ធ្វើការសរុប': 'Working Today',
       'ចូលពេលព្រឹក': 'Day Shift',
       'វេនល្ងាច': 'Night Shift',
       'វេន24ម៉ោង': '24-Hour Shift',
@@ -678,7 +704,7 @@ export default function WorkSchedulePage() {
       'កំពុងធ្វើការ': 'Working',
       'មិនបានកំណត់តារាងការងារ': 'No Schedule Set'
     };
-    
+
     // Return English equivalent or fallback to original
     return translations[khmerText] || khmerText;
   };
@@ -686,16 +712,16 @@ export default function WorkSchedulePage() {
   // Function to clean text for PDF (remove special chars and convert Khmer)
   const cleanTextForPDF = (text) => {
     if (!text) return 'N/A';
-    
+
     // Convert common Khmer phrases to English
     let cleaned = convertToEnglishEquivalent(text.toString());
-    
+
     // If still contains Khmer characters, use a fallback approach
     if (/[\u1780-\u17FF]/.test(cleaned)) {
       // Extract numbers and English parts only
       const englishParts = cleaned.match(/[a-zA-Z0-9\s\-\.\(\)]+/g) || [];
       const numbers = cleaned.match(/\d+/g) || [];
-      
+
       if (englishParts.length > 0) {
         cleaned = englishParts.join(' ').trim();
       } else if (numbers.length > 0) {
@@ -704,7 +730,7 @@ export default function WorkSchedulePage() {
         cleaned = 'Khmer Text';
       }
     }
-    
+
     return cleaned.trim() || 'N/A';
   };
 
@@ -716,20 +742,20 @@ export default function WorkSchedulePage() {
         title: statsModalData.title,
         employeeCount: statsModalData.employees.length
       });
-      
+
       const doc = new jsPDF();
-      
+
       // Add title (convert to English)
       doc.setFontSize(16);
       const title = cleanTextForPDF(statsModalData.title) || 'Employee Report';
       doc.text(title, 20, 20);
-      
+
       // Add date info
       doc.setFontSize(12);
       const dateFormatted = new Date(selectedDayStats).toLocaleDateString('en-US');
       doc.text(`Date: ${dateFormatted}`, 20, 30);
       doc.text(`Total Count: ${statsModalData.employees.length} employees`, 20, 40);
-      
+
       // Check if we have employees data
       if (statsModalData.employees.length === 0) {
         doc.text('No employees found for this category.', 20, 60);
@@ -743,9 +769,9 @@ export default function WorkSchedulePage() {
           cleanTextForPDF(emp.position || emp.status || 'N/A'), // ឋានានុក្រម (Position)
           cleanTextForPDF(emp.phoneNumber || 'N/A') // លេខទូរស័ព្ទ (Phone)
         ]);
-        
+
         console.log('📊 Table data prepared:', tableData.length, 'rows');
-        
+
         // Add table using autoTable - format matching the image structure
         if (typeof doc.autoTable === 'function') {
           doc.autoTable({
@@ -799,14 +825,14 @@ export default function WorkSchedulePage() {
           });
         }
       }
-      
+
       // Save PDF
       const cleanTitle = title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
       const fileName = `${cleanTitle}_${selectedDayStats}.pdf`;
-      
+
       console.log('💾 Saving PDF:', fileName);
       doc.save(fileName);
-      
+
       console.log('✅ PDF exported successfully');
       alert('PDF បានបង្កើតជោគជ័យ!');
     } catch (error) {
@@ -820,20 +846,20 @@ export default function WorkSchedulePage() {
   // Print stats function
   const handlePrintStats = () => {
     if (statsModalData.employees.length === 0) return;
-    
+
     // Sort employees by HR employee number (ល.រ) for matching HR database order
-    const sortedEmployees = [...statsModalData.employees].sort((a, b) => {
-      // Find HR record by staffId to get 'no' field
-      const hrA = hrData.find(hr => hr.staffId === (a.staffId || a.cardNumber));
-      const hrB = hrData.find(hr => hr.staffId === (b.staffId || b.cardNumber));
-      
-      // Sort by 'no' field from HR database which represents HR sequence (1, 2, 3, 4...)
-      const numA = parseInt(hrA?.no || a.no || a.employeeNumber) || 999999;
-      const numB = parseInt(hrB?.no || b.no || b.employeeNumber) || 999999;
-      
-      return numA - numB;
-    });
-    
+      const sortedEmployees = [...statsModalData.employees].sort((a, b) => {
+        // Find HR record by staffId to get 'no' field
+        const hrA = hrMap.get(String(a.staffId || a.cardNumber));
+        const hrB = hrMap.get(String(b.staffId || b.cardNumber));
+
+        // Sort by 'no' field from HR database which represents HR sequence (1, 2, 3, 4...)
+        const numA = parseInt(hrA?.no || a.no || a.employeeNumber) || 999999;
+        const numB = parseInt(hrB?.no || b.no || b.employeeNumber) || 999999;
+
+        return numA - numB;
+      });
+
     // Format current date in Khmer
     const currentDate = new Date();
     const monthsKh = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
@@ -841,7 +867,7 @@ export default function WorkSchedulePage() {
     const month = monthsKh[currentDate.getMonth()];
     const year = toKhmerNumerals(currentDate.getFullYear());
     const currentKhmerDate = `ថ្ងៃទី${day} ខែ${month} ឆ្នាំ${year}`;
-    
+
     const printWindow = window.open('', '_blank');
     const printContent = `
       <!DOCTYPE html>
@@ -872,7 +898,7 @@ export default function WorkSchedulePage() {
             <div style="margin: 1px 0; border-bottom: 1px solid #000; width: 150px; margin: 1px auto;font-weight: normal"></div>
           </div>
 
-          <h1 style="font-size: 14px; font-family: '!Khmer OS Siemreap';font-weight: bold">របាយការណ៍ ${statsModalData.title} ${currentKhmerDate}</h1>
+          <h1 style="font-size: 14px; font-family: 'Khmer OS Siemreap';font-weight: bold">របាយការណ៍ ${statsModalData.title} ${currentKhmerDate}</h1>
 
           <table>
             <thead>
@@ -905,7 +931,7 @@ export default function WorkSchedulePage() {
         </body>
       </html>
     `;
-    
+
     printWindow.document.write(printContent);
     printWindow.document.close();
     printWindow.focus();
@@ -924,20 +950,20 @@ export default function WorkSchedulePage() {
 
       // Prepare data for Excel
       const worksheetData = [];
-      
+
       // Sort employees by HR employee number (ល.រ) for matching HR database order
       const sortedEmployees = [...statsModalData.employees].sort((a, b) => {
         // Find HR record by staffId to get 'no' field
-        const hrA = hrData.find(hr => hr.staffId === (a.staffId || a.cardNumber));
-        const hrB = hrData.find(hr => hr.staffId === (b.staffId || b.cardNumber));
-        
+        const hrA = hrMap.get(String(a.staffId || a.cardNumber));
+        const hrB = hrMap.get(String(b.staffId || b.cardNumber));
+
         // Sort by 'no' field from HR database which represents HR sequence (1, 2, 3, 4...)
         const numA = parseInt(hrA?.no || a.no || a.employeeNumber) || 999999;
         const numB = parseInt(hrB?.no || b.no || b.employeeNumber) || 999999;
-        
+
         return numA - numB;
       });
-      
+
       // Add header row
       worksheetData.push([
         'ល.រ',
@@ -1036,100 +1062,74 @@ export default function WorkSchedulePage() {
           key: 'morning',
           title: 'ចូលពេលព្រឹក',
           filterFn: (emp) => {
-            const schedule = schedules.find(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              if (scheduleEmployeeId !== emp._id || schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return false;
-              if (!s.shiftStart || !s.shiftEnd) return false;
-              try {
-                const startParts = s.shiftStart.split(':');
-                const endParts = s.shiftEnd.split(':');
-                const startHour = parseInt(startParts[0]);
-                const endHour = parseInt(endParts[0]);
-                if (startHour < 12 && endHour >= 12) return true;
-                if (startHour < 12 && endHour < 12) {
-                  const startMinutes = startHour * 60 + parseInt(startParts[1] || 0);
-                  const endMinutes = endHour * 60 + parseInt(endParts[1] || 0);
-                  let duration = endMinutes - startMinutes;
-                  if (duration <= 0) duration += 24 * 60;
-                  return duration < 20 * 60;
-                }
-                if (startHour >= 12 && endHour >= 12) return true;
-                return false;
-              } catch (err) {
-                return false;
+            const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+            if (!s || s.shiftTitle === 'Day Off' || !s.shiftStart || !s.shiftEnd) return false;
+            try {
+              const startParts = s.shiftStart.split(':');
+              const endParts = s.shiftEnd.split(':');
+              const startHour = parseInt(startParts[0]);
+              const endHour = parseInt(endParts[0]);
+              if (startHour < 12 && endHour >= 12) return true;
+              if (startHour < 12 && endHour < 12) {
+                const startMin = startHour * 60 + parseInt(startParts[1] || 0);
+                const endMin = endHour * 60 + parseInt(endParts[1] || 0);
+                let dur = endMin - startMin;
+                if (dur <= 0) dur += 24 * 60;
+                return dur < 20 * 60;
               }
-            });
-            return schedule !== undefined;
+              if (startHour >= 12 && endHour >= 12) return true;
+              return false;
+            } catch (e) { return false; }
           }
         },
         {
           key: 'night',
           title: 'វេនល្ងាច',
           filterFn: (emp) => {
-            const schedule = schedules.find(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              if (scheduleEmployeeId !== emp._id || schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return false;
-              if (!s.shiftStart || !s.shiftEnd) return false;
+            const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+            if (!s || s.shiftTitle === 'Day Off' || !s.shiftStart || !s.shiftEnd) return false;
+            try {
               const startHour = parseInt(s.shiftStart.split(':')[0]);
               const endHour = parseInt(s.shiftEnd.split(':')[0]);
               return startHour >= 12 && endHour < 12;
-            });
-            return schedule !== undefined;
+            } catch (e) { return false; }
           }
         },
         {
           key: '24hour',
           title: 'វេន២៤ម៉ោង',
           filterFn: (emp) => {
-            const schedule = schedules.find(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              if (scheduleEmployeeId !== emp._id || schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return false;
-              if (!s.shiftStart || !s.shiftEnd) return false;
-              try {
-                const startParts = s.shiftStart.split(':');
-                const endParts = s.shiftEnd.split(':');
-                const startHour = parseInt(startParts[0]);
-                const endHour = parseInt(endParts[0]);
-                if (startHour < 12 && endHour < 12) {
-                  const startMinutes = startHour * 60 + parseInt(startParts[1] || 0);
-                  const endMinutes = endHour * 60 + parseInt(endParts[1] || 0);
-                  let duration = endMinutes - startMinutes;
-                  if (duration <= 0) duration += 24 * 60;
-                  return duration >= 20 * 60;
-                }
-                return false;
-              } catch (err) {
-                return false;
+            const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+            if (!s || s.shiftTitle === 'Day Off' || !s.shiftStart || !s.shiftEnd) return false;
+            try {
+              const startParts = s.shiftStart.split(':');
+              const endParts = s.shiftEnd.split(':');
+              const startHour = parseInt(startParts[0]);
+              const endHour = parseInt(endParts[0]);
+              if (startHour < 12 && endHour < 12) {
+                const startMin = startHour * 60 + parseInt(startParts[1] || 0);
+                const endMin = endHour * 60 + parseInt(endParts[1] || 0);
+                let dur = endMin - startMin;
+                if (dur <= 0) dur += 24 * 60;
+                return dur >= 20 * 60;
               }
-            });
-            return schedule !== undefined;
+              return false;
+            } catch (e) { return false; }
           }
         },
         {
           key: 'dayoff',
           title: 'ឈប់សម្រាក (Day Off)',
           filterFn: (emp) => {
-            const schedule = schedules.find(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              return scheduleEmployeeId === emp._id && schedDate === selectedDayStats && s.shiftTitle === 'Day Off';
-            });
-            return schedule !== undefined;
+            const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+            return s && s.shiftTitle === 'Day Off';
           }
         },
         {
           key: 'noschedule',
           title: 'មិនបានកំណត់ម៉ោង',
           filterFn: (emp) => {
-            const hasSchedule = schedules.some(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              return scheduleEmployeeId === emp._id && schedDate === selectedDayStats;
-            });
-            return !hasSchedule;
+            return !scheduleMap.has(`${String(emp._id)}_${selectedDayStats}`);
           }
         }
       ];
@@ -1149,8 +1149,8 @@ export default function WorkSchedulePage() {
       categoryLists.forEach(cat => {
         // Sort employees by HR 'no'
         const sortedEmployees = [...cat.employees].sort((a, b) => {
-          const hrA = hrData.find(hr => hr.staffId === (a.staffId || a.cardNumber));
-          const hrB = hrData.find(hr => hr.staffId === (b.staffId || b.cardNumber));
+          const hrA = hrMap.get(String(a.staffId || a.cardNumber));
+          const hrB = hrMap.get(String(b.staffId || b.cardNumber));
           const numA = parseInt(hrA?.no || a.no || a.employeeNumber) || 999999;
           const numB = parseInt(hrB?.no || b.no || b.employeeNumber) || 999999;
           return numA - numB;
@@ -1184,100 +1184,74 @@ export default function WorkSchedulePage() {
           key: 'morning',
           title: 'ចូលពេលព្រឹក',
           filterFn: (emp) => {
-            const schedule = schedules.find(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              if (scheduleEmployeeId !== emp._id || schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return false;
-              if (!s.shiftStart || !s.shiftEnd) return false;
-              try {
-                const startParts = s.shiftStart.split(':');
-                const endParts = s.shiftEnd.split(':');
-                const startHour = parseInt(startParts[0]);
-                const endHour = parseInt(endParts[0]);
-                if (startHour < 12 && endHour >= 12) return true;
-                if (startHour < 12 && endHour < 12) {
-                  const startMinutes = startHour * 60 + parseInt(startParts[1] || 0);
-                  const endMinutes = endHour * 60 + parseInt(endParts[1] || 0);
-                  let duration = endMinutes - startMinutes;
-                  if (duration <= 0) duration += 24 * 60;
-                  return duration < 20 * 60;
-                }
-                if (startHour >= 12 && endHour >= 12) return true;
-                return false;
-              } catch (err) {
-                return false;
+            const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+            if (!s || s.shiftTitle === 'Day Off' || !s.shiftStart || !s.shiftEnd) return false;
+            try {
+              const startParts = s.shiftStart.split(':');
+              const endParts = s.shiftEnd.split(':');
+              const startHour = parseInt(startParts[0]);
+              const endHour = parseInt(endParts[0]);
+              if (startHour < 12 && endHour >= 12) return true;
+              if (startHour < 12 && endHour < 12) {
+                const startMin = startHour * 60 + parseInt(startParts[1] || 0);
+                const endMin = endHour * 60 + parseInt(endParts[1] || 0);
+                let dur = endMin - startMin;
+                if (dur <= 0) dur += 24 * 60;
+                return dur < 20 * 60;
               }
-            });
-            return schedule !== undefined;
+              if (startHour >= 12 && endHour >= 12) return true;
+              return false;
+            } catch (e) { return false; }
           }
         },
         {
           key: 'night',
           title: 'វេនល្ងាច',
           filterFn: (emp) => {
-            const schedule = schedules.find(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              if (scheduleEmployeeId !== emp._id || schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return false;
-              if (!s.shiftStart || !s.shiftEnd) return false;
+            const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+            if (!s || s.shiftTitle === 'Day Off' || !s.shiftStart || !s.shiftEnd) return false;
+            try {
               const startHour = parseInt(s.shiftStart.split(':')[0]);
               const endHour = parseInt(s.shiftEnd.split(':')[0]);
               return startHour >= 12 && endHour < 12;
-            });
-            return schedule !== undefined;
+            } catch (e) { return false; }
           }
         },
         {
           key: '24hour',
           title: 'វេន២៤ម៉ោង',
           filterFn: (emp) => {
-            const schedule = schedules.find(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              if (scheduleEmployeeId !== emp._id || schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return false;
-              if (!s.shiftStart || !s.shiftEnd) return false;
-              try {
-                const startParts = s.shiftStart.split(':');
-                const endParts = s.shiftEnd.split(':');
-                const startHour = parseInt(startParts[0]);
-                const endHour = parseInt(endParts[0]);
-                if (startHour < 12 && endHour < 12) {
-                  const startMinutes = startHour * 60 + parseInt(startParts[1] || 0);
-                  const endMinutes = endHour * 60 + parseInt(endParts[1] || 0);
-                  let duration = endMinutes - startMinutes;
-                  if (duration <= 0) duration += 24 * 60;
-                  return duration >= 20 * 60;
-                }
-                return false;
-              } catch (err) {
-                return false;
+            const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+            if (!s || s.shiftTitle === 'Day Off' || !s.shiftStart || !s.shiftEnd) return false;
+            try {
+              const startParts = s.shiftStart.split(':');
+              const endParts = s.shiftEnd.split(':');
+              const startHour = parseInt(startParts[0]);
+              const endHour = parseInt(endParts[0]);
+              if (startHour < 12 && endHour < 12) {
+                const startMin = startHour * 60 + parseInt(startParts[1] || 0);
+                const endMin = endHour * 60 + parseInt(endParts[1] || 0);
+                let dur = endMin - startMin;
+                if (dur <= 0) dur += 24 * 60;
+                return dur >= 20 * 60;
               }
-            });
-            return schedule !== undefined;
+              return false;
+            } catch (e) { return false; }
           }
         },
         {
           key: 'dayoff',
           title: 'ឈប់សម្រាក (Day Off)',
           filterFn: (emp) => {
-            const schedule = schedules.find(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              return scheduleEmployeeId === emp._id && schedDate === selectedDayStats && s.shiftTitle === 'Day Off';
-            });
-            return schedule !== undefined;
+            const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+            return s && s.shiftTitle === 'Day Off';
           }
         },
         {
           key: 'noschedule',
           title: 'មិនបានកំណត់ម៉ោង',
           filterFn: (emp) => {
-            const hasSchedule = schedules.some(s => {
-              const schedDate = new Date(s.date).toISOString().slice(0, 10);
-              const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-              return scheduleEmployeeId === emp._id && schedDate === selectedDayStats;
-            });
-            return !hasSchedule;
+            return !scheduleMap.has(`${String(emp._id)}_${selectedDayStats}`);
           }
         }
       ];
@@ -1300,8 +1274,8 @@ export default function WorkSchedulePage() {
       categoryLists.forEach(cat => {
         // Sort employees by HR 'no'
         const sortedEmployees = [...cat.employees].sort((a, b) => {
-          const hrA = hrData.find(hr => hr.staffId === (a.staffId || a.cardNumber));
-          const hrB = hrData.find(hr => hr.staffId === (b.staffId || b.cardNumber));
+          const hrA = hrMap.get(String(a.staffId || a.cardNumber));
+          const hrB = hrMap.get(String(b.staffId || b.cardNumber));
           const numA = parseInt(hrA?.no || a.no || a.employeeNumber) || 999999;
           const numB = parseInt(hrB?.no || b.no || b.employeeNumber) || 999999;
           return numA - numB;
@@ -1340,7 +1314,7 @@ export default function WorkSchedulePage() {
       detailsHTML += '</div>';
       return detailsHTML;
     };
-    
+
     // Calculate comprehensive statistics
     const totalEmployees = filteredEmployees.length;
     const workingToday = dailyStats.workingToday;
@@ -1349,7 +1323,7 @@ export default function WorkSchedulePage() {
     const shift24Hours = dailyStats.shift24Hours;
     const dayOffToday = dailyStats.dayOffToday;
     const noSchedule = dailyStats.noSchedule;
-    
+
     // Calculate percentages
     const workingPercent = totalEmployees > 0 ? ((workingToday / totalEmployees) * 100).toFixed(1) : '0.0';
     const dayShiftPercent = totalEmployees > 0 ? ((dayShift / totalEmployees) * 100).toFixed(1) : '0.0';
@@ -1374,18 +1348,33 @@ export default function WorkSchedulePage() {
           <meta charset="UTF-8">
           <title>របាយការណ៍សរុប</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
-            h1 { text-align: center; font-size: 18px; margin-bottom: 20px; }
-            h2 { font-size: 16px; margin: 20px 0 10px 0; color: #333; }
+            @page { 
+              size: A4; 
+              margin: 15mm 15mm 20mm 15mm; 
+            }
+            body { 
+              font-family: 'Khmer OS Siemreap', 'Arial', sans-serif; 
+              margin: 0; 
+              padding: 0;
+              width: 210mm;
+              margin: auto;
+              background: white;
+            }
+            .content-wrapper {
+              padding: 0;
+            }
+            h1 { text-align: center; font-size: 16px; margin: 20px 0; }
+            h2 { font-size: 14px; margin: 15px 0 10px 0; color: #333; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
-            th { background-color: #f5f5f5; font-weight: bold; text-align: center; }
+            th, td { border: 1px solid #000; padding: 6px 10px; text-align: left; font-size: 11px; }
+            th { background-color: #f0f0f0; font-weight: bold; text-align: center; }
             .text-center { text-align: center; }
             .text-right { text-align: right; }
-            .summary-box { border: 2px solid #333; padding: 15px; margin: 20px 0; }
-            .category-title { font-weight: bold; font-size: 14px; margin: 15px 0 5px 0; }
             @media print {
-              body { margin: 10px; }
+              body { 
+                width: 100%; 
+                margin: 0;
+              }
               table { page-break-inside: auto; }
               tr { page-break-inside: avoid; }
             }
@@ -1399,7 +1388,7 @@ export default function WorkSchedulePage() {
             <div style="margin: 10px 0; border-bottom: 1px solid #000; width: 150px; margin: 1px auto;font-weight: normal"></div>
           </div>
 
-          <h1 style="font-size: 12px; font-family: '!Khmer OS Siemreap';font-weight: bold">របាយការណ៍សរុបសម្រាប់ ${khmerDate}</h1>
+          <h1 style="font-size: 12px; font-family: 'Khmer OS Siemreap';font-weight: bold">របាយការណ៍សរុបសម្រាប់ ${khmerDate}</h1>
           </div>
             <table>
               <thead>
@@ -1457,7 +1446,7 @@ export default function WorkSchedulePage() {
             </table>
           </div>
 
-          ${generateDetailedEmployeeLists()}
+          <!-- (Detailed list of names removed as per user request to show only card summary) -->
 
           <div style="margin-top: 30px;">
             <div style="float: left;">
@@ -1475,7 +1464,7 @@ export default function WorkSchedulePage() {
         </body>
       </html>
     `;
-    
+
     printWindow.document.write(printContent);
     printWindow.document.close();
     printWindow.focus();
@@ -1486,230 +1475,181 @@ export default function WorkSchedulePage() {
   // Function to show stats detail modal
   const showStatsDetail = (type) => {
     let title = '';
-    let employees = [];
-    
-    switch(type) {
+    let employeesList = [];
+
+    switch (type) {
       case 'totalEmployees':
         title = 'បុគ្គលិកសរុប';
-        employees = filteredEmployees.map(emp => ({
+        employeesList = filteredEmployees.map(emp => ({
           ...emp,
           status: 'មានក្នុងបញ្ជី',
           statusColor: 'text-blue-900'
         }));
         break;
-        
+
       case 'workingToday':
         title = 'ធ្វើការថ្ងៃនេះ';
-        employees = filteredEmployees.filter(emp => {
-          const schedule = schedules.find(s => {
-            const schedDate = new Date(s.date).toISOString().slice(0, 10);
-            const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-            return scheduleEmployeeId === emp._id && 
-                   schedDate === selectedDayStats && 
-                   s.shiftTitle !== 'Day Off';
-          });
-          return schedule;
+        employeesList = filteredEmployees.filter(emp => {
+          const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+          return s && s.shiftTitle !== 'Day Off';
         }).map(emp => {
-          const schedule = schedules.find(s => {
-            const schedDate = new Date(s.date).toISOString().slice(0, 10);
-            const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-            return scheduleEmployeeId === emp._id && 
-                   schedDate === selectedDayStats && 
-                   s.shiftTitle !== 'Day Off';
-          });
+          const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
           return {
             ...emp,
-            status: schedule ? `${schedule.shiftStart} - ${schedule.shiftEnd}` : 'កំពុងធ្វើការ',
+            status: s ? `${s.shiftStart} - ${s.shiftEnd}` : 'កំពុងធ្វើការ',
             statusColor: 'text-green-600'
           };
         });
         break;
-        
+
       case 'dayShift':
         title = 'ចូលពេលព្រឹក';
-        employees = filteredEmployees.filter(emp => {
-          const schedule = schedules.find(s => {
-            const schedDate = new Date(s.date).toISOString().slice(0, 10);
-            const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-            if (scheduleEmployeeId !== emp._id || schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return false;
-            
-            if (!s.shiftStart || !s.shiftEnd) return false;
-            
-            try {
-              const startParts = s.shiftStart.split(':');
-              const endParts = s.shiftEnd.split(':');
-              const startHour = parseInt(startParts[0]);
-              const endHour = parseInt(endParts[0]);
-              
-              // Day shift: starts AM (0-11) and ends PM (12-23)
-              if (startHour < 12 && endHour >= 12) {
-                return true;
-              }
-              // 24-hour shift: starts AM and ends AM next day (span >= 20 hours) - NOT day shift
-              else if (startHour < 12 && endHour < 12) {
-                const startMinutes = startHour * 60 + parseInt(startParts[1] || 0);
-                const endMinutes = endHour * 60 + parseInt(endParts[1] || 0);
-                let duration = endMinutes - startMinutes;
-                if (duration <= 0) duration += 24 * 60;
-                
-                // If duration >= 20 hours, it's 24-hour shift, NOT day shift
-                if (duration >= 20 * 60) {
-                  return false;
-                } else {
-                  // Short AM-AM shift (not 24h), count as day shift
-                  return true;
-                }
-              }
-              // PM to PM shift - count as day shift
-              else if (startHour >= 12 && endHour >= 12) {
-                return true;
-              }
-              // Night shift: starts PM (12-23) and ends AM (0-11) - NOT day shift
-              else if (startHour >= 12 && endHour < 12) {
-                return false;
-              }
-              
-              return false;
-            } catch (err) {
-              return false;
-            }
-          });
-          return schedule;
-        }).map(emp => {
-          const schedule = schedules.find(s => {
-            const schedDate = new Date(s.date).toISOString().slice(0, 10);
-            const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-            return scheduleEmployeeId === emp._id && schedDate === selectedDayStats;
-          });
-          return {
-            ...emp,
-            status: schedule ? `${schedule.shiftStart} - ${schedule.shiftEnd}` : 'ចូលពេលព្រឹក',
-            statusColor: 'text-teal-600'
-          };
-        });
-        break;
-        
-      case 'nightShift':
-        title = 'វេនល្ងាច';
-        employees = filteredEmployees.filter(emp => {
-          const schedule = schedules.find(s => {
-            const schedDate = new Date(s.date).toISOString().slice(0, 10);
-            const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-            if (scheduleEmployeeId !== emp._id || schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return false;
-            
-            if (!s.shiftStart || !s.shiftEnd) return false;
-            const startHour = parseInt(s.shiftStart.split(':')[0]);
-            const endHour = parseInt(s.shiftEnd.split(':')[0]);
-            
-            // Night shift: starts PM (12-23) and ends AM (0-11)
-            return startHour >= 12 && endHour < 12;
-          });
-          return schedule;
-        }).map(emp => {
-          const schedule = schedules.find(s => {
-            const schedDate = new Date(s.date).toISOString().slice(0, 10);
-            const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-            return scheduleEmployeeId === emp._id && schedDate === selectedDayStats;
-          });
-          return {
-            ...emp,
-            status: schedule ? `${schedule.shiftStart} - ${schedule.shiftEnd}` : 'វេនល្ងាច',
-            statusColor: 'text-indigo-600'
-          };
-        });
-        break;
-        
-      case 'shift24Hours':
-        title = 'វេន24ម៉ោង';
-        employees = filteredEmployees.filter(emp => {
-          const schedule = schedules.find(s => {
-            const schedDate = new Date(s.date).toISOString().slice(0, 10);
-            const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-            if (scheduleEmployeeId !== emp._id || schedDate !== selectedDayStats || s.shiftTitle === 'Day Off') return false;
-            
-            if (!s.shiftStart || !s.shiftEnd) return false;
+        employeesList = filteredEmployees.filter(emp => {
+          const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+          if (!s || s.shiftTitle === 'Day Off' || !s.shiftStart || !s.shiftEnd) return false;
+          try {
             const startParts = s.shiftStart.split(':');
             const endParts = s.shiftEnd.split(':');
             const startHour = parseInt(startParts[0]);
             const endHour = parseInt(endParts[0]);
-            
+            if (startHour < 12 && endHour >= 12) return true;
             if (startHour < 12 && endHour < 12) {
-              const startMinutes = startHour * 60 + parseInt(startParts[1] || 0);
-              const endMinutes = endHour * 60 + parseInt(endParts[1] || 0);
-              let duration = endMinutes - startMinutes;
-              if (duration <= 0) duration += 24 * 60;
-              return duration >= 20 * 60;
+              const startMin = startHour * 60 + parseInt(startParts[1] || 0);
+              const endMin = endHour * 60 + parseInt(endParts[1] || 0);
+              let dur = endMin - startMin;
+              if (dur <= 0) dur += 24 * 60;
+              return dur < 20 * 60;
             }
+            if (startHour >= 12 && endHour >= 12) return true;
             return false;
-          });
-          return schedule;
+          } catch (e) { return false; }
         }).map(emp => {
-          const schedule = schedules.find(s => {
-            const schedDate = new Date(s.date).toISOString().slice(0, 10);
-            const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-            return scheduleEmployeeId === emp._id && schedDate === selectedDayStats;
-          });
+          const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
           return {
             ...emp,
-            status: schedule ? `${schedule.shiftStart} - ${schedule.shiftEnd}` : 'វេន24ម៉ោង',
+            status: s ? `${s.shiftStart} - ${s.shiftEnd}` : 'ចូលពេលព្រឹក',
+            statusColor: 'text-teal-600'
+          };
+        });
+        break;
+
+      case 'nightShift':
+        title = 'វេនល្ងាច';
+        employeesList = filteredEmployees.filter(emp => {
+          const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+          if (!s || s.shiftTitle === 'Day Off' || !s.shiftStart || !s.shiftEnd) return false;
+          try {
+            const startHour = parseInt(s.shiftStart.split(':')[0]);
+            const endHour = parseInt(s.shiftEnd.split(':')[0]);
+            return startHour >= 12 && endHour < 12;
+          } catch (e) { return false; }
+        }).map(emp => {
+          const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+          return {
+            ...emp,
+            status: s ? `${s.shiftStart} - ${s.shiftEnd}` : 'វេនល្ងាច',
+            statusColor: 'text-indigo-600'
+          };
+        });
+        break;
+
+      case 'shift24Hours':
+        title = 'វេន24ម៉ោង';
+        employeesList = filteredEmployees.filter(emp => {
+          const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+          if (!s || s.shiftTitle === 'Day Off' || !s.shiftStart || !s.shiftEnd) return false;
+          try {
+            const startParts = s.shiftStart.split(':');
+            const endParts = s.shiftEnd.split(':');
+            const startHour = parseInt(startParts[0]);
+            const endHour = parseInt(endParts[0]);
+            if (startHour < 12 && endHour < 12) {
+              const startMin = startHour * 60 + parseInt(startParts[1] || 0);
+              const endMin = endHour * 60 + parseInt(endParts[1] || 0);
+              let dur = endMin - startMin;
+              if (dur <= 0) dur += 24 * 60;
+              return dur >= 20 * 60;
+            }
+            return false;
+          } catch (e) { return false; }
+        }).map(emp => {
+          const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+          return {
+            ...emp,
+            status: s ? `${s.shiftStart} - ${s.shiftEnd}` : 'វេន24ម៉ោង',
             statusColor: 'text-yellow-600'
           };
         });
         break;
-        
+
       case 'dayOffToday':
         title = 'ឈប់សម្រាកថ្ងៃនេះ';
-        employees = filteredEmployees.filter(emp => {
-          const schedule = schedules.find(s => {
-            const schedDate = new Date(s.date).toISOString().slice(0, 10);
-            const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-            return scheduleEmployeeId === emp._id && 
-                   schedDate === selectedDayStats && 
-                   s.shiftTitle === 'Day Off';
-          });
-          return schedule;
+        employeesList = filteredEmployees.filter(emp => {
+          const s = scheduleMap.get(`${String(emp._id)}_${selectedDayStats}`);
+          return s && s.shiftTitle === 'Day Off';
         }).map(emp => ({
           ...emp,
           status: 'ឈប់សម្រាក',
           statusColor: 'text-red-600'
         }));
         break;
-        
+
       case 'noSchedule':
         title = 'មិនបានកំណត់ម៉ោង';
-        employees = filteredEmployees.filter(emp => {
-          const hasSchedule = schedules.some(s => {
-            const schedDate = new Date(s.date).toISOString().slice(0, 10);
-            const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-            return scheduleEmployeeId === emp._id && schedDate === selectedDayStats;
-          });
-          return !hasSchedule;
+        employeesList = filteredEmployees.filter(emp => {
+          return !scheduleMap.has(`${String(emp._id)}_${selectedDayStats}`);
         }).map(emp => ({
           ...emp,
           status: 'មិនបានកំណត់តារាងការងារ',
           statusColor: 'text-gray-600'
         }));
         break;
-        
+
       default:
         return;
     }
-    
-    setStatsModalData({ title, employees, type });
+
+    setStatsModalData({ title, employees: employeesList, type });
     setShowStatsModal(true);
   };
 
   // Load schedules for the month
-  const loadSchedules = async () => {
+  const loadSchedules = async (skipAutoSync = false) => {
     setLoading(true);
     try {
-      const [year, month] = selectedMonth.split('-').map(Number);
-      
+      const { year, month } = getYearMonthFromSelected();
+
       // Use new work schedules API
       const { data } = await api.get('/work-schedules', {
         params: { year, month }
       });
-      setSchedules(Array.isArray(data) ? data : []);
+      const schedulesList = Array.isArray(data) ? data : [];
+      setSchedules(schedulesList);
+
+      // Fetch shift groups to identify employee groups
+      try {
+        const { data: sgData } = await api.get('/shift-groups', {
+          params: { year, month }
+        });
+        setShiftGroups(Array.isArray(sgData) ? sgData : []);
+      } catch (err) {
+        console.error('Error loading shift groups:', err);
+      }
+
+      // AUTOMATIC SYNC: Trigger if no schedules exist, or if coverage is low (e.g. < 80% of employees)
+      // NOTE: We skip this if the user just manually cleared the month.
+      const uniqueScheduled = new Set(schedulesList.map(s => String(s.employeeId?._id || s.employeeId))).size;
+      const totalActive = employees.length;
+
+      if (!skipAutoSync && !window.skipAutoSyncOnce && (schedulesList.length === 0 || (totalActive > 0 && uniqueScheduled < totalActive * 0.8))) {
+        console.log(`Coverage low (${uniqueScheduled}/${totalActive}), triggering automatic sync...`);
+        handleAutoFillStandard(true);
+      }
+
+      // Reset the one-time skip flag
+      if (window.skipAutoSyncOnce) {
+        window.skipAutoSyncOnce = false;
+      }
     } catch (error) {
       console.error('Error loading schedules:', error);
       setSchedules([]);
@@ -1718,46 +1658,92 @@ export default function WorkSchedulePage() {
     }
   };
 
-  // Load employees
+  const handleAutoFillStandard = async (silent = false) => {
+    if (!silent && !confirm('តើអ្នកចង់បំពេញម៉ោងការងារអូតូ ដោយផ្អែកលើការកំណត់ក្នុង "Group Timetables" មែនទេ? (ប្រព័ន្ធនឹងកំណត់ថ្ងៃឈប់សម្រាកបុណ្យជាតិអូតូសម្រាប់ផ្នែករដ្ឋបាល)')) return;
+
+    // We don't set global loading to true if silent to avoid UI flicker
+    if (!silent) setLoading(true);
+
+    try {
+      const { year, month } = getYearMonthFromSelected();
+      const res = await api.post('/work-schedules/auto-fill-standard', {
+        month,
+        year
+      });
+
+      if (res.data.success) {
+        if (!silent) alert(res.data.message || 'បំពេញម៉ោងអូតូបានជោគជ័យ!');
+        await loadSchedules(true); // reload without triggering loop
+      }
+    } catch (err) {
+      console.error('Auto Fill Error:', err);
+      if (!silent) alert('មានបញ្ហាក្នុងការបំពេញម៉ោងអូតូ: ' + (err.response?.data?.message || err.message));
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  // Load employees from HR as primary source
   const loadEmployees = async () => {
     try {
-      console.log('🔄 Loading employees...');
-      console.log('🔑 Auth token:', localStorage.getItem('auth') ? 'Present' : 'Missing');
-      
-      // Try work-schedule-employees first, fallback to regular employees
-      let employeeList = [];
-      
-      try {
-        console.log('📡 Trying work-schedule-employees API...');
-        const { data: workScheduleEmployees } = await api.get('/work-schedule-employees', {
-          params: { 
-            limit: 10000,
-            page: 1 
-          }
-        });
-        console.log('✅ Work schedule employees loaded:', workScheduleEmployees.length || 0);
-        employeeList = Array.isArray(workScheduleEmployees) ? workScheduleEmployees : [];
-      } catch (error) {
-        console.log('❌ Work schedule employees API failed:', error.message);
-        console.log('📡 Trying regular employees API...');
-        
-        try {
-          const { data: regularEmployees } = await api.get('/employees');
-          console.log('✅ Regular employees loaded:', regularEmployees.length || 0);
-          employeeList = Array.isArray(regularEmployees) ? regularEmployees : [];
-        } catch (employeeError) {
-          console.error('❌ Both employee APIs failed:', employeeError.message);
+      setLoading(true);
+      console.log('🔄 Loading employees from HR primary source...');
+
+      // Fetch from HR API
+      const { data: hrList } = await api.get('/hr', {
+        params: {
+          limit: 10000,
+          page: 1
         }
+      });
+
+      let employeeList = Array.isArray(hrList) ? hrList.filter(isCountedActive).map(emp => ({
+        ...emp,
+        // Ensure consistent field naming for components
+        khmerName: emp.khmerName || emp.fullName || emp.name || '',
+        cardNumber: emp.staffId || emp.cardNumber || '',
+        position: emp.Position_Kh || emp.position || '',
+        department: emp.Department_Kh || emp.department || ''
+      })) : [];
+
+      // Filter by department for non-admin users
+      const userDept = perms.user?.department;
+      const perms_list = perms.list || [];
+      const isAdmin = perms_list.includes('Admin') || perms_list.includes('Administrator') || perms.user?.email === 'admin@hospital.com';
+      
+      // Fallback: if userDept is missing but fullName contains 'ផ្នែក', use fullName
+      let effectiveDept = userDept;
+      if (!effectiveDept && perms.user?.fullName && perms.user.fullName.includes('ផ្នែក')) {
+        effectiveDept = perms.user.fullName;
       }
-      
+
+      if (!isAdmin && effectiveDept) {
+        employeeList = employeeList.filter(emp => 
+          emp.Department_Kh && (emp.Department_Kh === effectiveDept || effectiveDept.includes(emp.Department_Kh))
+        );
+      }
+
+      console.log('✅ HR employees loaded as primary list:', employeeList.length);
       setEmployees(employeeList);
-      
-      // Also load HR data and department data for department information
-      await loadHRData();
+      setHrData(employeeList); // Sync hrData for lookups too
+
+      // Load departments for the filter dropdown
       await loadDepartments();
     } catch (error) {
-      console.error('Error loading employees:', error);
-      setEmployees([]);
+      console.error('Error loading employees from HR:', error);
+
+      // Fallback to legacy endpoints if HR fails
+      try {
+        console.log('📡 Falling back to regular employees API...');
+        const { data: regularEmployees } = await api.get('/employees');
+        const fallbackList = Array.isArray(regularEmployees) ? regularEmployees : [];
+        setEmployees(fallbackList);
+      } catch (fallbackError) {
+        console.error('❌ All employee APIs failed:', fallbackError.message);
+        setEmployees([]);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1765,15 +1751,15 @@ export default function WorkSchedulePage() {
   const loadHRData = async () => {
     try {
       const { data } = await api.get('/hr', {
-        params: { 
+        params: {
           limit: 10000,
-          page: 1 
+          page: 1
         }
       });
       console.log('Loaded HR data:', data);
       console.log('HR data length:', data?.length || 0);
-      
-      const hrList = Array.isArray(data) ? data : [];
+
+      const hrList = Array.isArray(data) ? data.filter(isCountedActive) : [];
       console.log('HR departments found:', hrList.map(hr => hr.Department_Kh).filter(Boolean));
       setHrData(hrList);
     } catch (error) {
@@ -1798,21 +1784,58 @@ export default function WorkSchedulePage() {
 
   useEffect(() => {
     loadSchedules();
-  }, [selectedMonth]);
+    fetchHolidaysForMonth();
+  }, [startDate, endDate]);
+
+  const fetchHolidaysForMonth = async () => {
+    try {
+      const { year, month } = getYearMonthFromSelected();
+      const res = await api.get('/holidays', { params: { year } });
+      if (res.data && res.data.data) {
+        const filtered = res.data.data.filter(h => {
+          const m = parseInt(h.date.split('-')[1]);
+          return m === month;
+        });
+        setHolidays(filtered);
+      }
+    } catch (err) {
+      console.error('Error fetching holidays:', err);
+    }
+  };
+
+  const handleSaveHoliday = async (hData) => {
+    try {
+      await api.post('/holidays', hData);
+      fetchHolidaysForMonth();
+      setShowHolidayModal(false);
+      setEditingHoliday(null);
+    } catch (err) {
+      alert('Error saving holiday: ' + err.message);
+    }
+  };
+
+  const handleDeleteHoliday = async (id) => {
+    if (!id || !confirm('តើអ្នកប្រាកដថាចង់លុបថ្ងៃឈប់សម្រាកនេះមែនទេ?')) return;
+    try {
+      await api.delete(`/holidays/${id}`);
+      fetchHolidaysForMonth();
+    } catch (err) {
+      alert('Error deleting holiday: ' + err.message);
+    }
+  };
 
   useEffect(() => {
     loadEmployees();
   }, []);
 
+  useEffect(() => {
+    setSelectedDayStats(startDate);
+  }, [startDate]);
+
   // Get schedule for employee on specific day
-  const getScheduleForDay = (employeeId, day) => {
-    const dateStr = `${selectedMonth}-${String(day).padStart(2, '0')}`;
-    return schedules.find(s => {
-      const scheduleEmployeeId = s.employeeId?._id || s.employeeId;
-      return scheduleEmployeeId === employeeId && 
-             s.date && 
-             new Date(s.date).toISOString().slice(0, 10) === dateStr;
-    });
+  const getScheduleForDay = (employeeId, dateStr) => {
+    if (!employeeId) return null;
+    return scheduleMap.get(`${String(employeeId)}_${dateStr}`) || null;
   };
 
   // Handle form submit
@@ -1889,27 +1912,25 @@ export default function WorkSchedulePage() {
     const rows = data.slice(1);
 
     // Find column indices
-    const nameCol = headers.findIndex(h => 
+    const nameCol = headers.findIndex(h =>
       String(h).includes('ឈ្មោះ') || String(h).toLowerCase().includes('name')
     );
-    const phoneCol = headers.findIndex(h => 
-      String(h).includes('ទូរស័ព្ទ') || String(h).toLowerCase().includes('phone')
+    const phoneCol = headers.findIndex(h =>
+      String(h).includes('ទូរស័ព្ទ') || String(h).toLowerCase().includes('phone') || String(h).toLowerCase().includes('tel')
     );
-    const cardCol = headers.findIndex(h => 
-      String(h).includes('លេខកាត') || String(h).toLowerCase().includes('card') || String(h).toLowerCase().includes('id')
+    const cardCol = headers.findIndex(h =>
+      String(h).includes('លេខកាត') || String(h).toLowerCase().includes('card') || String(h).toLowerCase().includes('id') || String(h).toLowerCase().includes('code')
     );
-    const positionCol = headers.findIndex(h => 
-      String(h).includes('តួនាទី') || String(h).toLowerCase().includes('position')
-    );
-    const seqCol = headers.findIndex(h => 
-      String(h).includes('ល.រ') || String(h).toLowerCase().includes('no')
+    const positionCol = headers.findIndex(h =>
+      String(h).includes('តួនាទី') || String(h).toLowerCase().includes('position') || String(h).toLowerCase().includes('department')
     );
 
-    // Find where day columns start (look for "ទី1" or "01" or number patterns)
+    // Find where day columns start (look for "ទី1" or "01" or number patterns or dates "01-Apr")
     let firstDayCol = 5; // default
     for (let i = 0; i < headers.length; i++) {
       const header = String(headers[i]).trim();
-      if (header.match(/^ទី?\d+$/) || header.match(/^\d{2}$/)) {
+      // Match patterns: "1", "01", "ទី1", "01-Apr", "01/04" or raw Excel date numbers
+      if (header.match(/^ទី?\d{1,2}$/) || header.match(/^\d{1,2}[-\/]/) || (!isNaN(Date.parse(header)) && header.length > 2)) {
         firstDayCol = i;
         break;
       }
@@ -1938,23 +1959,24 @@ export default function WorkSchedulePage() {
         position: position
       });
 
-      // Parse schedule for each day
-      for (let day = 1; day <= daysInMonth; day++) {
-        const colIndex = firstDayCol + day - 1;
+      // Parse schedule for each day in the provided range
+      // Find which days are in this row based on headers
+      datesInRange.forEach((dateStr, rangeIdx) => {
+        const colIndex = firstDayCol + rangeIdx;
         const cellValue = row[colIndex];
 
-        if (!cellValue) continue;
+        if (!cellValue) return;
 
         const cellStr = String(cellValue).trim().toUpperCase();
-        
+
         // Skip empty or dash
-        if (!cellStr || cellStr === '-' || cellStr === '') continue;
+        if (!cellStr || cellStr === '-' || cellStr === '') return;
 
         let status = 'scheduled';
         let startTime = '08:00';
         let endTime = '17:00';
         let shiftTitle = 'Work';
-        
+
         // Check for "Day Off"
         if (cellStr.includes('DAY OFF') || cellStr === 'DAY OFF') {
           shiftTitle = 'Day Off';
@@ -1976,7 +1998,7 @@ export default function WorkSchedulePage() {
             if (startPeriod.toUpperCase() === 'AM' && startHour === 12) startHour = 0;
             if (endPeriod.toUpperCase() === 'PM' && endHour !== 12) endHour += 12;
             if (endPeriod.toUpperCase() === 'AM' && endHour === 12) endHour = 0;
-            
+
             // If no period specified for end time, assume PM if less than start hour
             if (!endPeriod && endHour < 12 && endHour < startHour) endHour += 12;
 
@@ -1985,8 +2007,6 @@ export default function WorkSchedulePage() {
           }
         }
 
-        const dateStr = `${selectedMonth}-${String(day).padStart(2, '0')}`;
-        
         parsed.schedules.push({
           staffId: cardNumber, // Will be replaced with employeeId after import
           date: dateStr,
@@ -1995,7 +2015,7 @@ export default function WorkSchedulePage() {
           shiftEnd: endTime,
           notes: String(cellValue)
         });
-      }
+      });
     });
 
     return parsed;
@@ -2010,41 +2030,44 @@ export default function WorkSchedulePage() {
 
     setLoading(true);
     try {
-      // Step 1: Import employees first
-      console.log(`Importing ${importData.employees.length} employees...`);
-      const empResponse = await api.post('/work-schedule-employees/bulk', { 
-        employees: importData.employees 
-      });
-      const importedEmployees = empResponse.data.results || [];
-      console.log(`Imported ${importedEmployees.length} employees`);
-
-      // Step 2: Create mapping from staffId to employeeId
+      // Step 1: Create mapping from staffId to HR _id using hrData state
+      // This eliminates the need for a separate work-schedule-employees collection
       const staffIdMap = {};
-      importedEmployees.forEach(emp => {
-        staffIdMap[emp.staffId] = emp._id;
+      hrData.forEach(emp => {
+        const sid = String(emp.staffId || emp.cardNumber || '').trim();
+        if (sid) staffIdMap[sid] = emp._id;
       });
 
-      // Step 3: Prepare schedules with employeeId references
-      const schedules = importData.schedules.map(sched => ({
-        employeeId: staffIdMap[sched.staffId],
-        date: sched.date,
-        shiftTitle: sched.shiftTitle || 'Work',
-        shiftStart: sched.shiftStart || '',
-        shiftEnd: sched.shiftEnd || '',
-        shiftColor: sched.shiftTitle === 'Day Off' ? '#ff0000' : '#0b74de',
-        notes: sched.notes || ''
-      })).filter(sched => sched.employeeId); // Only include schedules with valid employeeId
+      console.log(`HR Data map size: ${Object.keys(staffIdMap).length}`);
 
-      // Step 4: Bulk import schedules
+      // Step 2: Prepare schedules with HR _id references
+      let matchedCount = 0;
+      let totalSchedulesInImport = importData.schedules.length;
+
+      const schedules = importData.schedules.map(sched => {
+        const hrId = staffIdMap[String(sched.staffId).trim()];
+        if (hrId) matchedCount++;
+        return {
+          employeeId: hrId,
+          date: sched.date,
+          shiftTitle: sched.shiftTitle || 'Work',
+          shiftStart: sched.shiftStart || '',
+          shiftEnd: sched.shiftEnd || '',
+          shiftColor: sched.shiftTitle === 'Day Off' ? '#ff0000' : '#0b74de',
+          notes: sched.notes || ''
+        };
+      }).filter(sched => sched.employeeId); // Only include schedules with valid HR ID
+
+      // Step 3: Bulk import schedules
       if (schedules.length > 0) {
-        console.log(`Importing ${schedules.length} schedules...`);
+        console.log(`Importing ${schedules.length} schedules linked to HR IDs...`);
         const schedResponse = await api.post('/work-schedules/bulk', { schedules });
         const importedSchedules = schedResponse.data.results || [];
         console.log(`Imported ${importedSchedules.length} schedules`);
-        
-        alert(`Import បានបញ្ចប់!\nបុគ្គលិក: ${importedEmployees.length}\nតារាងការងារ: ${importedSchedules.length}`);
+
+        alert(`Import បានបញ្ចប់!\nទិន្នន័យបានផ្គូផ្គងជាមួយបុគ្គលិក HR: ${matchedCount} នាក់\nតារាងការងារសរុប: ${importedSchedules.length}`);
       } else {
-        alert(`Import បានបញ្ចប់!\nបុគ្គលិក: ${importedEmployees.length}\nតារាងការងារ: 0`);
+        alert(`រកមិនឃើញបុគ្គលិក HR ដែលត្រូវគ្នានឹងទិន្នន័យ Excel ទេ។ សូមឆែកមើល "លេខកាត" ក្នុង Excel ថាត្រូវគ្នានឹងក្នុង HR ឬទេ?`);
       }
 
       setShowImportModal(false);
@@ -2062,12 +2085,13 @@ export default function WorkSchedulePage() {
   // Export to Excel template
   const handleExportTemplate = () => {
     const templateData = [];
-    
+
     // Headers
     const headers = ['ល.រ', 'ទូរស័ព្ទ', 'លេខកាត', 'ឈ្មោះ', 'តួនាទី'];
-    for (let day = 1; day <= daysInMonth; day++) {
+    datesInRange.forEach(dateStr => {
+      const day = dateStr.split('-')[2];
       headers.push(`ទី${day}`);
-    }
+    });
     templateData.push(headers);
 
     // Employee rows
@@ -2079,18 +2103,18 @@ export default function WorkSchedulePage() {
         emp.khmerName || emp.fullName || emp.name || emp.staffName || '',
         emp.position || emp.Position_Kh || ''
       ];
-      
-      // Add schedule data for each day
-      for (let day = 1; day <= daysInMonth; day++) {
-        const schedule = getScheduleForDay(emp._id, day);
+
+      // Add schedule data for each day in range
+      datesInRange.forEach(dateStr => {
+        const schedule = scheduleMap.get(`${String(emp._id)}_${dateStr}`);
+
         if (schedule) {
           if (schedule.shiftTitle === 'Day Off') {
             row.push('Day Off');
           } else {
             const startTime = schedule.shiftStart || schedule.scheduledStart || schedule.startTime || '07:30';
             const endTime = schedule.shiftEnd || schedule.scheduledEnd || schedule.endTime || '15:30';
-            
-            // Format time for Excel display with AM/PM
+
             const formattedStart = formatTimeToAMPM(startTime);
             const formattedEnd = formatTimeToAMPM(endTime);
             const cellValue = `${formattedStart}-${formattedEnd}`;
@@ -2099,14 +2123,14 @@ export default function WorkSchedulePage() {
         } else {
           row.push('');
         }
-      }
-      
+      });
+
       templateData.push(row);
     });
 
     // Create workbook
     const ws = XLSX.utils.aoa_to_sheet(templateData);
-    
+
     // Set column widths
     const colWidths = [
       { wch: 5 },  // ល.រ
@@ -2115,74 +2139,224 @@ export default function WorkSchedulePage() {
       { wch: 20 }, // ឈ្មោះ
       { wch: 15 }  // តួនាទី
     ];
-    for (let i = 0; i < daysInMonth; i++) {
+    datesInRange.forEach(() => {
       colWidths.push({ wch: 15 }); // Day columns
-    }
+    });
     ws['!cols'] = colWidths;
-    
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'ប្រតិទិនការងារ');
 
     // Download
-    XLSX.writeFile(wb, `ប្រតិទិនការងារ_${selectedMonth}.xlsx`);
+    XLSX.writeFile(wb, `ប្រតិទិនការងារ_${startDate}_to_${endDate}.xlsx`);
   };
 
+  const getYearMonthFromSelected = () => {
+    const d = new Date(startDate);
+    return {
+      year: d.getFullYear(),
+      month: d.getMonth() + 1
+    };
+  };
 
+  const handleAutoSync = async () => {
+    if (!confirm('តើអ្នកចង់ទាញទិន្នន័យពី Checkinme ដោយស្វ័យប្រវត្តិតាមរយៈ Backend មែនទេ?\n(ចំណាំ៖ វានឹងទាញទិន្នន័យសម្រាប់ខែដែលអ្នកកំពុងមើលនេះ)')) return;
+
+    setAutoSyncing(true);
+    try {
+      const res = await api.post('/work-schedules/auto-sync-checkinme', {
+        startDate: startDate,
+        endDate: endDate
+      });
+
+      if (res.data.success) {
+        let msg = `✅ ជោគជ័យ! បានទាញយក និងរក្សាទុកទិន្នន័យចំនួន ${res.data.synced} កំណត់ត្រា។`;
+        if (res.data.errors && res.data.errors.length > 0) {
+          const unmatchedNames = [...new Set(res.data.errors.map(e => e.name).filter(Boolean))];
+          msg += `\n\n⚠️ ប៉ុន្តែមានបុគ្គលិកចំនួន ${unmatchedNames.length} នាក់ មិនត្រូវបានបញ្ជូលទេ ដោយសារឈ្មោះក្នុង Checkinme មិនត្រូវគ្នានឹងឈ្មោះក្នុងប្រព័ន្ធ HR៖\n\n- ` + unmatchedNames.slice(0, 10).join('\n- ');
+          if (unmatchedNames.length > 10) msg += `\n... និង ${unmatchedNames.length - 10} នាក់ទៀត`;
+        }
+        alert(msg);
+        await loadSchedules(); // Refresh the grid
+        await loadEmployees(); // Refresh employee list
+      } else {
+        alert(`❌ Sync បរាជ័យ: ${res.data.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Auto Sync Error:', err);
+      alert(`❌ មានបញ្ហាក្នុងការភ្ជាប់ទៅកាន់ Server: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setAutoSyncing(false);
+    }
+  };
+
+  const handleDailyAutoSync = async () => {
+    if (!confirm(`តើអ្នកចង់ទាញទិន្នន័យពី Checkinme សម្រាប់ថ្ងៃទី ${selectedDayStats} មែនទេ?`)) return;
+
+    setAutoSyncing(true);
+    try {
+      const res = await api.post('/work-schedules/auto-sync-checkinme-daily', {
+        date: selectedDayStats
+      });
+
+      if (res.data.success) {
+        let msg = `✅ ជោគជ័យ! បានទាញយក និងរក្សាទុកទិន្នន័យចំនួន ${res.data.synced} កំណត់ត្រាសម្រាប់ថ្ងៃ ${selectedDayStats}។`;
+        if (res.data.errors && res.data.errors.length > 0) {
+          const unmatchedNames = [...new Set(res.data.errors.map(e => e.name).filter(Boolean))];
+          msg += `\n\n⚠️ ប៉ុន្តែមានបុគ្គលិកចំនួន ${unmatchedNames.length} នាក់ មិនត្រូវបានបញ្ជូលទេ ដោយសារឈ្មោះក្នុង Checkinme មិនត្រូវគ្នានឹងឈ្មោះក្នុងប្រព័ន្ធ HR៖\n\n- ` + unmatchedNames.slice(0, 10).join('\n- ');
+          if (unmatchedNames.length > 10) msg += `\n... និង ${unmatchedNames.length - 10} នាក់ទៀត`;
+        }
+        alert(msg);
+        await loadSchedules(); // Refresh the grid
+        await loadEmployees(); // Refresh employee list
+      } else {
+        alert(`❌ Sync បរាជ័យ: ${res.data.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Daily Auto Sync Error:', err);
+      alert(`❌ មានបញ្ហាក្នុងការភ្ជាប់ទៅកាន់ Server: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setAutoSyncing(false);
+    }
+  };
+
+  const handleSingleEmployeeSync = async (employee) => {
+    const staffId = employee.staffId || employee.cardNumber;
+    const name = employee.khmerName || employee.fullName || employee.name || employee.staffName;
+
+    if (!confirm(`តើអ្នកចង់ Sync ទិន្នន័យសម្រាប់បុគ្គលិក "${name}" មែនទេ?`)) return;
+
+    setSyncingId(employee._id);
+    try {
+      const res = await api.post('/work-schedules/auto-sync-checkinme', {
+        startDate: startDate,
+        endDate: endDate,
+        staffId: staffId,
+        name: name
+      });
+
+      if (res.data.success && (res.data.synced > 0 || (res.data.results && res.data.results.length > 0))) {
+        alert(`✅ ជោគជ័យ! បាន Sync ទិន្នន័យសម្រាប់ ${name} រួចរាល់។`);
+        await loadSchedules(); // Refresh the grid
+        await loadEmployees(); // Refresh employee list
+      } else {
+        alert(`⚠️ មិនមានទិន្នន័យថ្មីសម្រាប់ ${name} ក្នុង Checkinme សម្រាប់ចន្លោះថ្ងៃនេះទេ។`);
+      }
+    } catch (err) {
+      console.error('Single Sync Error:', err);
+      alert(`❌ Sync បរាជ័យ: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  const handleBulkSync = async () => {
+    if (selectedEmployees.length === 0) {
+      alert('សូមជ្រើសរើសបុគ្គលិកដែលចង់ Sync');
+      return;
+    }
+
+    if (!confirm(`តើអ្នកចង់ Sync ទិន្នន័យសម្រាប់បុគ្គលិកចំនួន ${selectedEmployees.length} នាក់ដែលបានជ្រើសរើសមែនទេ?`)) {
+      return;
+    }
+
+    setAutoSyncing(true);
+    let successCount = 0;
+    try {
+      for (const employeeId of selectedEmployees) {
+        setSyncingId(employeeId);
+        const employee = employees.find(emp => emp._id === employeeId);
+        if (!employee) continue;
+
+        const staffId = employee.staffId || employee.cardNumber;
+        const name = employee.khmerName || employee.fullName || employee.name || employee.staffName;
+
+        try {
+          const res = await api.post('/work-schedules/auto-sync-checkinme', {
+            startDate: startDate,
+            endDate: endDate,
+            staffId: staffId,
+            name: name
+          });
+          if (res.data.success && res.data.results.length > 0) {
+            successCount++;
+          }
+        } catch (err) {
+          console.error(`Error syncing ${name}:`, err);
+        }
+      }
+
+      alert(`✅ រួចរាល់! បាន Sync ជោគជ័យចំនួន ${successCount} នាក់ ក្នុងចំណោម ${selectedEmployees.length} នាក់។`);
+      await loadSchedules();
+      await loadEmployees(); // Refresh employee list
+      setSelectedEmployees([]);
+    } catch (error) {
+      console.error('Bulk Sync Error:', error);
+      alert('មានបញ្ហាក្នុងការ Bulk Sync: ' + error.message);
+    } finally {
+      setAutoSyncing(false);
+      setSyncingId(null);
+    }
+  };
+
+  const handleClearMonth = async () => {
+    if (!confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យម៉ោងការងារទាំងអស់ក្នុងចន្លោះថ្ងៃនេះមែនទេ?\nការលុបនេះនឹងមិនអាចយកត្រឡប់មកវិញបានទេ។`)) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.delete('/work-schedules/range-clear', {
+        params: { startDate, endDate }
+      });
+
+      if (res.data.success) {
+        alert(`លុបទិន្នន័យបានជោគជ័យ! សរុបចំនួន ${res.data.deletedCount} កំណត់ត្រា។`);
+        // Set flag to avoid immediate auto-sync after manual deletion
+        window.skipAutoSyncOnce = true;
+        await loadSchedules(); // Reload grid, names will remain
+      }
+    } catch (error) {
+      console.error('Error clearing month data:', error);
+      alert('មានបញ្ហាក្នុងការលុបទិន្នន័យ: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="p-3">
       {/* Header */}
       <div className="mb-1" style={{ fontSize: '18px' }}>
         <h1 className=" font-bold text-gray-800">ប្រតិទិនការងារ</h1>
-      
+
       </div>
 
       {/* Controls */}
       <div className="bg-white rounded-lg shadow p-2 mb-2" style={{ fontSize: '18px' }}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                ជ្រើសរើសខែ
-              </label>
-              <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-md">
-                {/* Previous Month Button */}
-                <button
-                  onClick={navigateToPreviousMonth}
-                  className="p-2 hover:bg-gray-100 rounded-l-md transition-colors"
-                  title="ខែមុន"
-                >
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                
-                {/* Month Display/Input */}
-                <div className="flex-1 px-2 py-1 text-center relative">
-                  <input
-                    type="month"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                  <span className="text-sm font-medium text-gray-700">
-                    {formatMonthDisplay(selectedMonth)}
-                  </span>
-                </div>
-                
-                {/* Next Month Button */}
-                <button
-                  onClick={navigateToNextMonth}
-                  className="p-2 hover:bg-gray-100 rounded-r-md transition-colors"
-                  title="ខែបន្ទាប់"
-                >
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
+            <div className="flex items-center gap-2">
+              <div className="flex flex-col">
+                <label className="text-[10px] text-gray-500">ចាប់ផ្តើម:</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="text-[10px] text-gray-500">ដល់ថ្ងៃ:</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             </div>
-          
+
             <div className="flex flex-wrap items-center gap-3">
               {/* 1. Export Excel - Purple */}
               <button
@@ -2194,17 +2368,75 @@ export default function WorkSchedulePage() {
                 </svg>
                 Export Excel
               </button>
-              
+
               {/* 2. Import Excel - Orange */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition flex items-center gap-2 text-sm"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                Import Excel
-              </button>
+              {(perms.isAdmin || perms.canEditWorkSchedule) && (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition flex items-center gap-2 text-sm"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Import Excel
+                </button>
+              )}
+
+              {/* Auto Fill Standard from Group Timetables - Light Green */}
+              {(perms.isAdmin || perms.canEditWorkSchedule) && (
+                <button
+                  onClick={() => handleAutoFillStandard(false)}
+                  disabled={loading}
+                  className="px-3 py-2 bg-emerald-500 text-white rounded-md hover:bg-emerald-600 transition flex items-center gap-2 text-sm font-bold shadow-md disabled:opacity-70"
+                  title="បំពេញម៉ោងអូតូ ដោយយោងតាមការកំណត់ក្នុងផ្នែក Group Timetables សម្រាប់គ្រប់បុគ្គលិក"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  បំពេញតាម Group Timetables
+                </button>
+              )}
+
+              {/* Auto Sync from Checkinme (Backend) - Amber Gradient */}
+              {(perms.isAdmin || perms.canEditWorkSchedule) && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleAutoSync}
+                    disabled={autoSyncing}
+                    className="px-3 py-2 text-white rounded-l-md transition flex items-center gap-2 text-sm font-bold shadow-md hover:brightness-110 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed border-r border-amber-600"
+                    style={{
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                    }}
+                    title="ទាញទិន្នន័យ Checkinme សម្រាប់ពេញមួយខែ"
+                  >
+                    {autoSyncing ? (
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    )}
+                    {autoSyncing ? '...' : 'Sync ខែ'}
+                  </button>
+                  <button
+                    onClick={handleDailyAutoSync}
+                    disabled={autoSyncing}
+                    className="px-3 py-2 text-white rounded-r-md transition flex items-center gap-2 text-sm font-bold shadow-md hover:brightness-110 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+                    style={{
+                      background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
+                    }}
+                    title={`ទាញទិន្នន័យ Checkinme សម្រាប់ថ្ងៃទី ${selectedDayStats}`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    {autoSyncing ? '...' : 'Sync ថ្ងៃនេះ'}
+                  </button>
+                </div>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -2212,15 +2444,32 @@ export default function WorkSchedulePage() {
                 onChange={handleFileUpload}
                 className="hidden"
               />
-              
+
+              {/* Clear Month Data - Red */}
+              {(perms.isAdmin || perms.canEditWorkSchedule) && (
+                <button
+                  onClick={handleClearMonth}
+                  disabled={loading}
+                  className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition flex items-center gap-2 text-sm disabled:opacity-50"
+                  title="លុបទិន្នន័យម៉ោងការងារទាំងអស់ក្នុងខែនេះ (រក្សាទុកឈ្មោះបុគ្គលិក)"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  {loading ? 'កំពុងលុប...' : 'លុបទិន្នន័យម៉ោងទាំងអស់'}
+                </button>
+              )}
+
               {/* 4. បន្ថែមកាលវិភាគការងារ - Green */}
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition text-sm"
-              >
-                + បន្ថែមកាលវិភាគការងារ
-              </button>
-              
+              {(perms.isAdmin || perms.canEditWorkSchedule) && (
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition text-sm"
+                >
+                  + បន្ថែមកាលវិភាគការងារ
+                </button>
+              )}
+
               {/* 5. របាយការណ៍សរុប - Purple */}
               <button
                 onClick={() => setShowSummaryModal(true)}
@@ -2231,38 +2480,101 @@ export default function WorkSchedulePage() {
                 </svg>
                 របាយការណ៍សរុប
               </button>
-      {/* Summary Report Modal */}
-      {showSummaryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
-            <h2 className="text-xl font-bold mb-4 text-center">របាយការណ៍សរុប</h2>
-            <div className="flex flex-col gap-4">
-              <button
-                onClick={() => { exportSummaryExcel(); setShowSummaryModal(false); }}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center justify-center gap-2 font-semibold text-lg"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v16h16V4H4zm8 8v4m0 0l-3-3m3 3l3-3" />
-                </svg>
-                Export Excel
-              </button>
-              <button
-                onClick={() => { setShowSummaryModal(false); handleComprehensiveSummaryReport(); }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center gap-2 font-semibold text-lg"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-                ព្រីន
-              </button>
-              <button
-                onClick={() => setShowSummaryModal(false)}
-                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 font-semibold text-lg"
-              >បិទ</button>
-            </div>
-          </div>
-        </div>
-      )}
+              {/* Summary Report Modal */}
+              {showSummaryModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+                    <h2 className="text-xl font-bold mb-4 text-center">របាយការណ៍សរុប</h2>
+
+                    {/* Summary Statistics Table */}
+                    <div className="mb-6 border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-gray-700 font-bold border-b">
+                          <tr>
+                            <th className="px-4 py-2 text-left">ប្រភេទ</th>
+                            <th className="px-4 py-2 text-center">ចំនួន (នាក់)</th>
+                            <th className="px-4 py-2 text-center">ភាគរយ (%)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          <tr className="hover:bg-gray-50">
+                            <td className="px-4 py-2 font-medium text-blue-700">បុគ្គលិកសរុប</td>
+                            <td className="px-4 py-2 text-center font-bold text-blue-900">{dailyStats.totalEmployees}</td>
+                            <td className="px-4 py-2 text-center text-gray-500">100.0%</td>
+                          </tr>
+                          <tr className="hover:bg-gray-50">
+                            <td className="px-4 py-2 font-medium text-green-700">ធ្វើការសរុប</td>
+                            <td className="px-4 py-2 text-center font-bold text-green-900">{dailyStats.workingToday}</td>
+                            <td className="px-4 py-2 text-center text-gray-500">
+                              {dailyStats.totalEmployees > 0 ? ((dailyStats.workingToday / dailyStats.totalEmployees) * 100).toFixed(1) : '0.0'}%
+                            </td>
+                          </tr>
+                          <tr className="hover:bg-gray-50">
+                            <td className="px-4 py-2 font-medium text-teal-700">ចូលពេលព្រឹក</td>
+                            <td className="px-4 py-2 text-center font-semibold text-teal-900">{dailyStats.dayShift}</td>
+                            <td className="px-4 py-2 text-center text-gray-500 text-xs">
+                              {dailyStats.totalEmployees > 0 ? ((dailyStats.dayShift / dailyStats.totalEmployees) * 100).toFixed(1) : '0.0'}%
+                            </td>
+                          </tr>
+                          <tr className="hover:bg-gray-50">
+                            <td className="px-4 py-2 font-medium text-indigo-700">វេនល្ងាច</td>
+                            <td className="px-4 py-2 text-center font-semibold text-indigo-900">{dailyStats.nightShift}</td>
+                            <td className="px-4 py-2 text-center text-gray-500 text-xs">
+                              {dailyStats.totalEmployees > 0 ? ((dailyStats.nightShift / dailyStats.totalEmployees) * 100).toFixed(1) : '0.0'}%
+                            </td>
+                          </tr>
+                          <tr className="hover:bg-gray-50">
+                            <td className="px-4 py-2 font-medium text-yellow-700">វេន២៤ម៉ោង</td>
+                            <td className="px-4 py-2 text-center font-semibold text-yellow-900">{dailyStats.shift24Hours}</td>
+                            <td className="px-4 py-2 text-center text-gray-500 text-xs">
+                              {dailyStats.totalEmployees > 0 ? ((dailyStats.shift24Hours / dailyStats.totalEmployees) * 100).toFixed(1) : '0.0'}%
+                            </td>
+                          </tr>
+                          <tr className="hover:bg-gray-50">
+                            <td className="px-4 py-2 font-medium text-red-700">ឈប់សម្រាក</td>
+                            <td className="px-4 py-2 text-center font-bold text-red-900">{dailyStats.dayOffToday}</td>
+                            <td className="px-4 py-2 text-center text-gray-500">
+                              {dailyStats.totalEmployees > 0 ? ((dailyStats.dayOffToday / dailyStats.totalEmployees) * 100).toFixed(1) : '0.0'}%
+                            </td>
+                          </tr>
+                          <tr className="hover:bg-gray-50">
+                            <td className="px-4 py-2 font-medium text-gray-700">មិនបានកំណត់ម៉ោង</td>
+                            <td className="px-4 py-2 text-center font-medium text-gray-900">{dailyStats.noSchedule}</td>
+                            <td className="px-4 py-2 text-center text-gray-400 text-xs">
+                              {dailyStats.totalEmployees > 0 ? ((dailyStats.noSchedule / dailyStats.totalEmployees) * 100).toFixed(1) : '0.0'}%
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={() => { exportSummaryExcel(); setShowSummaryModal(false); }}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center justify-center gap-2 font-semibold"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v16h16V4H4zm8 8v4m0 0l-3-3m3 3l3-3" />
+                        </svg>
+                        Export Excel
+                      </button>
+                      <button
+                        onClick={() => { setShowSummaryModal(false); handleComprehensiveSummaryReport(); }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center gap-2 font-semibold"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                        </svg>
+                        ព្រីន
+                      </button>
+                      <button
+                        onClick={() => setShowSummaryModal(false)}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 font-semibold"
+                      >បិទ</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2279,8 +2591,56 @@ export default function WorkSchedulePage() {
             className="px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
           />
         </div>
-        <div className="grid grid-cols-7 gap-3">
-          <div 
+        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          {/* Holidays Card - Occupies 2 columns */}
+          <div className="bg-white rounded-lg p-3 shadow-sm border-l-4 border-rose-500 lg:col-span-2 cursor-default group relative">
+            <div className="flex items-center justify-between h-full">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-gray-600">ថ្ងៃបុណ្យប្រចាំខែ ({holidays.length})</p>
+                  {(perms.isAdmin || perms.canEditWorkSchedule) && (
+                    <button 
+                      onClick={() => { setEditingHoliday(null); setShowHolidayModal(true); }}
+                      className="p-1 text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                      title="គ្រប់គ្រងថ្ងៃឈប់សម្រាក"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1 max-h-[44px] overflow-y-auto custom-scrollbar">
+                  {holidays.length > 0 ? holidays.map((h, i) => (
+                    <span 
+                      key={i} 
+                      className={`text-[10px] px-1.5 py-0.5 rounded border whitespace-nowrap flex items-center gap-1 ${
+                        h.isManual ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-rose-50 text-rose-700 border-rose-100'
+                      }`} 
+                      title={h.name}
+                    >
+                      {h.date.split('-')[2]}: {h.name.length > 15 ? h.name.slice(0, 15) + '...' : h.name}
+                      {h.isManual && (perms.isAdmin || perms.canEditWorkSchedule) && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDeleteHoliday(h._id); }}
+                          className="hover:text-red-600 font-bold ml-1"
+                        >×</button>
+                      )}
+                    </span>
+                  )) : (
+                    <span className="text-[10px] text-gray-400 italic">គ្មានថ្ងៃបុណ្យ</span>
+                  )}
+                </div>
+              </div>
+              <div className="bg-rose-100 rounded-full p-2 ml-2 flex-shrink-0">
+                <svg className="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div
             className="bg-white rounded-lg p-3 shadow-sm border-l-4 border-blue-500 cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => showStatsDetail('totalEmployees')}
           >
@@ -2298,7 +2658,7 @@ export default function WorkSchedulePage() {
             </div>
           </div>
 
-          <div 
+          <div
             className="bg-white rounded-lg p-3 shadow-sm border-l-4 border-green-500 cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => showStatsDetail('workingToday')}
           >
@@ -2307,8 +2667,8 @@ export default function WorkSchedulePage() {
                 <p className="text-xs text-gray-600 mb-1">ធ្វើការសរុប</p>
                 <p className="text-xl font-bold text-green-600">{dailyStats.workingToday}</p>
                 <p className="text-[10px] text-gray-500 mt-0.5">
-                  {dailyStats.totalEmployees > 0 
-                    ? `${((dailyStats.workingToday / dailyStats.totalEmployees) * 100).toFixed(1)}%` 
+                  {dailyStats.totalEmployees > 0
+                    ? `${((dailyStats.workingToday / dailyStats.totalEmployees) * 100).toFixed(1)}%`
                     : '0.0%'}
                 </p>
               </div>
@@ -2320,7 +2680,7 @@ export default function WorkSchedulePage() {
             </div>
           </div>
 
-          <div 
+          <div
             className="bg-white rounded-lg p-3 shadow-sm border-l-4 border-teal-500 cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => showStatsDetail('dayShift')}
           >
@@ -2329,8 +2689,8 @@ export default function WorkSchedulePage() {
                 <p className="text-xs text-gray-600 mb-1">ចូលពេលព្រឹក</p>
                 <p className="text-xl font-bold text-teal-600">{dailyStats.dayShift}</p>
                 <p className="text-[10px] text-gray-500 mt-0.5">
-                  {dailyStats.totalEmployees > 0 
-                    ? `${((dailyStats.dayShift / dailyStats.totalEmployees) * 100).toFixed(1)}%` 
+                  {dailyStats.totalEmployees > 0
+                    ? `${((dailyStats.dayShift / dailyStats.totalEmployees) * 100).toFixed(1)}%`
                     : '0.0%'}
                 </p>
               </div>
@@ -2342,7 +2702,7 @@ export default function WorkSchedulePage() {
             </div>
           </div>
 
-          <div 
+          <div
             className="bg-white rounded-lg p-3 shadow-sm border-l-4 border-indigo-500 cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => showStatsDetail('nightShift')}
           >
@@ -2351,8 +2711,8 @@ export default function WorkSchedulePage() {
                 <p className="text-xs text-gray-600 mb-1">ចូលវេនល្ងាច</p>
                 <p className="text-xl font-bold text-indigo-600">{dailyStats.nightShift}</p>
                 <p className="text-[10px] text-gray-500 mt-0.5">
-                  {dailyStats.totalEmployees > 0 
-                    ? `${((dailyStats.nightShift / dailyStats.totalEmployees) * 100).toFixed(1)}%` 
+                  {dailyStats.totalEmployees > 0
+                    ? `${((dailyStats.nightShift / dailyStats.totalEmployees) * 100).toFixed(1)}%`
                     : '0.0%'}
                 </p>
               </div>
@@ -2364,7 +2724,7 @@ export default function WorkSchedulePage() {
             </div>
           </div>
 
-          <div 
+          <div
             className="bg-white rounded-lg p-3 shadow-sm border-l-4 border-yellow-500 cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => showStatsDetail('shift24Hours')}
           >
@@ -2373,8 +2733,8 @@ export default function WorkSchedulePage() {
                 <p className="text-xs text-gray-600 mb-1">ប្រចាំ24ម៉ោង</p>
                 <p className="text-xl font-bold text-yellow-600">{dailyStats.shift24Hours}</p>
                 <p className="text-[10px] text-gray-500 mt-0.5">
-                  {dailyStats.totalEmployees > 0 
-                    ? `${((dailyStats.shift24Hours / dailyStats.totalEmployees) * 100).toFixed(1)}%` 
+                  {dailyStats.totalEmployees > 0
+                    ? `${((dailyStats.shift24Hours / dailyStats.totalEmployees) * 100).toFixed(1)}%`
                     : '0.0%'}
                 </p>
               </div>
@@ -2386,7 +2746,7 @@ export default function WorkSchedulePage() {
             </div>
           </div>
 
-          <div 
+          <div
             className="bg-white rounded-lg p-3 shadow-sm border-l-4 border-red-500 cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => showStatsDetail('dayOffToday')}
           >
@@ -2395,8 +2755,8 @@ export default function WorkSchedulePage() {
                 <p className="text-xs text-gray-600 mb-1">ឈប់សម្រាក</p>
                 <p className="text-xl font-bold text-red-600">{dailyStats.dayOffToday}</p>
                 <p className="text-[10px] text-gray-500 mt-0.5">
-                  {dailyStats.totalEmployees > 0 
-                    ? `${((dailyStats.dayOffToday / dailyStats.totalEmployees) * 100).toFixed(1)}%` 
+                  {dailyStats.totalEmployees > 0
+                    ? `${((dailyStats.dayOffToday / dailyStats.totalEmployees) * 100).toFixed(1)}%`
                     : '0.0%'}
                 </p>
               </div>
@@ -2408,7 +2768,7 @@ export default function WorkSchedulePage() {
             </div>
           </div>
 
-          <div 
+          <div
             className="bg-white rounded-lg p-3 shadow-sm border-l-4 border-gray-500 cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => showStatsDetail('noSchedule')}
           >
@@ -2417,8 +2777,8 @@ export default function WorkSchedulePage() {
                 <p className="text-xs text-gray-600 mb-1">មិនបានកំណត់ម៉ោង</p>
                 <p className="text-xl font-bold text-gray-600">{dailyStats.noSchedule}</p>
                 <p className="text-[10px] text-gray-500 mt-0.5">
-                  {dailyStats.totalEmployees > 0 
-                    ? `${((dailyStats.noSchedule / dailyStats.totalEmployees) * 100).toFixed(1)}%` 
+                  {dailyStats.totalEmployees > 0
+                    ? `${((dailyStats.noSchedule / dailyStats.totalEmployees) * 100).toFixed(1)}%`
                     : '0.0%'}
                 </p>
               </div>
@@ -2474,6 +2834,33 @@ export default function WorkSchedulePage() {
                   )}
                 </div>
 
+                {/* Group Filter */}
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <label className="text-sm font-medium text-gray-700">ក្រុម:</label>
+                  <select
+                    value={selectedGroup}
+                    onChange={(e) => setSelectedGroup(e.target.value)}
+                    className="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-32"
+                  >
+                    <option value="all">ក្រុមទាំងអស់</option>
+                    {[...new Set(Array.from(employeeShiftGroupMap.values()).map(m => m.subgroup.name))].sort().map((group, index) => (
+                      <option key={index} value={group}>{group}</option>
+                    ))}
+                  </select>
+                  {selectedGroup !== 'all' && (
+                    <button
+                      onClick={() => setSelectedGroup('all')}
+                      className="px-2 py-1 text-gray-500 hover:text-gray-700 text-sm"
+                      title="សម្អាតការជ្រើសរើសក្រុម"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
                 {/* Search Controls */}
                 <div className="flex items-center gap-2 flex-1">
                   <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2514,6 +2901,21 @@ export default function WorkSchedulePage() {
                   )}
                 </div>
 
+                {/* Schedule Status Filter */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 whitespace-nowrap">ស្ថានភាព:</label>
+                  <select
+                    value={scheduleFilter}
+                    onChange={(e) => setScheduleFilter(e.target.value)}
+                    className={`px-3 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${scheduleFilter === 'no_schedule' ? 'bg-red-50 border-red-300 text-red-700 font-semibold' : 'bg-white border-gray-300'
+                      }`}
+                  >
+                    <option value="all">ស្ថានភាពទាំងអស់</option>
+                    <option value="has_schedule">មានម៉ោងរួច</option>
+                    <option value="no_schedule">មិនទាន់មានម៉ោង</option>
+                  </select>
+                </div>
+
                 {/* Status Display */}
                 <div className="flex items-center gap-3 text-sm">
                   {selectedDepartment !== 'all' && (
@@ -2529,7 +2931,7 @@ export default function WorkSchedulePage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="p-3 bg-gray-50 border-b">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-4">
@@ -2538,8 +2940,8 @@ export default function WorkSchedulePage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-600">បង្ហាញ:</label>
-                    <select 
-                      value={itemsPerPage} 
+                    <select
+                      value={itemsPerPage}
                       onChange={(e) => handleItemsPerPageChange(parseInt(e.target.value))}
                       className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -2555,20 +2957,36 @@ export default function WorkSchedulePage() {
                       <span className="text-sm text-blue-600">
                         បានជ្រើស: <span className="font-semibold">{selectedEmployees.length}</span> នាក់ (ពីសរុប {filteredEmployees.length} នាក់)
                       </span>
-                      <button
-                        onClick={handleBulkDelete}
-                        className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition flex items-center gap-1"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        លុប
-                      </button>
+                      {(perms.isAdmin || perms.canEditWorkSchedule) && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={handleBulkDelete}
+                            className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition flex items-center gap-1"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            លុប
+                          </button>
+
+                          <button
+                            onClick={handleBulkSync}
+                            disabled={autoSyncing}
+                            className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition flex items-center gap-1 shadow-sm"
+                            title="Sync បុគ្គលិកដែលបានជ្រើសរើសពី Checkinme"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Sync ជ្រើសរើស
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
                 <div className="flex items-center justify-between sm:justify-end gap-3">
-                
+
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
@@ -2592,103 +3010,179 @@ export default function WorkSchedulePage() {
               </div>
             </div>
             <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse" style={{ fontSize: '12px' }}>
-              <thead className="bg-gray-100 sticky top-0">
-                <tr>
-                  <th className="border border-gray-300 px-2 py-2 text-center font-semibold" style={{ minWidth: '40px' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedEmployees.length === filteredEmployees.length && filteredEmployees.length > 0}
-                      onChange={handleSelectAll}
-                      className="w-4 h-4"
-                      title="ជ្រើសរើស/បោះបង់ទិន្នន័យទាំងអស់"
-                    />
-                  </th>
-                  <th className="border border-gray-300 px-2 py-2 text-center font-semibold" style={{ minWidth: '50px' }}>
-                    ល.រ
-                  </th>
-                  <th className="border border-gray-300 px-2 py-2 text-center font-semibold" style={{ minWidth: '100px' }}>
-                    ទូរស័ព្ទ
-                  </th>
-                  <th className="border border-gray-300 px-2 py-2 text-center font-semibold" style={{ minWidth: '80px' }}>
-                    លេខកាត
-                  </th>
-                  <th className="border border-gray-300 px-2 py-2 text-center font-semibold" style={{ minWidth: '150px' }}>
-                    ឈ្មោះ
-                  </th>
-                  <th className="border border-gray-300 px-2 py-2 text-center font-semibold" style={{ minWidth: '120px' }}>
-                    តួនាទី
-                  </th>
-                  {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
-                    <th key={day} className="border border-gray-300 px-1 py-2 text-center font-semibold" style={{ minWidth: '40px' }}>
-                      ទី{day}
+              <table className="min-w-full border-collapse" style={{ fontSize: '12px' }}>
+                <thead className="bg-gray-100 sticky top-0">
+                  <tr>
+                    {(perms.isAdmin || perms.canEditWorkSchedule) && (
+                      <th className="border border-gray-300 px-2 py-2 text-center font-semibold" style={{ minWidth: '40px' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedEmployees.length === filteredEmployees.length && filteredEmployees.length > 0}
+                          onChange={handleSelectAll}
+                          className="w-4 h-4"
+                          title="ជ្រើសរើស/បោះបង់ទិន្នន័យទាំងអស់"
+                        />
+                      </th>
+                    )}
+                    <th className="border border-gray-300 px-2 py-2 text-center font-semibold" style={{ minWidth: '50px' }}>
+                      ល.រ
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedEmployees.map((employee, index) => (
-                  <tr key={employee._id} className={`hover:bg-gray-50 ${selectedEmployees.includes(employee._id) ? 'bg-blue-50' : ''}`}>
-                    <td className="border border-gray-300 px-2 py-2 text-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedEmployees.includes(employee._id)}
-                        onChange={() => handleSelectEmployee(employee._id)}
-                        className="w-4 h-4"
-                      />
-                    </td>
-                    <td className="border border-gray-300 px-2 py-2 text-center">
-                      {startIndex + index + 1}
-                    </td>
-                    <td className="border border-gray-300 px-2 py-2 text-center">
-                                      {(() => {
-                                        const raw = employee.phoneNumber || employee.phone || '';
-                                        try {
-                                          // lazy require to avoid circular imports in some builds
-                                          const f = require('../utils/formatPhone').formatPhoneDisplay;
-                                          return f(raw) || '-';
-                                        } catch (e) {
-                                          return raw || '-';
-                                        }
-                                      })()}
-                    </td>
-                    <td className="border border-gray-300 px-2 py-2 text-center">
-                      {employee.staffId || employee.cardNumber || '-'}
-                    </td>
-                    <td className="border border-gray-300 px-2 py-2">
-                      <div className="font-medium text-gray-900">
-                        {employee.khmerName || employee.fullName || employee.name || employee.staffName || '-'}
-                      </div>
-                    </td>
-                    <td className="border border-gray-300 px-2 py-2">
-                      {employee.position || employee.Position_Kh || '-'}
-                    </td>
-                    {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
-                      const schedule = getScheduleForDay(employee._id, day);
+                    <th className="border border-gray-300 px-2 py-2 text-center font-semibold" style={{ minWidth: '100px' }}>
+                      ទូរស័ព្ទ
+                    </th>
+                    <th className="border border-gray-300 px-2 py-2 text-center font-semibold" style={{ minWidth: '80px' }}>
+                      លេខកាត
+                    </th>
+                    <th className="border border-gray-300 px-2 py-2 text-center font-semibold" style={{ minWidth: '150px' }}>
+                      ឈ្មោះ
+                    </th>
+                    <th className="border border-gray-300 px-2 py-2 text-center font-semibold" style={{ minWidth: '120px' }}>
+                      ក្រុម
+                    </th>
+                    <th className="border border-gray-300 px-2 py-2 text-center font-semibold" style={{ minWidth: '120px' }}>
+                      តួនាទី
+                    </th>
+                    {datesInRange.map(dateStr => {
+                      const isHoliday = holidays.some(h => h.date === dateStr);
+                      const dayName = new Date(dateStr).toLocaleDateString('km-KH', { weekday: 'short' });
                       return (
-                        <td key={day} className="border border-gray-300 px-1 py-1 text-center">
-                          {schedule ? (
-                            <div className="text-[10px] font-medium" style={{ color: schedule.shiftTitle === 'Day Off' ? '#dc2626' : '#374151' }}>
-                              {schedule.shiftTitle === 'Day Off' ? (
-                                'Day Off'
-                              ) : (
-                                schedule.shiftStart || schedule.scheduledStart || schedule.startTime ? 
-                                  `${formatTimeToAMPM(schedule.shiftStart || schedule.scheduledStart || schedule.startTime)}-${formatTimeToAMPM(schedule.shiftEnd || schedule.scheduledEnd || schedule.endTime)}` 
-                                  : '-'
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-300">-</span>
-                          )}
-                        </td>
+                        <th 
+                          key={dateStr} 
+                          className={`border border-gray-300 px-1 py-1 text-center font-semibold cursor-pointer hover:brightness-95 transition-all ${isHoliday ? 'bg-rose-100 text-rose-700' : 'bg-gray-50'}`}
+                          style={{ minWidth: '40px' }}
+                          onClick={() => {
+                            if (!perms.isAdmin && !perms.canEditWorkSchedule) return;
+                            const h = holidays.find(h => h.date === dateStr);
+                            if (h && h.isManual) {
+                              if (confirm(`តើអ្នកចង់លុបថ្ងៃឈប់សម្រាក "${h.name}" មែនទេ?`)) {
+                                handleDeleteHoliday(h._id);
+                              }
+                            } else if (!h) {
+                              const name = prompt('បញ្ចូលឈ្មោះថ្ងៃឈប់សម្រាក:');
+                              if (name) handleSaveHoliday({ date: dateStr, name });
+                            }
+                          }}
+                        >
+                          <div className="text-[9px] opacity-70 mb-0.5">{dayName}</div>
+                          <div className="text-[11px]">ទី{dateStr.split('-')[2]}</div>
+                        </th>
                       );
                     })}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paginatedEmployees.map((employee, index) => (
+                    <tr key={employee._id} className={`hover:bg-gray-50 ${selectedEmployees.includes(employee._id) ? 'bg-blue-50' : ''}`}>
+                      {(perms.isAdmin || perms.canEditWorkSchedule) && (
+                        <td className="border border-gray-300 px-2 py-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedEmployees.includes(employee._id)}
+                            onChange={() => handleSelectEmployee(employee._id)}
+                            className="w-4 h-4"
+                          />
+                        </td>
+                      )}
+                      <td className="border border-gray-300 px-2 py-2 text-center">
+                        {startIndex + index + 1}
+                      </td>
+                      <td className="border border-gray-300 px-2 py-2 text-center">
+                        {(() => {
+                          const raw = employee.phoneNumber || employee.phone || '';
+                          try {
+                            // lazy require to avoid circular imports in some builds
+                            const f = require('../utils/formatPhone').formatPhoneDisplay;
+                            return f(raw) || '-';
+                          } catch (e) {
+                            return raw || '-';
+                          }
+                        })()}
+                      </td>
+                      <td className="border border-gray-300 px-2 py-2 text-center">
+                        {employee.staffId || employee.cardNumber || '-'}
+                      </td>
+                      <td className="border border-gray-300 px-2 py-2">
+                        <div className="flex items-center justify-between group">
+                          <div className="font-medium text-gray-900">
+                            {employee.khmerName || employee.fullName || employee.name || employee.staffName || '-'}
+                          </div>
+                          {(perms.isAdmin || perms.canEditWorkSchedule) && (
+                            <button
+                              onClick={() => handleSingleEmployeeSync(employee)}
+                              disabled={syncingId === employee._id}
+                              className="p-1 text-blue-500 hover:bg-blue-100 rounded transition-colors ml-2 bg-blue-50"
+                              title="Sync បុគ្គលិកម្នាក់នេះពី Checkinme"
+                            >
+                              {syncingId === employee._id ? (
+                                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                              ) : (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="border border-gray-300 px-2 py-2 text-center text-blue-600 font-medium">
+                        {getEmployeeGroup(employee)}
+                      </td>
+                      <td className="border border-gray-300 px-2 py-2">
+                        {employee.position || employee.Position_Kh || '-'}
+                      </td>
+                      {datesInRange.map(dateStr => {
+                        const schedule = scheduleMap.get(`${String(employee._id)}_${dateStr}`);
+
+                        return (
+                          <td key={dateStr} className={`border border-gray-300 px-1 py-1 text-center ${new Date(dateStr).getDay() === 0 || new Date(dateStr).getDay() === 6 ? 'bg-red-50/50' : ''}`}>
+                            {schedule ? (
+                              <div 
+                                className={`text-[10px] font-bold px-1 py-0.5 rounded-sm inline-block min-w-[32px] shadow-sm ${schedule.isPlanned ? 'opacity-70 border border-dashed border-gray-400' : ''}`} 
+                                style={{ 
+                                  backgroundColor: schedule.shiftColor || (schedule.shiftTitle === 'Day Off' ? '#fee2e2' : '#e0f2fe'),
+                                  color: schedule.shiftTitle === 'Day Off' ? '#dc2626' : getContrastColor(schedule.shiftColor),
+                                  border: !schedule.isPlanned && schedule.shiftTitle === 'Day Off' ? '1px solid #fecaca' : undefined
+                                }}
+                                title={schedule.isPlanned ? `Planned from Shift Group: ${schedule.shiftTitle}` : (schedule.notes || schedule.shiftTitle)}
+                              >
+                                {schedule.shiftTitle === 'Day Off' ? (
+                                  'OFF'
+                                ) : (
+                                  (schedule.shiftStart && schedule.shiftEnd) ? (
+                                    `${formatTimeToAMPM(schedule.shiftStart).replace(/\s/g,'')}-${formatTimeToAMPM(schedule.shiftEnd).replace(/\s/g,'')}`
+                                  ) : (
+                                    schedule.shiftTitle || '-'
+                                  )
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-300">-</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                  {filteredEmployees.length === 0 && !loading && (
+                    <tr>
+                      <td colSpan={datesInRange.length + 6} className="px-6 py-12 text-center text-gray-500 italic bg-gray-50">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                          <p className="text-lg">រកមិនឃើញបុគ្គលិកដែលអ្នកស្វែងរកទេ</p>
+                          <p className="text-sm">សូមព្យាយាមស្វែងរកជាមួយពាក្យគន្លឹះផ្សេងទៀត ឬប្តូរការចម្រោះ (Filter)</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-            
+
             {/* Bottom Pagination */}
             <div className="p-3 bg-gray-50 border-t flex items-center justify-between">
               <div className="text-sm text-gray-600">
@@ -2837,7 +3331,7 @@ export default function WorkSchedulePage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">ពិនិត្យមើលទិន្នន័យ Import</h2>
-            
+
             {(!importData.employees || importData.employees.length === 0) ? (
               <div className="text-center py-8 text-gray-500">
                 មិនមានទិន្នន័យសម្រាប់ import
@@ -2911,9 +3405,8 @@ export default function WorkSchedulePage() {
                             <td className="border border-gray-300 px-3 py-2 text-center">{item.staffId}</td>
                             <td className="border border-gray-300 px-3 py-2 text-center">{item.date}</td>
                             <td className="border border-gray-300 px-3 py-2 text-center">
-                              <span className={`px-2 py-1 rounded text-xs ${
-                                item.shiftTitle === 'Day Off' ? 'bg-red-100 text-red-800 font-semibold' : 'bg-blue-100 text-blue-800'
-                              }`}>
+                              <span className={`px-2 py-1 rounded text-xs ${item.shiftTitle === 'Day Off' ? 'bg-red-100 text-red-800 font-semibold' : 'bg-blue-100 text-blue-800'
+                                }`}>
                                 {item.shiftTitle || 'Work'}
                               </span>
                             </td>
@@ -2974,7 +3467,7 @@ export default function WorkSchedulePage() {
                 </svg>
               </button>
             </div>
-            
+
             <div className="p-6 overflow-y-auto max-h-[60vh]">
               {statsModalData.employees.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
@@ -2988,7 +3481,7 @@ export default function WorkSchedulePage() {
                   <div className="text-sm text-gray-600 mb-4">
                     សរុប: {statsModalData.employees.length} នាក់
                   </div>
-                  
+
                   <div className="grid gap-4">
                     {statsModalData.employees.map((employee, index) => (
                       <div key={employee._id || index} className="bg-gray-50 rounded-lg p-4 flex items-center justify-between">
@@ -3010,13 +3503,36 @@ export default function WorkSchedulePage() {
                             </p>
                           </div>
                         </div>
-                        
-                        <div className="text-right">
-                          <p className={`font-semibold ${employee.statusColor || 'text-gray-600'}`}>
-                            {employee.status}
-                          </p>
-                          {employee.phoneNumber && (
-                            <p className="text-sm text-gray-500">{employee.phoneNumber}</p>
+
+                        <div className="flex items-center space-x-2">
+                          <div className="text-right mr-2">
+                            <p className={`font-semibold ${employee.statusColor || 'text-gray-600'}`}>
+                              {employee.status}
+                            </p>
+                            {employee.phoneNumber && (
+                              <p className="text-sm text-gray-500">{employee.phoneNumber}</p>
+                            )}
+                          </div>
+
+                          {(perms.isAdmin || perms.canEditWorkSchedule) && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleSingleEmployeeSync(employee); }}
+                              disabled={syncingId === employee._id}
+                              className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition flex items-center gap-1.5 text-xs font-bold border border-blue-200"
+                              title="Sync បច្ចុប្បន្នភាពពី Checkinme"
+                            >
+                              {syncingId === employee._id ? (
+                                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                              ) : (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                              )}
+                              Sync ម្នាក់នេះ
+                            </button>
                           )}
                         </div>
                       </div>
@@ -3025,32 +3541,30 @@ export default function WorkSchedulePage() {
                 </div>
               )}
             </div>
-            
+
             <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
               <div className="flex gap-3">
                 <button
                   onClick={handlePrintStats}
                   disabled={statsModalData.employees.length === 0}
-                  className={`px-4 py-2 rounded-md transition flex items-center gap-2 ${
-                    statsModalData.employees.length === 0
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                  }`}
+                  className={`px-4 py-2 rounded-md transition flex items-center gap-2 ${statsModalData.employees.length === 0
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                   </svg>
                   ព្រីន
                 </button>
-                
+
                 <button
                   onClick={exportStatsToExcel}
                   disabled={statsModalData.employees.length === 0 || isExportingPDF}
-                  className={`px-4 py-2 rounded-md transition flex items-center gap-2 ${
-                    statsModalData.employees.length === 0 || isExportingPDF
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-green-600 text-white hover:bg-green-700'
-                  }`}
+                  className={`px-4 py-2 rounded-md transition flex items-center gap-2 ${statsModalData.employees.length === 0 || isExportingPDF
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
                 >
                   {isExportingPDF ? (
                     <>
@@ -3070,7 +3584,7 @@ export default function WorkSchedulePage() {
                   )}
                 </button>
               </div>
-              
+
               <button
                 onClick={() => setShowStatsModal(false)}
                 className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition"
@@ -3078,6 +3592,67 @@ export default function WorkSchedulePage() {
                 បិទ
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Holiday Management Modal */}
+      {showHolidayModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">គ្រប់គ្រងថ្ងៃឈប់សម្រាក</h2>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const fd = new FormData(e.target);
+              handleSaveHoliday({
+                date: fd.get('date'),
+                name: fd.get('name'),
+                description: fd.get('description')
+              });
+            }}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">កាលបរិច្ឆេទ</label>
+                  <input 
+                    name="date" 
+                    type="date" 
+                    required 
+                    defaultValue={editingHoliday?.date || startDate}
+                    className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-rose-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ឈ្មោះថ្ងៃឈប់សម្រាក</label>
+                  <input 
+                    name="name" 
+                    type="text" 
+                    required 
+                    placeholder="ឧទាហរណ៍៖ បុណ្យវិសាខបូជា"
+                    defaultValue={editingHoliday?.name || ''}
+                    className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-rose-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">សម្គាល់ (តាមចិត្ត)</label>
+                  <textarea 
+                    name="description" 
+                    rows="2"
+                    defaultValue={editingHoliday?.description || ''}
+                    className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-rose-500 outline-none"
+                  ></textarea>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button 
+                  type="button" 
+                  onClick={() => setShowHolidayModal(false)}
+                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md transition"
+                >បោះបង់</button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-700 transition"
+                >រក្សាទុក</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

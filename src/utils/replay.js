@@ -11,26 +11,26 @@ export function buildFormHTML(it, editable = false) {
     it.deputyName1,
     it.deputyName2,
     it.directorName,
-    ...(Array.isArray(it.approvals) ? it.approvals.map(a=>a.byName) : [])
+    ...(Array.isArray(it.approvals) ? it.approvals.map(a => a.byName) : [])
   ]);
-  
+
   const fmtDate = (d) => {
     try {
       if (!d) return '';
       const dt = new Date(d);
       if (isNaN(+dt)) return '';
-      return dt.toISOString().slice(0,10);
+      return dt.toISOString().slice(0, 10);
     } catch { return ''; }
   };
-  
+
   // Khmer numerals and month names
-  const khmerDigits = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
-  const khmerMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
-  
+  const khmerDigits = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
+  const khmerMonths = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
+
   const toKhmerNumber = (num) => {
     return num.toString().split('').map(c => (c >= '0' && c <= '9') ? khmerDigits[+c] : c).join('');
   };
-  
+
   const fmtDateKh = (d) => {
     try {
       if (!d) return '';

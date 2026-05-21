@@ -274,116 +274,20 @@ export default function MyHrPage() {
 
   return (
     <div className="p-6">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <h1 className="text-xl font-semibold text-gray-900">ព័ត៌មានបុគ្គលិក (ខ្លួនឯង)</h1>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={downloadPdf}
-              disabled={pdfSaving}
-              className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-50 disabled:opacity-60"
-            >{pdfSaving ? 'កំពុងទាញ...' : 'ទាញ PDF'}</button>
-            {canRequestEdit && (
-              <button
-                onClick={() => { setRequestError(''); setRequestOk(''); setIsRequestOpen(true); }}
-                className="px-3 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
-              >ស្នើកែប្រែ</button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                setShowEmployeeRegister((v) => !v);
-                setTimeout(() => registerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
-              }}
-              className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-50"
-            >{showEmployeeRegister ? 'លាក់ ទម្រង់ចុះឈ្មោះ' : 'បំពេញទិន្នន័យ (Tabs)'}</button>
+      <div className="max-w-5xl mx-auto">
+        <div className="bg-white border rounded-lg p-6">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="text-xl font-semibold text-gray-900">ទម្រង់ចុះឈ្មោះ (Tabs)</div>
           </div>
+          <StaffOnboardingPage
+            embedded
+            allowApproved
+            initialData={profile}
+            onSubmitted={() => {
+              setRequestOk('បានផ្ញើព័ត៌មានរួចហើយ — សូមរង់ចាំ Admin អនុម័ត');
+            }}
+          />
         </div>
-
-        {requestOk && (
-          <div className="mb-4 bg-green-50 border border-green-200 text-green-800 rounded p-3 text-sm">
-            {requestOk}
-          </div>
-        )}
-        {requestError && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-800 rounded p-3 text-sm">
-            {requestError}
-          </div>
-        )}
-
-        <div ref={pdfRef} className="bg-white border rounded-lg overflow-hidden">
-          <div className="p-6 flex items-start gap-5">
-            <div className="w-20 h-24 rounded border bg-gray-50 overflow-hidden flex items-center justify-center flex-shrink-0">
-              {imageUrl ? (
-                // eslint-disable-next-line jsx-a11y/alt-text
-                <img src={imageUrl} className="w-full h-full object-cover" />
-              ) : (
-                <div className="text-xs text-gray-500">No Photo</div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-lg font-semibold text-gray-900 truncate">{profile?.khmerName || profile?.name || '—'}</div>
-              <div className="text-sm text-gray-600 mt-1">អត្តលេខ: {profile?.staffId || '—'}</div>
-              <div className="text-sm text-gray-600">លេខរៀង: {profile?.no || '—'}</div>
-            </div>
-          </div>
-
-          <div className="px-6 pb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="border rounded-lg p-4">
-                <div className="font-medium text-gray-900 mb-2">ព័ត៌មានផ្ទាល់ខ្លួន</div>
-                <Field label="ភេទ" value={profile?.gender} />
-                <Field label="ថ្ងៃខែឆ្នាំកំណើត" value={formatDate(profile?.dob)} />
-                <Field label="ទីកន្លែងកំណើត" value={profile?.birthPlace} />
-                <Field label="អាសយដ្ឋានបច្ចុប្បន្ន" value={profile?.currentPlace} />
-              </div>
-
-              <div className="border rounded-lg p-4">
-                <div className="font-medium text-gray-900 mb-2">ការងារ</div>
-                <Field label="ប្រភេទមន្ត្រី" value={profile?.officerType} />
-                <Field label="ផ្នែក" value={profile?.Department_Kh} />
-                <Field label="តួនាទី" value={profile?.position} />
-                <Field label="តួនាទីមន្ត្រី" value={profile?.civilServantRole} />
-              </div>
-
-              <div className="border rounded-lg p-4 md:col-span-2">
-                <div className="font-medium text-gray-900 mb-2">ទំនាក់ទំនង</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <Field label="ទូរស័ព្ទ" value={profile?.phone} />
-                  </div>
-                  <div>
-                    <Field label="អ៊ីមែល" value={profile?.email} />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 text-xs text-gray-500">
-              * ទិន្នន័យនេះយកពី HR record ដែល Admin បានអនុម័ត/បង្កើត។
-            </div>
-          </div>
-        </div>
-
-        {showEmployeeRegister && (
-          <div className="mt-4 bg-white border rounded-lg p-4" ref={registerRef}>
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div className="font-semibold text-gray-900">ទម្រង់ចុះឈ្មោះ (Tabs)</div>
-              <button
-                type="button"
-                onClick={() => setShowEmployeeRegister(false)}
-                className="px-2 py-1 rounded border text-sm"
-              >បិទ</button>
-            </div>
-            <StaffOnboardingPage
-              embedded
-              allowApproved
-              onSubmitted={() => {
-                setRequestOk('បានផ្ញើព័ត៌មានរួចហើយ — សូមរង់ចាំ Admin អនុម័ត');
-              }}
-            />
-          </div>
-        )}
       </div>
 
       {isRequestOpen && (

@@ -30,8 +30,17 @@ router.get('/', requirePermission('view:skills'), async (req, res) => {
 // Create skill
 router.post('/', requirePermission('edit:skills'), async (req, res) => {
   try {
-    const { skills_Id, skills_Kh, ministryFunction, skills_En, other } = req.body;
-    const skill = new Skill({ skills_Id, skills_Kh, ministryFunction, skills_En, other });
+    const { ID_skills, skills_Id, skills_Kh, ministryFunction, skills_En, other, Other } = req.body;
+    const final_ID_skills = ID_skills || skills_Id;
+    const final_Other = Other || other;
+    
+    const skill = new Skill({ 
+      ID_skills: final_ID_skills, 
+      skills_Kh, 
+      ministryFunction, 
+      skills_En, 
+      Other: final_Other 
+    });
     await skill.save();
     res.status(201).json(skill);
   } catch (err) {
@@ -52,10 +61,13 @@ router.delete('/:id', requirePermission('edit:skills'), async (req, res) => {
 // Update skill
 router.put('/:id', requirePermission('edit:skills'), async (req, res) => {
   try {
-    const { skills_Id, skills_Kh, ministryFunction, skills_En, other } = req.body;
+    const { ID_skills, skills_Id, skills_Kh, ministryFunction, skills_En, other, Other } = req.body;
+    const final_ID_skills = ID_skills || skills_Id;
+    const final_Other = Other || other;
+    
     const skill = await Skill.findByIdAndUpdate(
       req.params.id,
-      { skills_Id, skills_Kh, ministryFunction, skills_En, other },
+      { ID_skills: final_ID_skills, skills_Kh, ministryFunction, skills_En, Other: final_Other },
       { new: true, runValidators: true }
     );
     if (!skill) {

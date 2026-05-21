@@ -6,7 +6,7 @@ import usePermission from '../hooks/usePermission';
 import headerBg from '../assets/3.JPG';
 
 function toKhmerDigits(n) {
-  const map = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+  const map = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
   return String(n).replace(/[0-9]/g, d => map[d]);
 }
 
@@ -14,8 +14,8 @@ function fmtKhmerLongDate(d) {
   if (!d) return '';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '';
-  const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
-  const dd = toKhmerDigits(String(dt.getDate()).padStart(1,'0'));
+  const khMonths = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
+  const dd = toKhmerDigits(String(dt.getDate()).padStart(1, '0'));
   const mmName = khMonths[dt.getMonth()];
   const yyyy = toKhmerDigits(dt.getFullYear());
   return `ថ្ងៃទី ${dd} ខែ ${mmName} ឆ្នាំ ${yyyy}`;
@@ -25,7 +25,7 @@ function defaultMonthlyReportText(d = new Date()) {
   try {
     const dt = new Date(d);
     if (isNaN(dt.getTime())) return 'ប្រចាំខែ';
-    const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
+    const khMonths = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
     const mmName = khMonths[dt.getMonth()] || '';
     return `ប្រចាំខែ${mmName}`;
   } catch {
@@ -34,7 +34,7 @@ function defaultMonthlyReportText(d = new Date()) {
 }
 
 function khWeekday(d) {
-  const names = ['អាទិត្យ','ចន្ទ','អង្គារ','ពុធ','ព្រហស្បតិ៍','សុក្រ','សៅរ៍'];
+  const names = ['អាទិត្យ', 'ចន្ទ', 'អង្គារ', 'ពុធ', 'ព្រហស្បតិ៍', 'សុក្រ', 'សៅរ៍'];
   const dt = new Date(d);
   return names[dt.getDay()];
 }
@@ -44,13 +44,23 @@ function buddhistEraYear(d) {
   return dt.getFullYear() + 543;
 }
 
+function fmtDateInput(d) {
+  if (!d) return '';
+  const dt = parseDateSafe(d);
+  if (!dt || isNaN(dt.getTime())) return '';
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function fmtShortDate(d) {
   if (!d) return '';
   try {
-    const dt = new Date(d);
-    if (!isNaN(dt.getTime())) {
-      const dd = String(dt.getDate()).padStart(2,'0');
-      const mm = String(dt.getMonth()+1).padStart(2,'0');
+    const dt = parseDateSafe(d);
+    if (dt && !isNaN(dt.getTime())) {
+      const dd = String(dt.getDate()).padStart(2, '0');
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
       const yyyy = dt.getFullYear();
       return `${dd}/${mm}/${yyyy}`;
     }
@@ -61,9 +71,21 @@ function fmtShortDate(d) {
 function parseDateSafe(v) {
   if (!v) return null;
   try {
-    const dt = new Date(v);
+    let dt = new Date(v);
+    if (isNaN(dt.getTime())) {
+      // Try parsing DD/MM/YYYY
+      const s = String(v).trim();
+      const parts = s.split(/[\/\-]/);
+      if (parts.length === 3) {
+        if (parts[2].length === 4) { // DD/MM/YYYY
+          dt = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+        } else if (parts[0].length === 4) { // YYYY/MM/DD
+          dt = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        }
+      }
+    }
     if (isNaN(dt.getTime())) return null;
-    dt.setHours(0,0,0,0);
+    dt.setHours(0, 0, 0, 0);
     return dt;
   } catch { return null; }
 }
@@ -92,7 +114,7 @@ function computeDelistedMeta(delisted) {
   const dateDelisted = parseDateSafe(delisted && (delisted.dateDelisted || delisted.date));
   const reason = (delisted && (delisted.reason || delisted.Reason)) || '';
   const delistStatus = (delisted && (delisted.delistStatus || delisted.delistingStatus)) || '';
-  
+
   let statusLabel = '';
   if (dateDelisted) {
     const today = new Date();
@@ -108,32 +130,51 @@ function computeDelistedMeta(delisted) {
 }
 
 export default function OfficialDelistedReportPage() {
+  const khMonths = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
   const perms = usePermission();
   const [list, setList] = useState([]);
+
+  const getProbationStatus = (h) => {
+    if (!h) return '';
+    const jd = parseDateSafe(h.joinDate);
+    const pEnd = parseDateSafe(h.probationEndDate || h.probationEnd) || (jd ? new Date(jd.getFullYear(), jd.getMonth() + 3, jd.getDate()) : null);
+    if (!pEnd) return '';
+    const todayLocal = new Date(); todayLocal.setHours(0, 0, 0, 0);
+    const diffMs = pEnd.getTime() - todayLocal.getTime();
+    const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    if (days <= 0) return 'បញ្ចប់សាកល្បង';
+    if (days < 10) return 'ជិតចប់សាកល្បង';
+    return 'កំពុងសាកល្បង';
+  };
   const [q, setQ] = useState('');
   const [dept] = useState('');
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
   const [filterDateField, setFilterDateField] = useState('removed');
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reportYear] = useState(new Date().getFullYear());
   const printRef = useRef();
-  
+
   const defaultCols = [
-    'index','staffId','civilId','name','gender','role','position','dept','reason','delistStatus','dateDelisted','dateRemoved','note','image','action'
+    'index', 'civilId', 'name', 'gender', 'role', 'position', 'dept', 'reason', 'delistStatus', 'dateDelisted', 'dateRemoved', 'note', 'image', 'action'
   ];
-  const [colOrder, setColOrder] = useState(defaultCols);
-  const draggingKeyRef = useRef(null);
+  const [colOrder, setColOrder] = useState(() => {
+    if (!(perms.isAdmin || perms.canEditOfficialDelistedReport)) {
+      return defaultCols.filter(c => c !== 'action');
+    }
+    return defaultCols;
+  });
   const [lunarText, setLunarText] = useState('');
-  const [footerDate, setFooterDate] = useState(() => new Date().toISOString().slice(0,10));
-  
+  const [footerDate, setFooterDate] = useState(() => new Date().toISOString().slice(0, 10));
+
   // Edit modal state
   const [showEdit, setShowEdit] = useState(false);
   const [editingHr, setEditingHr] = useState(null);
   const [editingDelisted, setEditingDelisted] = useState({});
+  const [selectedMonthKey, setSelectedMonthKey] = useState('all');
   const [noteAutoMode, setNoteAutoMode] = useState(false);
   const fileInputRef = useRef();
   const [originalDelisted, setOriginalDelisted] = useState(null);
@@ -154,6 +195,19 @@ export default function OfficialDelistedReportPage() {
   const [renameValue, setRenameValue] = useState('');
   const [multiScanActive, setMultiScanActive] = useState(false);
   const [multiScanFiles, setMultiScanFiles] = useState([]);
+  const [modalMode, setModalMode] = useState('delist'); // 'delist' or 'probation'
+
+  // Sync colOrder if permissions change (e.g. login/logout or admin override)
+  useEffect(() => {
+    if (!(perms.isAdmin || perms.canEditOfficialDelistedReport)) {
+      setColOrder(prev => (prev || []).filter(c => c !== 'action'));
+    } else {
+      setColOrder(prev => {
+        if (prev && !prev.includes('action')) return [...prev, 'action'];
+        return prev || defaultCols;
+      });
+    }
+  }, [perms.isAdmin, perms.canEditOfficialDelistedReport]);
 
   // Load initial data
   useEffect(() => {
@@ -187,7 +241,7 @@ export default function OfficialDelistedReportPage() {
   useEffect(() => {
     if (!(perms.canViewHR || perms.canViewEmployees)) return;
     if (searchTidRef.current) { clearTimeout(searchTidRef.current); searchTidRef.current = null; }
-    
+
     if (!q || q.toString().trim() === '') {
       // No-op: keep loaded list
     } else {
@@ -258,7 +312,7 @@ export default function OfficialDelistedReportPage() {
     const chosen = (scannerNameInput || '').toString().trim();
     if (!chosen) { window.alert('សូមបញ្ចូលឈ្មោះម៉ាស៊ីនស្កេន'); return; }
     try {
-      try { localStorage.setItem('scannerName', chosen); } catch (e) {}
+      try { localStorage.setItem('scannerName', chosen); } catch (e) { }
       setScannerName(chosen);
       setLoadingScannerFiles(true);
       // Try to start a scan and attach the newest resulting file automatically
@@ -294,10 +348,10 @@ export default function OfficialDelistedReportPage() {
             // nothing to attach — open scanner file list for manual attach
             setTimeout(() => openScannerPicker(), 800);
           }
-          } catch (e) {
-            console.error('Post-scan list failed', e);
-            setTimeout(() => openScannerPicker(), 800);
-          }
+        } catch (e) {
+          console.error('Post-scan list failed', e);
+          setTimeout(() => openScannerPicker(), 800);
+        }
       }
     } catch (err) {
       try { await scanNow(); setTimeout(() => openScannerPicker(), 1200); } catch (e) { console.error('Scan now failed', e); window.alert('បរាជ័យក្នុងការចាប់ផ្ដើមស្កេន'); }
@@ -308,8 +362,24 @@ export default function OfficialDelistedReportPage() {
 
   const derived = useMemo(() => {
     const term = (q || '').toString().trim().toLowerCase();
-    const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
     const currentYear = new Date().getFullYear();
+
+    const getMonthlyReportNote = (hr) => {
+      try {
+        const del = hr && hr.delisted ? hr.delisted : {};
+        return (
+          hr.resignationOther ||
+          hr.otherReason ||
+          hr.additionalInfo ||
+          hr.remarks ||
+          hr.comments ||
+          hr.note ||
+          del.note ||
+          del.Note ||
+          ''
+        );
+      } catch (e) { return ''; }
+    };
 
     const parseYearFromText = (text) => {
       try {
@@ -386,17 +456,17 @@ export default function OfficialDelistedReportPage() {
       const status = (hr && hr.status) || '';
       return status === 'Resigned' || status === 'Deleted' || status === 'Inactive';
     };
-    
+
     // Enrich delisted data with various possible field names
     const enrichDelistedData = (hr) => {
       if (!hr.delisted) hr.delisted = {};
-      
+
       // Debug: log first record to see available fields
       if (!window.__logged_hr_fields) {
         console.log('Sample HR record fields:', Object.keys(hr).sort());
         window.__logged_hr_fields = true;
       }
-      
+
       // Map date from primary field: resignationDate
       if (!hr.delisted.dateDelisted && !hr.delisted.date) {
         if (hr.resignationDate) hr.delisted.dateDelisted = hr.resignationDate;
@@ -408,7 +478,7 @@ export default function OfficialDelistedReportPage() {
         else if (hr.endDate) hr.delisted.dateDelisted = hr.endDate;
         else if (hr.separationDate) hr.delisted.dateDelisted = hr.separationDate;
       }
-      
+
       // Map reason from primary field: resignationReason
       if (!hr.delisted.reason && !hr.delisted.Reason) {
         if (hr.resignationReason) hr.delisted.reason = hr.resignationReason;
@@ -420,7 +490,7 @@ export default function OfficialDelistedReportPage() {
         else if (hr.departureReason) hr.delisted.reason = hr.departureReason;
         else if (hr.resignation_reason) hr.delisted.reason = hr.resignation_reason;
       }
-      
+
       // Map documents from primary field: resignationDocument
       if (!hr.delisted.image) {
         if (hr.resignationDocument) hr.delisted.image = hr.resignationDocument;
@@ -434,7 +504,7 @@ export default function OfficialDelistedReportPage() {
         else if (hr.file) hr.delisted.image = hr.file;
         else if (hr.files) hr.delisted.image = hr.files;
       }
-      
+
       // Map other/note from resignationOther
       if (!hr.delisted.note && !hr.delisted.Note) {
         if (hr.resignationOther) hr.delisted.note = hr.resignationOther;
@@ -443,7 +513,7 @@ export default function OfficialDelistedReportPage() {
         else if (hr.remarks) hr.delisted.note = hr.remarks;
         else if (hr.comments) hr.delisted.note = hr.comments;
       }
-      
+
       return hr;
     };
 
@@ -500,7 +570,7 @@ export default function OfficialDelistedReportPage() {
           const found = fields.some(f => (f || '').toString().toLowerCase().includes(loc));
           if (!found) return false;
         }
-      } catch (e) {}
+      } catch (e) { }
       const sid = (hr.civilServantId || hr.staffId || hr.no || hr.cardNo || hr.cardNumber || '').toString().toLowerCase();
       const name = (hr.khmerName || hr.name || '').toString().toLowerCase();
       const position = (hr.position || hr.role || hr.title || '').toString().toLowerCase();
@@ -520,7 +590,7 @@ export default function OfficialDelistedReportPage() {
     const prepared = [];
     const deleted = [];
     const other = [];
-    const today = new Date(); today.setHours(0,0,0,0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
 
     matchedRows.forEach(r => {
       const hr = r.hr;
@@ -560,26 +630,106 @@ export default function OfficialDelistedReportPage() {
       deleted.sort(compareMostRecent);
     } catch (e) { /* ignore sort errors */ }
 
-    const rows = deleted.slice();
-    
-    // Debug: log summary
-    console.log('OfficialDelistedReportPage derived groups:', {
-      totalRecords: list.length,
-      prepared: prepared.length,
-      deleted: deleted.length,
-      other: other.length,
-      hasSearch: !!term,
-      searchTerm: term
+    // Group into monthly buckets based on filtered 'deleted' rows AND 'new' rows
+    const monthlyGroups = {}; // key: "YYYY-MM" -> { month, year, label, records: [], newRecords: [], closingDate: null, entryClosingDate: null }
+
+    // Group resigned employees
+    deleted.forEach(r => {
+      const hr = r.hr;
+      const note = getMonthlyReportNote(hr);
+      const delDate = getDelistedDate(hr);
+      const remDate = getRemovedDate(hr);
+      const mIdx = monthKeyFromNote(note, delDate);
+
+      let y, m;
+      if (mIdx != null) {
+        y = Math.floor(mIdx / 12);
+        m = (mIdx % 12) + 1;
+      } else if (delDate) {
+        y = delDate.getFullYear();
+        m = delDate.getMonth() + 1;
+      } else {
+        return;
+      }
+
+      const key = `${y}-${String(m).padStart(2, '0')}`;
+      if (!monthlyGroups[key]) {
+        monthlyGroups[key] = {
+          month: m,
+          year: y,
+          label: `ខែ ${khMonths[m - 1]} ${toKhmerDigits(y)}`,
+          records: [],
+          newRecords: [],
+          closingDate: null,
+          entryClosingDate: null
+        };
+      }
+      monthlyGroups[key].records.push(r);
+
+      // Closing date is the latest removal or delisted date in this group
+      const refDate = remDate || delDate;
+      if (refDate) {
+        if (!monthlyGroups[key].closingDate || refDate > monthlyGroups[key].closingDate) {
+          monthlyGroups[key].closingDate = refDate;
+        }
+      }
     });
+
+    // Group NEW employees
+    (list || []).forEach(hr => {
+      // Exclude those already in 'deleted' if they are also new (rare but possible)
+      // Actually, we want them in both if they joined and left in the same month?
+      // For now, just count all new entries.
+      const jd = parseDateSafe(hr.joinDate || hr.nominationStartDate || hr.contractStartDate || hr.civilServantStartDate);
+      if (!jd) return;
+      const y = jd.getFullYear();
+      const m = jd.getMonth() + 1;
+      const key = `${y}-${String(m).padStart(2, '0')}`;
+
+      if (!monthlyGroups[key]) {
+        monthlyGroups[key] = {
+          month: m,
+          year: y,
+          label: `ខែ ${khMonths[m - 1]} ${toKhmerDigits(y)}`,
+          records: [],
+          newRecords: [],
+          closingDate: null,
+          entryClosingDate: null
+        };
+      }
+      monthlyGroups[key].newRecords.push({ hr });
+
+      const eClose = parseDateSafe(hr.entryClosingDate);
+      if (eClose) {
+        if (!monthlyGroups[key].entryClosingDate || eClose > monthlyGroups[key].entryClosingDate) {
+          monthlyGroups[key].entryClosingDate = eClose;
+        }
+      }
+    });
+
+    const sortedGroups = Object.values(monthlyGroups).sort((a, b) => (b.year * 12 + b.month) - (a.year * 12 + a.month));
+
+    const rows = (selectedMonthKey === 'all')
+      ? deleted
+      : (monthlyGroups[selectedMonthKey]?.records || []);
 
     const male = rows.filter(r => r.hr.gender === 'Male').length;
     const female = rows.filter(r => r.hr.gender === 'Female').length;
-    return { rows, preparedRows: prepared, deletedRows: deleted, otherRows: other, male, female, total: rows.length };
-  }, [list, dept, q, filterFrom, filterTo, filterLocation, filterDateField]);
+    return {
+      rows,
+      preparedRows: prepared,
+      deletedRows: deleted,
+      otherRows: other,
+      male,
+      female,
+      total: rows.length,
+      monthlyGroups: sortedGroups
+    };
+  }, [list, dept, q, filterFrom, filterTo, filterLocation, filterDateField, selectedMonthKey]);
 
   const renderStatusBadge = (s) => {
     if (!s) return null;
-    const style = { display:'inline-block', padding:'6px 10px', borderRadius:14, color:'#fff', fontSize:13, fontWeight:700, minWidth:40, textAlign:'center' };
+    const style = { display: 'inline-block', padding: '6px 10px', borderRadius: 14, color: '#fff', fontSize: 13, fontWeight: 700, minWidth: 40, textAlign: 'center' };
     const mapping = {
       'ត្រៀមលុបឈ្មោះ': { background: '#f39c12' },
       'លុបឈ្មោះរួច': { background: '#b91c1c' }
@@ -591,7 +741,7 @@ export default function OfficialDelistedReportPage() {
   const openEdit = (hr) => {
     // Enrich delisted data with field mapping when opening edit modal
     const enrichedDelisted = { ...(hr.delisted || {}) };
-    
+
     // Map date from primary field: resignationDate
     if (!enrichedDelisted.dateDelisted && !enrichedDelisted.date) {
       if (hr.resignationDate) enrichedDelisted.dateDelisted = hr.resignationDate;
@@ -603,7 +753,7 @@ export default function OfficialDelistedReportPage() {
       else if (hr.endDate) enrichedDelisted.dateDelisted = hr.endDate;
       else if (hr.separationDate) enrichedDelisted.dateDelisted = hr.separationDate;
     }
-    
+
     // Map reason from primary field: resignationReason
     if (!enrichedDelisted.reason && !enrichedDelisted.Reason) {
       if (hr.resignationReason) enrichedDelisted.reason = hr.resignationReason;
@@ -615,7 +765,7 @@ export default function OfficialDelistedReportPage() {
       else if (hr.departureReason) enrichedDelisted.reason = hr.departureReason;
       else if (hr.resignation_reason) enrichedDelisted.reason = hr.resignation_reason;
     }
-    
+
     // Map documents from primary field: resignationDocument
     if (!enrichedDelisted.image) {
       if (hr.resignationDocument) enrichedDelisted.image = hr.resignationDocument;
@@ -629,7 +779,7 @@ export default function OfficialDelistedReportPage() {
       else if (hr.file) enrichedDelisted.image = hr.file;
       else if (hr.files) enrichedDelisted.image = hr.files;
     }
-    
+
     // Map other/note from resignationOther
     if (!enrichedDelisted.note && !enrichedDelisted.Note) {
       if (hr.resignationOther) enrichedDelisted.note = hr.resignationOther;
@@ -644,7 +794,7 @@ export default function OfficialDelistedReportPage() {
       try {
         const d = enrichedDelisted.dateDelisted.toString();
         // If ISO-like, take first 10 chars
-        if (d.includes('T')) enrichedDelisted.dateDelisted = d.slice(0,10);
+        if (d.includes('T')) enrichedDelisted.dateDelisted = d.slice(0, 10);
         else enrichedDelisted.dateDelisted = d;
       } catch (e) {
         // leave as-is on failure
@@ -660,6 +810,10 @@ export default function OfficialDelistedReportPage() {
       setNoteAutoMode(false);
     }
 
+    // Map joining info
+    if (hr.joinDate) enrichedDelisted.joinDate = fmtDateInput(hr.joinDate);
+    if (hr.probationEndDate || hr.probationEnd) enrichedDelisted.probationEndDate = fmtDateInput(hr.probationEndDate || hr.probationEnd);
+
     // Map any existing removal-from-dataset date into editing object
     if (!enrichedDelisted.dateRemoved && !enrichedDelisted.date_removed) {
       if (hr.dateRemoved) enrichedDelisted.dateRemoved = hr.dateRemoved;
@@ -672,13 +826,13 @@ export default function OfficialDelistedReportPage() {
     if (enrichedDelisted.dateRemoved) {
       try {
         const d2 = enrichedDelisted.dateRemoved.toString();
-        if (d2.includes('T')) enrichedDelisted.dateRemoved = d2.slice(0,10);
+        if (d2.includes('T')) enrichedDelisted.dateRemoved = d2.slice(0, 10);
         else enrichedDelisted.dateRemoved = d2;
       } catch (e) { }
     }
 
     console.log('Opening edit for HR:', hr.staffId, 'Enriched delisted:', enrichedDelisted);
-    
+
     setEditingHr({ ...hr, delisted: enrichedDelisted });
     setEditingDelisted(enrichedDelisted);
     try { setOriginalDelisted(JSON.parse(JSON.stringify(enrichedDelisted))); } catch { setOriginalDelisted(enrichedDelisted); }
@@ -769,7 +923,7 @@ export default function OfficialDelistedReportPage() {
           }
           setSelectedFileName(fileNameToUse);
         }
-      } catch (e) {}
+      } catch (e) { }
       const file = new File([blob], fileNameToUse, { type: blob.type || 'image/jpeg' });
       handleFileSelect(file);
       setShowScannerModal(false);
@@ -930,7 +1084,7 @@ export default function OfficialDelistedReportPage() {
     const ok = window.confirm('លុបឯកសារយោង?');
     if (!ok) return;
     const imageUrl = editingDelisted.image;
-    setEditingDelisted(prev => ({ ...(prev||{}), image: '' }));
+    setEditingDelisted(prev => ({ ...(prev || {}), image: '' }));
     try {
       const q = new URL(imageUrl, window.location.origin).pathname;
       await api.delete('/upload', { params: { path: q } });
@@ -963,7 +1117,7 @@ export default function OfficialDelistedReportPage() {
         if (res && res.item) {
           // update editingDelisted.image to new scanner route if available
           const newUrl = res.item.url || (`/kshf_hospital_app/scanner/file/${encodeURIComponent(res.item.name || newName)}`);
-          setEditingDelisted(prev => ({ ...(prev||{}), image: newUrl }));
+          setEditingDelisted(prev => ({ ...(prev || {}), image: newUrl }));
           setScannerFiles((s) => (s || []).map(it => ((it && (it.name || it)) === oldName ? res.item : it)));
           window.alert('ប្តូរឈ្មោះបានសម្រេច');
         } else {
@@ -1003,32 +1157,36 @@ export default function OfficialDelistedReportPage() {
         uploadedUrl = await handleUploadFile();
         if (!uploadedUrl) { setSaving(false); return; }
       }
-      
+
       // Map form fields to database schema fields (top-level, not nested delisted object)
       const payload = {};
-      
-      // Map reason to resignationReason
-      if (editingDelisted.reason) payload.resignationReason = editingDelisted.reason;
-      
-      // Map dateDelisted to resignationDate (allow clearing)
-      if (typeof editingDelisted.dateDelisted !== 'undefined') payload.resignationDate = editingDelisted.dateDelisted ? editingDelisted.dateDelisted : null;
-      
-      // Map image to resignationDocument
-      if (uploadedUrl) payload.resignationDocument = uploadedUrl;
-      else if (editingDelisted.image && editingDelisted.image !== '') payload.resignationDocument = editingDelisted.image;
-      
-      // Map note/other to resignationOther
-      if (editingDelisted.note) payload.resignationOther = editingDelisted.note;
 
-      // Map dateRemoved (កាលបរិច្ឆេទដកទិន្នន័យ) — allow clearing when empty
-      if (typeof editingDelisted.dateRemoved !== 'undefined') payload.dateRemoved = editingDelisted.dateRemoved ? editingDelisted.dateRemoved : null;
-      
+      if (modalMode === 'probation') {
+        if (editingDelisted.probationEndDate) payload.probationEndDate = editingDelisted.probationEndDate;
+      } else {
+        // Map reason to resignationReason
+        if (editingDelisted.reason) payload.resignationReason = editingDelisted.reason;
+
+        // Map dateDelisted to resignationDate (allow clearing)
+        if (typeof editingDelisted.dateDelisted !== 'undefined') payload.resignationDate = editingDelisted.dateDelisted ? editingDelisted.dateDelisted : null;
+
+        // Map image to resignationDocument
+        if (uploadedUrl) payload.resignationDocument = uploadedUrl;
+        else if (editingDelisted.image && editingDelisted.image !== '') payload.resignationDocument = editingDelisted.image;
+
+        // Map note/other to resignationOther
+        if (editingDelisted.note) payload.resignationOther = editingDelisted.note;
+
+        // Map dateRemoved (កាលបរិច្ឆេទដកទិន្នន័យ) — allow clearing when empty
+        if (typeof editingDelisted.dateRemoved !== 'undefined') payload.dateRemoved = editingDelisted.dateRemoved ? editingDelisted.dateRemoved : null;
+      }
+
       const id = editingHr._id || editingHr.no || editingHr.staffId;
       console.log('Saving delisted for HR ID:', id, 'Payload:', payload);
-      
+
       const { data } = await api.put(`/hr/${id}`, payload);
       console.log('Save response:', data);
-      
+
       // Update list with returned data
       setList(prev => prev.map(h => {
         if (h._id && data && data._id && h._id === data._id) return data;
@@ -1076,6 +1234,41 @@ export default function OfficialDelistedReportPage() {
     } catch (err) {
       console.error('Return to work failed', err);
       window.alert('មិនអាចកំណត់បាន: ' + (err?.response?.data?.message || err?.message || 'កំហុស'));
+    }
+  };
+
+  const handleSetGroupClosingDate = async (groupRecords, selectedDate) => {
+    if (!groupRecords || groupRecords.length === 0 || !selectedDate) return;
+    const ok = window.confirm(`តើអ្នកចង់រក្សាទុក "ថ្ងៃទី ${toKhmerDigits(new Date(selectedDate).getDate())}" ជាថ្ងៃបិទរបាយការណ៍ សម្រាប់មន្ត្រីទាំង ${toKhmerDigits(groupRecords.length)} នាក់ក្នុងខែនេះ?`);
+    if (!ok) return;
+
+    // Immediate local update for responsiveness
+    setList(prev => (prev || []).map(h => {
+      const isMember = groupRecords.some(r =>
+        (r.hr._id && h._id && r.hr._id === h._id) ||
+        (r.hr.staffId && h.staffId && r.hr.staffId === h.staffId) ||
+        (r.hr.no && h.no && r.hr.no === h.no)
+      );
+      if (isMember) return { ...h, dateRemoved: selectedDate };
+      return h;
+    }));
+
+    setSaving(true);
+    try {
+      const promises = groupRecords.map(r => {
+        const id = r.hr._id || r.hr.no || r.hr.staffId;
+        return api.put(`/hr/${id}`, { dateRemoved: selectedDate });
+      });
+      await Promise.all(promises);
+
+      const { data } = await api.get('/hr');
+      setList(Array.isArray(data) ? data : []);
+      window.alert('រក្សាទុកបានដោយជោគជ័យ');
+    } catch (err) {
+      console.error('Batch save failed', err);
+      window.alert('រក្សាទុកបរាជ័យ');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1129,7 +1322,6 @@ export default function OfficialDelistedReportPage() {
     const rows = derived.rows;
     const header = [
       'ល.រ',
-      'លេខកាត',
       'លេខមន្ត្រីរាជការ',
       'គោត្តនាម និងនាម',
       'ភេទ',
@@ -1147,8 +1339,7 @@ export default function OfficialDelistedReportPage() {
       const delisted = row.hr && row.hr.delisted ? row.hr.delisted : {};
       const meta = computeDelistedMeta(delisted || {});
       return ([
-        idx+1,
-        row.hr.staffId || row.hr.cardNumber || row.hr.cardNo || row.hr.no || '',
+        idx + 1,
         row.hr.civilServantId || row.hr.officerId || row.hr.staffId || row.hr.no || '',
         row.hr.khmerName || row.hr.name || '',
         row.hr.gender === 'Male' ? 'ប' : row.hr.gender === 'Female' ? 'ស' : '',
@@ -1170,7 +1361,7 @@ export default function OfficialDelistedReportPage() {
 
     const ws = XLSX.utils.aoa_to_sheet([header, ...data, [], ...summary]);
     ws['!cols'] = [
-      { wch: 5 }, { wch: 12 }, { wch: 12 }, { wch: 30 }, { wch: 6 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
+      { wch: 5 }, { wch: 12 }, { wch: 30 }, { wch: 6 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
       { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 24 }
     ];
     const wb = XLSX.utils.book_new();
@@ -1179,54 +1370,24 @@ export default function OfficialDelistedReportPage() {
     XLSX.writeFile(wb, `OfficialDelisted_${reportYear}.xlsx`);
   };
 
-  const renderGroupTable = (title, rows, showHeader = true) => {
-    if (!rows || rows.length === 0) return null;
+  const renderGroupTable = (group, showHeader = true) => {
+    const { label, records: resignedRows = [], newRecords: joinedRows = [], closingDate, entryClosingDate } = group;
+    if ((!resignedRows || resignedRows.length === 0) && (!joinedRows || joinedRows.length === 0)) return null;
 
-    const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
-    const now = new Date();
-    const currentKey = (now.getFullYear() * 12) + now.getMonth();
+    // Status checks
+    const isResignedClosed = resignedRows.length > 0 && resignedRows.every(r => {
+      const d = r.hr.dateRemoved || (r.hr.delisted && (r.hr.delisted.dateRemoved || r.hr.delisted.date_removed));
+      return d && d !== '';
+    });
+    const isJoinedClosed = joinedRows.length > 0 && joinedRows.every(r => r.hr.entryClosingDate && r.hr.entryClosingDate !== '');
+    const isFullyClosed = (resignedRows.length === 0 || isResignedClosed) && (joinedRows.length === 0 || isJoinedClosed);
 
-    const parseYearFromText = (text) => {
-      try {
-        const t = String(text || '');
-        if (!t) return null;
-        const map = { '០': '0', '១': '1', '២': '2', '៣': '3', '៤': '4', '៥': '5', '៦': '6', '៧': '7', '៨': '8', '៩': '9' };
-        const normalized = t.replace(/[០-៩]/g, ch => map[ch] || ch);
-        const m = normalized.match(/\b(19\d{2}|20\d{2})\b/);
-        if (!m) return null;
-        const y = Number(m[1]);
-        if (!Number.isFinite(y)) return null;
-        return y;
-      } catch {
-        return null;
-      }
-    };
+    const refClosing = closingDate || entryClosingDate || footerDate;
+    const day = refClosing ? new Date(refClosing).getDate() : new Date().getDate();
+    const title = `ថ្ងៃទី ${toKhmerDigits(day)} ${label}`;
 
-    const monthKeyForHr = (hr) => {
-      try {
-        const del = hr?.delisted || {};
-        const note = (del.note || del.Note || hr?.resignationOther || hr?.note || '').toString();
-        const delistedDate = parseDateSafe(del.dateDelisted || del.date || hr?.resignationDate || hr?.resignDate || hr?.date_resigned || hr?.dateLeft || hr?.leftDate || hr?.departureDate || null);
-        const yearFallback = delistedDate ? delistedDate.getFullYear() : now.getFullYear();
-
-        if (note) {
-          const monthIndex = khMonths.findIndex(m => note.includes(m));
-          if (monthIndex >= 0) {
-            const y = parseYearFromText(note) || yearFallback;
-            return (y * 12) + monthIndex;
-          }
-        }
-
-        if (delistedDate) return (delistedDate.getFullYear() * 12) + delistedDate.getMonth();
-        return null;
-      } catch {
-        return null;
-      }
-    };
-
-    const columnDefs = [
+    const columnDefsResigned = [
       { key: 'index', label: 'ល.រ', width: '40px' },
-      { key: 'staffId', label: 'លេខកាត', width: '70px' },
       { key: 'civilId', label: 'លេខមន្ត្រី', width: '80px' },
       { key: 'name', label: 'គោត្តនាម និងនាម', width: '120px' },
       { key: 'gender', label: 'ភេទ', width: '30px' },
@@ -1242,122 +1403,185 @@ export default function OfficialDelistedReportPage() {
       { key: 'action', label: 'សកម្មភាព', width: '90px' }
     ];
 
-    const orderedDefs = (colOrder || defaultCols).map(k => columnDefs.find(c => c.key === k)).filter(Boolean);
-    const numCols = orderedDefs.length;
-    const equalPct = (100 / numCols).toFixed(4) + '%';
-    const colElems = orderedDefs.map((c, i) => {
-      const w = c && c.width ? c.width : equalPct;
-      return <col key={c.key || i} style={{ width: w }} />;
-    });
+    const columnDefsNew = [
+      { key: 'index', label: 'ល.រ', width: '40px' },
+      { key: 'civilId', label: 'លេខកាត', width: '80px' },
+      { key: 'name', label: 'គោត្តនាម និងនាម', width: '150px' },
+      { key: 'gender', label: 'ភេទ', width: '30px' },
+      { key: 'position', label: 'តួនាទី', width: '150px' },
+      { key: 'dept', label: 'ផ្នែក', width: '200px' },
+      { key: 'joinDate', label: 'ថ្ងៃចូលបម្រើការ', width: '100px' },
+      { key: 'probationEnd', label: 'សាកល្បងដល់ថ្ងៃ', width: '100px' },
+      { key: 'probationStatus', label: 'ស្ថានភាព', width: '100px' },
+      { key: 'action', label: 'សកម្មភាព', width: '60px' }
+    ];
+    const khMonths = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
+    const now = new Date();
+    const currentKey = (now.getFullYear() * 12) + now.getMonth();
+
+    const handleSetMovementClosingDate = async (targetRowsJoined, targetRowsResigned, selectedDate) => {
+      if (!selectedDate) return;
+      const count = (targetRowsJoined?.length || 0) + (targetRowsResigned?.length || 0);
+      const confirm = window.confirm(`តើលោកអ្នកចង់កំណត់ថ្ងៃបិទរបាយការណ៍បម្រែបម្រួលបុគ្គលិកទាំង ${toKhmerDigits(count)} នាក់ ជាថ្ងៃទី ${fmtShortDate(selectedDate)} មែនទេ?`);
+      if (!confirm) return;
+
+      try {
+        setSaving(true);
+        const promises = [];
+        if (targetRowsJoined) {
+          targetRowsJoined.forEach(r => {
+            const id = r.hr._id || r.hr.no || r.hr.staffId;
+            if (id) promises.push(api.put(`/hr/${id}`, { entryClosingDate: selectedDate }));
+          });
+        }
+        if (targetRowsResigned) {
+          targetRowsResigned.forEach(r => {
+            const id = r.hr._id || r.hr.no || r.hr.staffId;
+            if (id) promises.push(api.put(`/hr/${id}`, { dateRemoved: selectedDate }));
+          });
+        }
+
+        await Promise.all(promises);
+        // Refresh data
+        const { data } = await api.get('/hr');
+        if (isMountedRef.current) setList(Array.isArray(data) ? data : []);
+      } catch (err) {
+        window.alert('ការរក្សាទុកមានបញ្ហា: ' + (err.response?.data?.message || err.message));
+      } finally {
+        if (isMountedRef.current) setSaving(false);
+      }
+    };
+
+    let sectionCounter = 1;
+    const titleParts = [];
+    if (joinedRows.length > 0) titleParts.push(`ថ្មី: ${toKhmerDigits(joinedRows.length)}`);
+    if (resignedRows.length > 0) titleParts.push(`ឈប់: ${toKhmerDigits(resignedRows.length)}`);
+    const countSuffix = titleParts.length > 0 ? ` (${titleParts.join(' | ')})` : '';
 
     return (
-      <div style={{marginBottom:12}}>
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6}}>
-          {(() => {
-            const totalN = rows.length || 0;
-            const maleN = rows.filter(r => r.hr && r.hr.gender === 'Male').length;
-            const femaleN = rows.filter(r => r.hr && r.hr.gender === 'Female').length;
-            return (
-              <h4 style={{fontSize:12, fontWeight:700, margin:0}}>{title} — {toKhmerDigits(totalN)} នាក់ ( ប្រុស: {toKhmerDigits(maleN)} — ស្រី: {toKhmerDigits(femaleN)} )</h4>
-            );
-          })()}
-        </div>
-        <table style={{width:'100%', borderCollapse:'collapse', fontSize:12, tableLayout:'fixed'}}>
-          <colgroup>
-            {colElems}
-          </colgroup>
-          {showHeader && (
-            <thead>
-              <tr>
-                {orderedDefs.map((col) => (
-                  <th
-                    key={col.key}
-                    draggable
-                    onDragStart={(e) => { draggingKeyRef.current = col.key; e.dataTransfer?.setData('text/plain', col.key); }}
-                    onDragOver={(e) => { e.preventDefault(); }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const from = draggingKeyRef.current || e.dataTransfer?.getData('text/plain');
-                      const to = col.key;
-                      if (!from || from === to) return;
-                      setColOrder(prev => {
-                        const next = (prev || defaultCols).slice();
-                        const fi = next.indexOf(from);
-                        const ti = next.indexOf(to);
-                        if (fi === -1 || ti === -1) return prev;
-                        next.splice(fi,1);
-                        next.splice(ti,0,from);
-                        return next;
-                      });
-                      draggingKeyRef.current = null;
-                    }}
-                    style={{border:'1px solid #d1cfcf', padding:'6px', cursor:'grab', userSelect:'none', textAlign: 'center'}}
-                    className="center"
-                  >
-                    {col.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
+      <div style={{ marginBottom: 24, border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', background: '#fff' }}>
+        {/* Unified Group Header */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 12,
+          background: isFullyClosed ? '#f0fdf4' : '#f8fafc',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          border: isFullyClosed ? '1px solid #bbf7d0' : '1px solid #e2e8f0'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <h4 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: isFullyClosed ? '#166534' : '#1e293b' }}>
+              {title}{countSuffix}
+            </h4>
+            {isFullyClosed && (
+              <span style={{ fontSize: '10px', background: '#22c55e', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>
+                ✓ បានបិទរបាយការណ៍រួម
+              </span>
+            )}
+          </div>
+          {(perms.isAdmin || perms.canEditOfficialDelistedReport) && (
+            <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 6, background: isFullyClosed ? '#dcfce7' : '#eff6ff', padding: '4px 10px', borderRadius: '4px', border: isFullyClosed ? '1px solid #86efac' : '1px solid #dbeafe' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: isFullyClosed ? '#166534' : '#1e40af' }}>{isFullyClosed ? 'ប្តូរថ្ងៃបិទរួម:' : 'កំណត់ថ្ងៃបិទរួម:'}</span>
+              <input
+                type="date"
+                value={fmtDateInput(refClosing)}
+                onChange={(e) => handleSetMovementClosingDate(joinedRows, resignedRows, e.target.value)}
+                style={{ fontSize: '11px', padding: '2px 6px', border: '1px solid #bfdbfe', borderRadius: '3px' }}
+              />
+            </div>
           )}
-          <tbody>
-            {rows.map((row, idx) => {
-              const staffId = row.hr.staffId || row.hr.cardNumber || row.hr.cardNo || row.hr.no || null;
-              const civilId = row.hr.civilServantId || row.hr.officerId || row.hr.staffId || row.hr.no || null;
-              const fullName = row.hr.khmerName || row.hr.name || null;
-              const gender = row.hr.gender === 'Male' ? 'ប' : row.hr.gender === 'Female' ? 'ស' : null;
-              const role = row.hr.civilServantRole || row.hr.role || row.hr.title || row.hr.position || null;
-              const position = row.hr.position || row.hr.role || row.hr.title || null;
-              const deptName = row.hr.Department_Kh || row.hr.department || null;
-              const delisted = row.hr && row.hr.delisted ? row.hr.delisted : {};
-              const meta = computeDelistedMeta(delisted || {});
-              const rowKey = monthKeyForHr(row.hr);
-              const isOldMonth = (rowKey != null) && (rowKey < currentKey);
-              const isFutureMonth = (rowKey != null) && (rowKey > currentKey);
+        </div>
 
-              return (
-                <tr
-                  key={row.hr._id || idx}
-                  style={
-                    isFutureMonth
-                      ? { background: '#a5cabb' }
-                      : isOldMonth
-                        ? { background: '#cccad4' }
-                        : undefined
-                  }
-                >
-                  {orderedDefs.map((col) => {
-                    const k = col.key;
-                    if (k === 'index') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}} className="center">{toKhmerDigits(idx+1)}</td>);
-                    if (k === 'staffId') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center">{staffId ? staffId : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'civilId') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}} className="center">{civilId ? civilId : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'name') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}}>{fullName ? fullName : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'gender') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}} className="center">{gender ? gender : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'role') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}}>{role ? role : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'position') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}}>{position ? position : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'dept') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6, wordBreak:'break-word', overflowWrap:'break-word'}}>{deptName ? deptName : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'reason') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}}>{(delisted && (delisted.reason || delisted.Reason)) ? (delisted.reason || delisted.Reason) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'delistStatus') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center">{meta.statusLabel ? renderStatusBadge(meta.statusLabel) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'dateDelisted') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center">{(delisted && (delisted.dateDelisted || delisted.date)) ? fmtShortDate(delisted.dateDelisted || delisted.date) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'dateDelisted') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center">{(delisted && (delisted.dateDelisted || delisted.date)) ? fmtShortDate(delisted.dateDelisted || delisted.date) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'dateRemoved') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center">{(row.hr && (row.hr.dateRemoved || (row.hr.delisted && (row.hr.delisted.dateRemoved || row.hr.delisted.date_removed)))) ? fmtShortDate(row.hr.dateRemoved || (row.hr.delisted && (row.hr.delisted.dateRemoved || row.hr.delisted.date_removed))) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'note') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}}>{(delisted && (delisted.note || delisted.Note)) ? (delisted.note || delisted.Note) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'image') return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}}>{delisted && delisted.image ? (<a href={delisted.image} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'action') return (
-                      <td key={k} style={{border:'1px solid #e6dbdbff', padding:6}} className="center">
-                        <div style={{display:'inline-flex', gap:8, alignItems:'center', justifyContent:'center'}}>
-                          <button type="button" onClick={() => openEdit(row.hr)} style={{background:'#facc15', borderRadius:4, padding:'4px 8px', border:'1px solid #d4af2b'}} className="text-xs">Edit</button>
-                          <button type="button" onClick={() => handleReturnToWork(row.hr)} style={{background:'#10b981', borderRadius:4, padding:'4px 8px', border:'1px solid #059669'}} className="text-xs text-white">ចូលវិញ</button>
-                        </div>
-                      </td>
-                    );
-                    return (<td key={k} style={{border:'1px solid #e6dbdbff', padding:6}}>-</td>);
-                  })}
+        {/* Section 1: New Employees */}
+        {joinedRows.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <h5 style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f97316' }}></span>
+              {toKhmerDigits(sectionCounter++)}. បញ្ជីបុគ្គលិកចូលថ្មី ({toKhmerDigits(joinedRows.length)} នាក់)
+            </h5>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, tableLayout: 'fixed' }}>
+              <thead>
+                <tr style={{ background: '#f1f5f9' }}>
+                  {columnDefsNew.map(c => <th key={c.key} style={{ border: '1px solid #cbd5e1', padding: '4px', width: c.width, textAlign: 'center' }}>{c.label}</th>)}
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {joinedRows.map((r, idx) => (
+                  <tr key={r.hr._id || idx} style={{ background: r.hr.entryClosingDate ? '#f1f5f9' : '#fff' }}>
+                    <td style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>{toKhmerDigits(idx + 1)}</td>
+                    <td style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>{r.hr.staffId || r.hr.no}</td>
+                    <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{r.hr.khmerName || r.hr.name}</td>
+                    <td style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>{r.hr.gender === 'Male' ? 'ប' : r.hr.gender === 'Female' ? 'ស' : ''}</td>
+                    <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{r.hr.position || r.hr.role}</td>
+                    <td style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{r.hr.Department_Kh || r.hr.department}</td>
+                    <td style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>{fmtShortDate(r.hr.joinDate)}</td>
+                    <td style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>{fmtShortDate(r.hr.probationEndDate || r.hr.probationEnd)}</td>
+                    <td style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>
+                      {(() => {
+                        const s = getProbationStatus(r.hr);
+                        if (!s) return '';
+                        const color = s === 'កំពុងសាកល្បង' ? '#854d0e' : s === 'បញ្ចប់សាកល្បង' ? '#166534' : '#9a3412';
+                        const bg = s === 'កំពុងសាកល្បង' ? '#fef9c3' : s === 'បញ្ចប់សាកល្បង' ? '#dcfce7' : '#ffedd5';
+                        return <span style={{ padding: '1px 4px', borderRadius: '4px', background: bg, color, fontSize: '9px', fontWeight: 600 }}>{s}</span>;
+                      })()}
+                    </td>
+                    <td style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setModalMode('probation'); openEdit(r.hr); }} className="px-2 py-0.5 bg-yellow-400 rounded text-[10px]">Edit</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Section 2: Resigned Employees */}
+        {resignedRows.length > 0 && (
+          <div>
+            <h5 style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#e11d48' }}></span>
+              {toKhmerDigits(sectionCounter++)}. បញ្ជីបុគ្គលិកឈប់ពីការងារ ({toKhmerDigits(resignedRows.length)} នាក់)
+            </h5>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, tableLayout: 'fixed' }}>
+              <thead>
+                <tr style={{ background: '#f1f5f9' }}>
+                  {columnDefsResigned.filter(c => colOrder.includes(c.key)).map(c => <th key={c.key} style={{ border: '1px solid #cbd5e1', padding: '4px', width: c.width, textAlign: 'center' }}>{c.label}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {resignedRows.map((row, idx) => (
+                  <tr key={row.hr._id || idx} style={{ background: row.hr.dateRemoved ? '#f1f5f9' : '#fff' }}>
+                    {(colOrder || defaultCols).map(k => {
+                      const hr = row.hr;
+                      const del = hr.delisted || {};
+                      if (k === 'index') return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>{toKhmerDigits(idx + 1)}</td>;
+                      if (k === 'civilId') return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>{hr.civilServantId || hr.staffId || hr.no}</td>;
+                      if (k === 'name') return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{hr.khmerName || hr.name}</td>;
+                      if (k === 'gender') return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>{hr.gender === 'Male' ? 'ប' : 'ស'}</td>;
+                      if (k === 'role') return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{hr.civilServantRole || hr.role}</td>;
+                      if (k === 'position') return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{hr.position}</td>;
+                      if (k === 'dept') return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{hr.Department_Kh || hr.department}</td>;
+                      if (k === 'reason') return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{del.reason || del.Reason || '-'}</td>;
+                      if (k === 'delistStatus') return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>{computeDelistedMeta(del).statusLabel}</td>;
+                      if (k === 'dateDelisted') return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>{fmtShortDate(del.dateDelisted || del.date)}</td>;
+                      if (k === 'dateRemoved') return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>{fmtShortDate(hr.dateRemoved)}</td>;
+                      if (k === 'note') return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px' }}>{del.note || del.Note || '-'}</td>;
+                      if (k === 'image') return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>{del.image ? 'មាន' : '-'}</td>;
+                      if (k === 'action') return (
+                        <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px', textAlign: 'center' }}>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setModalMode('delist'); openEdit(hr); }} className="px-2 py-0.5 bg-yellow-400 rounded text-[10px]">Edit</button>
+                        </td>
+                      );
+                      return <td key={k} style={{ border: '1px solid #e2e8f0', padding: '4px' }}>-</td>;
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     );
   };
@@ -1365,7 +1589,7 @@ export default function OfficialDelistedReportPage() {
   if (!(perms.canViewHR || perms.canViewEmployees)) {
     return (
       <div className="p-6">
-        <h3 className="text-xl font-semibold mb-2">របាយការណ៍ មន្ត្រីឈប់ពីការងារ</h3>
+        <h3 className="text-xl font-semibold mb-2">របាយការណ៍បម្រែបម្រួលបុគ្គលិកប្រចាំខែ</h3>
         <div className="p-3 border rounded bg-yellow-50 text-yellow-800">ត្រូវការ សិទ្ធិ: view:hr ឬ view:employees</div>
       </div>
     );
@@ -1375,11 +1599,11 @@ export default function OfficialDelistedReportPage() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="text-xl font-semibold text-gray-900">របាយការណ៍ មន្ត្រីឈប់ពីការងារ</h3>
+          <h3 className="text-xl font-semibold text-gray-900">របាយការណ៍បម្រែបម្រួលបុគ្គលិកប្រចាំខែ</h3>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <label className="text-sm" title="ស្វែងរកក្នុងចំណោម មន្ត្រីឈប់ទាំងអស់ - ID, ឈ្មោះ, តួនាទី, ផ្នែក, មូលហេតុ">ស្វែងរក (ID ឬ ឈ្មោះ):</label>
-          <div style={{display:'inline-flex', alignItems:'center', gap:6}}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <input
               type="text"
               className="rounded-md bg-gray-50 px-3 py-2 w-56 text-sm placeholder-gray-400 border border-gray-200"
@@ -1396,9 +1620,9 @@ export default function OfficialDelistedReportPage() {
               Clear
             </button>
           </div>
-          
+
           <label className="text-sm">គ្រប់គ្រង​:</label>
-          <select value={filterDateField} onChange={(e)=>setFilterDateField(e.target.value)} className="border rounded px-2 py-1">
+          <select value={filterDateField} onChange={(e) => setFilterDateField(e.target.value)} className="border rounded px-2 py-1">
             <option value="removed">ថ្ងៃលុប (dateRemoved)</option>
             <option value="delisted">ថ្ងៃលាលែង (dateDelisted)</option>
             <option value="either">ទាំងពីរ (Either)</option>
@@ -1425,16 +1649,31 @@ export default function OfficialDelistedReportPage() {
             className="border rounded px-2 py-1 w-72"
             placeholder="ឧ. ថ្ងៃសុក្រ ១៣កើត ខែភទ្របទ ឆ្នាំម្សាញ់"
             value={lunarText}
-            onChange={(e)=> setLunarText(e.target.value)}
+            onChange={(e) => setLunarText(e.target.value)}
           />
           <label className="text-sm">ថ្ងៃខែឆ្នាំ:</label>
           <input
             type="date"
             className="border rounded px-2 py-1"
             value={footerDate}
-            onChange={(e)=> setFooterDate(e.target.value)}
+            onChange={(e) => setFooterDate(e.target.value)}
           />
-          
+
+          <label className="text-sm">ខែរបាយការណ៍:</label>
+          <select
+            value={selectedMonthKey}
+            onChange={(e) => setSelectedMonthKey(e.target.value)}
+            className="border rounded px-2 py-1 bg-white"
+            style={{ minWidth: '150px' }}
+          >
+            <option value="all">-- ទាំងអស់ --</option>
+            {derived.monthlyGroups.map(g => (
+              <option key={`${g.year}-${g.month}`} value={`${g.year}-${String(g.month).padStart(2, '0')}`}>
+                {g.label} ({toKhmerDigits(g.records.length)} នាក់)
+              </option>
+            ))}
+          </select>
+
           {(!lunarText.trim()) && <span className="text-red-600 text-xs">សូមបំពេញចន្ទគតិ</span>}
           <button className={`border px-2 py-1 rounded ${loading ? 'bg-gray-100 text-gray-300' : 'bg-green-600 text-white border-green-600'}`} onClick={handleExportExcel} disabled={loading}>Export Excel</button>
           <button className={`border px-2 py-1 rounded ${(!lunarText.trim() || loading) ? 'bg-gray-100 text-gray-300' : 'bg-blue-600 text-white border-blue-600'}`} onClick={handlePrint} disabled={!lunarText.trim() || loading}>បោះពុម្ព</button>
@@ -1445,29 +1684,45 @@ export default function OfficialDelistedReportPage() {
 
       <div ref={printRef} className="bg-white p-4 border rounded print-scope">
         <style dangerouslySetInnerHTML={{ __html: SCREEN_CSS }} />
-        <div style={{textAlign:'center', marginBottom: '8px'}}>
-          <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'16px'}}>ព្រះរាជាណាចក្រកម្ពុជា</div>
-          <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'14px'}}>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
-          <div style={{position:'relative', textAlign:'left', padding:'6px 0'}}>
+        <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+          <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '16px' }}>ព្រះរាជាណាចក្រកម្ពុជា</div>
+          <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '14px' }}>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
+          <div style={{ position: 'relative', textAlign: 'left', padding: '6px 0' }}>
             <img src={headerBg} alt="" aria-hidden="true"
-                 style={{position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)', width:'150px', height:'auto', opacity:88, pointerEvents:'none'}} />
-            <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12.5px', position:'relative', zIndex:1}}>ក្រសួងសុខាភិបាល</div>
+              style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '150px', height: 'auto', opacity: 88, pointerEvents: 'none' }} />
+            <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12.5px', position: 'relative', zIndex: 1 }}>ក្រសួងសុខាភិបាល</div>
           </div>
-          <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'left'}}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</div>
-          <div style={{fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'13px',marginTop:'4px', fontWeight:600}}>បញ្ជីឈ្មោះមន្ត្រីលុបឈ្មោះពីក្របខណ្ឌ ឆ្នាំ {toKhmerDigits(reportYear)}</div>
+          <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'left' }}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</div>
+          <div style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '13px', marginTop: '4px', fontWeight: 600 }}>របាយការណ៍បម្រែបម្រួលបុគ្គលិកប្រចាំខែ ឆ្នាំ {toKhmerDigits(reportYear)}</div>
+          {selectedMonthKey !== 'all' && (() => {
+            const group = derived.monthlyGroups.find(g => `${g.year}-${String(g.month).padStart(2, '0')}` === selectedMonthKey);
+            if (!group) return null;
+            return (
+              <div style={{ fontSize: '12px', marginTop: '4px', fontStyle: 'italic' }}>
+                ថ្ងៃទី {toKhmerDigits(group.closingDate ? new Date(group.closingDate).getDate() : new Date(footerDate).getDate())} {group.label}
+              </div>
+            );
+          })()}
         </div>
 
         <div className="no-print">
           {(() => {
             const prepared = derived.preparedRows || [];
-            const deleted = derived.rows || [];
             const other = derived.otherRows || [];
             const hasSearch = (q || '').toString().trim() !== '';
-            if (!prepared.length && !deleted.length && !(hasSearch && other.length)) return <div className="center text-gray-600">មិនមានទិន្នន័យ</div>;
+
             return (
               <div>
-                {prepared.length > 0 && renderGroupTable('ត្រៀមលុបឈ្មោះ (Prepared for deletion)', prepared, true)}
-                {deleted.length > 0 && renderGroupTable('លុបឈ្មោះរួច (Deleted)', deleted, true)}
+                {prepared.length > 0 && renderGroupTable({ label: 'ត្រៀមលុបឈ្មោះ (Prepared for deletion)', records: prepared }, true)}
+                {derived.monthlyGroups.map(g => {
+                  if (selectedMonthKey !== 'all' && `${g.year}-${String(g.month).padStart(2, '0')}` !== selectedMonthKey) return null;
+                  return (
+                    <div key={`${g.year}-${g.month}`} style={{ marginBottom: '24px' }}>
+                      {renderGroupTable(g, true)}
+                    </div>
+                  );
+                })}
+
                 {hasSearch && other.length > 0 && renderGroupTable('ផ្សេងៗ (Other)', other, true)}
               </div>
             );
@@ -1475,33 +1730,36 @@ export default function OfficialDelistedReportPage() {
         </div>
 
         {/* Print-only simplified table */}
-        <div className="print-only" style={{display:'none'}}>
-          {(() => {
-            const rows = derived.rows || [];
-            if (!rows || rows.length === 0) return <div className="center">មិនមានទិន្នន័យ</div>;
+        <div className="print-only" style={{ display: 'none' }}>
+          {derived.monthlyGroups.map(g => {
+            if (selectedMonthKey !== 'all' && `${g.year}-${String(g.month).padStart(2, '0')}` !== selectedMonthKey) return null;
+            const rows = g.records || [];
+            if (rows.length === 0) return null;
             return (
-              <div style={{marginBottom:12}}>
-                <div style={{fontSize:12,fontWeight:700, marginBottom:6}}>មន្ត្រីលុបឈ្មោះពីក្របខណ្ឌ — {toKhmerDigits(rows.length)} នាក់</div>
-                <table>
+              <div key={`${g.year}-${g.month}`} style={{ marginBottom: 24, breakAfter: 'auto' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, borderBottom: '1px solid #000', paddingBottom: 4 }}>
+                  មន្ត្រីលុបឈ្មោះ — ថ្ងៃទី {toKhmerDigits(g.closingDate ? new Date(g.closingDate).getDate() : new Date(footerDate).getDate())} {g.label}
+                  <span style={{ float: 'right' }}>សរុប {toKhmerDigits(rows.length)} នាក់</span>
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
                   <thead>
                     <tr>
-                      <th>ល.រ</th>
-                      <th>លេខកាត</th>
-                      <th>លេខមន្ត្រី</th>
-                      <th>គោត្តនាម និងនាម</th>
-                      <th>ភេទ</th>
-                      <th>តួនាទី</th>
-                      <th>ផ្នែក</th>
-                      <th>មូលហេតុលុប</th>
-                      <th>ថ្ងៃលុប</th>
-                      <th>ស្ថានភាព</th>
+                      <th style={{ width: '40px' }}>ល.រ</th>
+                      <th style={{ width: '80px' }}>លេខកាត</th>
+                      <th style={{ width: '80px' }}>លេខមន្ត្រី</th>
+                      <th style={{ width: '150px' }}>គោត្តនាម និងនាម</th>
+                      <th style={{ width: '40px' }}>ភេទ</th>
+                      <th style={{ width: '160px' }}>តួនាទី</th>
+                      <th style={{ width: '180px' }}>ផ្នែក</th>
+                      <th>មូលហេតុ</th>
+                      <th style={{ width: '90px' }}>ថ្ងៃលុប</th>
+                      <th style={{ width: '100px' }}>ស្ថានភាព</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row, idx) => {
                       const delisted = (row.hr && row.hr.delisted) ? row.hr.delisted : {};
                       const meta = computeDelistedMeta(delisted || {});
-                      const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
                       const now = new Date();
                       const currentKey = (now.getFullYear() * 12) + now.getMonth();
                       const note = (delisted.note || delisted.Note || row.hr.resignationOther || row.hr.note || '').toString();
@@ -1532,7 +1790,7 @@ export default function OfficialDelistedReportPage() {
                                 : undefined
                           }
                         >
-                          <td className="center">{toKhmerDigits(idx+1)}</td>
+                          <td className="center">{toKhmerDigits(idx + 1)}</td>
                           <td className="center">{row.hr.staffId || row.hr.cardNumber || row.hr.cardNo || row.hr.no || ''}</td>
                           <td className="center">{row.hr.civilServantId || row.hr.officerId || row.hr.staffId || row.hr.no || ''}</td>
                           <td>{row.hr.khmerName || row.hr.name || ''}</td>
@@ -1549,101 +1807,180 @@ export default function OfficialDelistedReportPage() {
                 </table>
               </div>
             );
-          })()}
+          })}
         </div>
 
         {/* Edit modal for delisted fields */}
         {showEdit && (
-          <div className="no-print" style={{position:'fixed', left:0, top:0, right:0, bottom:0, background:'rgba(0,0,0,0.35)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999}}>
-            <div style={{width:720, background:'#fff', borderRadius:6, padding:16, maxHeight:'90vh', overflow:'auto'}}>
-              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
-                <h4 style={{margin:0}}>កែប្រែ មន្ត្រីលុបឈ្មោះ</h4>
+          <div className="no-print" style={{ position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+            <div style={{ width: 720, background: '#fff', borderRadius: 6, padding: 16, maxHeight: '90vh', overflow: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <h4 style={{ margin: 0 }}>{modalMode === 'probation' ? 'កែទិន្នន័យសាកល្បង' : 'កែប្រែ មន្ត្រីលុបឈ្មោះ'}</h4>
                 <button onClick={closeEdit} className="text-gray-600">បិទ</button>
               </div>
 
-              <div style={{display:'flex', flexDirection:'column', gap:12}}>
-                {/* Date Delisted */}
-                <div>
-                  <label className="text-sm block mb-1">កាលបរិច្ឆេទលាលែង</label>
-                  <input 
-                    type="date" 
-                    value={editingDelisted.dateDelisted || ''} 
-                    onChange={(e) => handleEditChange('dateDelisted', e.target.value)} 
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="dd/mm/yyyy"
-                  />
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {modalMode === 'probation' ? (
+                  <>
+                    <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '8px' }}>
+                      <div className="text-xs text-gray-500">លេខកាត: <span className="font-semibold text-gray-800">{editingHr?.staffId || editingHr?.no}</span></div>
+                      <div className="text-xs text-gray-500">ឈ្មោះ: <span className="font-semibold text-gray-800">{editingHr?.khmerName || editingHr?.name}</span></div>
+                    </div>
 
-                {/* Date Removed from dataset */}
-                <div>
-                  <label className="text-sm block mb-1">កាលបរិច្ឆេទដកទិន្នន័យ</label>
-                  <input
-                    type="date"
-                    value={editingDelisted.dateRemoved || ''}
-                    onChange={(e) => handleEditChange('dateRemoved', e.target.value)}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="dd/mm/yyyy"
-                  />
-                </div>
+                    <div>
+                      <label className="text-sm block mb-1 font-semibold">សាកល្បងដល់ថ្ងៃ</label>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
+                        {['៣ ខែ', '៦ ខែ', '១ ឆ្នាំ'].map((label, i) => {
+                          const months = [3, 6, 12][i];
+                          return (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={() => {
+                                const jd = parseDateSafe(editingHr?.joinDate) || new Date();
+                                const next = new Date(jd.getFullYear(), jd.getMonth() + months, jd.getDate());
+                                handleEditChange('probationEndDate', fmtDateInput(next));
+                              }}
+                              className="py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm text-gray-700 transition-colors"
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
 
-                {/* Reason */}
-                <div>
-                  <label className="text-sm block mb-1">មូលហេតុលាលែង</label>
-                  <textarea 
-                    value={editingDelisted.reason || ''} 
-                    onChange={(e) => handleEditChange('reason', e.target.value)} 
-                    className="w-full border rounded px-3 py-2"
-                    rows={3}
-                    placeholder="ផ្តល់ឱ្យមូលហេតុលុបឈ្មោះ"
-                  />
-                </div>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                        <input
+                          type="number"
+                          placeholder="ចំនួន"
+                          className="w-1/3 border rounded px-3 py-2 text-sm"
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            const unit = document.getElementById('probationUnit')?.value || 'months';
+                            if (!isNaN(val)) {
+                              const jd = parseDateSafe(editingHr?.joinDate) || new Date();
+                              let next = new Date(jd);
+                              if (unit === 'days') next.setDate(jd.getDate() + val);
+                              else if (unit === 'months') next.setMonth(jd.getMonth() + val);
+                              else if (unit === 'years') next.setFullYear(jd.getFullYear() + val);
+                              handleEditChange('probationEndDate', fmtDateInput(next));
+                            }
+                          }}
+                        />
+                        <select id="probationUnit" className="w-2/3 border rounded px-3 py-2 text-sm">
+                          <option value="days">ថ្ងៃ</option>
+                          <option value="months">ខែ</option>
+                          <option value="years">ឆ្នាំ</option>
+                        </select>
+                      </div>
 
-                {/* Note / Month report entry */}
-                <div>
-                  <label className="text-sm block mb-1">ចូលរបាយការណ៍ខែ</label>
-                  <textarea
-                    value={editingDelisted.note || ''}
-                    onChange={(e) => handleEditChange('note', e.target.value)}
-                    className="w-full border rounded px-3 py-2"
-                    rows={2}
-                    placeholder="បញ្ចូលចូលរបាយការណ៍ខែ..."
-                  />
-                </div>
+                      <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '6px', border: '1px solid #dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <input
+                          type="date"
+                          value={editingDelisted.probationEndDate || ''}
+                          onChange={(e) => handleEditChange('probationEndDate', e.target.value)}
+                          className="bg-transparent border-none focus:ring-0 text-blue-700 font-bold"
+                        />
+                        <span className="text-gray-400">📅</span>
+                      </div>
+                    </div>
 
-                {/* Document Upload */}
-                <div>
-                  <label className="text-sm block mb-1">ឯកសារលាលែង</label>
-                  <div style={{display:'flex', gap:8, alignItems:'center'}}>
-                    <input 
-                      ref={fileInputRef} 
-                      type="file" 
-                      accept="image/*,.pdf"
-                      onChange={(e) => handleFileSelect(e.target.files && e.target.files[0])} 
-                      className="w-full border rounded px-3 py-2"
-                    />
-                    <button type="button" onClick={async () => { try { setScannerNameInput(scannerName || ''); setShowScannerDevicesModal(true); await loadDevices(); } catch (e) { setScannerNameInput(scannerName || ''); setShowScannerDevicesModal(true); } }} className="border rounded px-3 py-1 bg-gray-100 text-sm">Import from scanner</button>
-                  </div>
-                  <div style={{display:'flex', gap:8, marginTop:8, flexWrap:'wrap', fontSize:'12px'}}>
-                    {selectedPreviewUrl && (
-                      <>
-                        <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">Preview file</a>
-                        <input value={selectedFileName} onChange={(e) => setSelectedFileName(e.target.value)} className="border rounded px-2 py-1 text-sm ml-2" style={{width:220}} />
-                      </>
-                    )}
-                    {!selectedPreviewUrl && editingDelisted.image && (
-                      <>
-                        <a href={editingDelisted.image} target="_blank" rel="noreferrer" className="text-blue-600 underline">Current file</a>
-                        {editingDelisted.image && editingDelisted.image.includes('/kshf_hospital_app/scanner/file/') && (
-                          <button type="button" onClick={renameAttachedScannerFile} className="border rounded px-2 py-0.5 text-sm ml-2">កែឈ្មោះ</button>
+                    <div>
+                      <label className="text-sm block mb-1 font-semibold">ស្ថានភាពសាកល្បង</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={getProbationStatus({ ...editingHr, probationEndDate: editingDelisted.probationEndDate })}
+                        className="w-full border rounded px-3 py-2 bg-gray-50 text-sm text-gray-700 font-medium"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Date Delisted */}
+                    <div>
+                      <label className="text-sm block mb-1">កាលបរិច្ឆេទលាលែង</label>
+                      <input
+                        type="date"
+                        value={editingDelisted.dateDelisted || ''}
+                        onChange={(e) => handleEditChange('dateDelisted', e.target.value)}
+                        className="w-full border rounded px-3 py-2"
+                        placeholder="dd/mm/yyyy"
+                      />
+                    </div>
+
+                    {/* Date Removed from dataset */}
+                    <div>
+                      <label className="text-sm block mb-1">កាលបរិច្ឆេទដកទិន្នន័យ</label>
+                      <input
+                        type="date"
+                        value={editingDelisted.dateRemoved || ''}
+                        onChange={(e) => handleEditChange('dateRemoved', e.target.value)}
+                        className="w-full border rounded px-3 py-2"
+                        placeholder="dd/mm/yyyy"
+                      />
+                    </div>
+
+                    {/* Reason */}
+                    <div>
+                      <label className="text-sm block mb-1">មូលហេតុលាលែង</label>
+                      <textarea
+                        value={editingDelisted.reason || ''}
+                        onChange={(e) => handleEditChange('reason', e.target.value)}
+                        className="w-full border rounded px-3 py-2"
+                        rows={3}
+                        placeholder="ផ្តល់ឱ្យមូលហេតុលុបឈ្មោះ"
+                      />
+                    </div>
+
+                    {/* Note / Month report entry */}
+                    <div>
+                      <label className="text-sm block mb-1">ចូលរបាយការណ៍ខែ</label>
+                      <textarea
+                        value={editingDelisted.note || ''}
+                        onChange={(e) => handleEditChange('note', e.target.value)}
+                        className="w-full border rounded px-3 py-2"
+                        rows={2}
+                        placeholder="បញ្ចូលចូលរបាយការណ៍ខែ..."
+                      />
+                    </div>
+
+                    {/* Document Upload */}
+                    <div>
+                      <label className="text-sm block mb-1">ឯកសារលាលែង</label>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={(e) => handleFileSelect(e.target.files && e.target.files[0])}
+                          className="w-full border rounded px-3 py-2"
+                        />
+                        <button type="button" onClick={async () => { try { setScannerNameInput(scannerName || ''); setShowScannerDevicesModal(true); await loadDevices(); } catch (e) { setScannerNameInput(scannerName || ''); setShowScannerDevicesModal(true); } }} className="border rounded px-3 py-1 bg-gray-100 text-sm">Import from scanner</button>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', fontSize: '12px' }}>
+                        {selectedPreviewUrl && (
+                          <>
+                            <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">Preview file</a>
+                            <input value={selectedFileName} onChange={(e) => setSelectedFileName(e.target.value)} className="border rounded px-2 py-1 text-sm ml-2" style={{ width: 220 }} />
+                          </>
                         )}
-                      </>
-                    )}
-                    {editingDelisted.image && <button type="button" onClick={handleDeleteReference} className="border rounded px-2 py-0.5 text-sm bg-red-50 text-red-700 ml-2">លុប</button>}
-                  </div>
-                </div>
+                        {!selectedPreviewUrl && editingDelisted.image && (
+                          <>
+                            <a href={editingDelisted.image} target="_blank" rel="noreferrer" className="text-blue-600 underline">Current file</a>
+                            {editingDelisted.image && editingDelisted.image.includes('/kshf_hospital_app/scanner/file/') && (
+                              <button type="button" onClick={renameAttachedScannerFile} className="border rounded px-2 py-0.5 text-sm ml-2">កែឈ្មោះ</button>
+                            )}
+                          </>
+                        )}
+                        {editingDelisted.image && <button type="button" onClick={handleDeleteReference} className="border rounded px-2 py-0.5 text-sm bg-red-50 text-red-700 ml-2">លុប</button>}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div style={{display:'flex', justifyContent:'flex-end', gap:8, marginTop:12}}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
                 <button type="button" onClick={closeEdit} className="border rounded px-3 py-1">បោះបង់</button>
                 <button type="button" onClick={handleSaveEdit} className="border rounded px-3 py-1 bg-green-600 text-white" disabled={saving || uploadingFile}>{saving ? 'កំពុងរក្សាទុក...' : 'រក្សាទុក'}</button>
               </div>
@@ -1651,10 +1988,10 @@ export default function OfficialDelistedReportPage() {
           </div>
         )}
         {showScannerDevicesModal && (
-          <div className="no-print" style={{ position:'fixed', left:0, top:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:99999 }}>
-            <div style={{ background:'#fff', padding:16, borderRadius:8, width:'100%', maxWidth:420, boxShadow:'0 6px 40px rgba(0,0,0,0.3)' }}>
-              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
-                <h4 style={{margin:0}}>ជ្រើសម៉ាស៊ីនស្កែន (Scanner)</h4>
+          <div className="no-print" style={{ position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
+            <div style={{ background: '#fff', padding: 16, borderRadius: 8, width: '100%', maxWidth: 420, boxShadow: '0 6px 40px rgba(0,0,0,0.3)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <h4 style={{ margin: 0 }}>ជ្រើសម៉ាស៊ីនស្កែន (Scanner)</h4>
                 <button type="button" onClick={() => setShowScannerDevicesModal(false)} className="text-sm">បិទ</button>
               </div>
               <div>
@@ -1675,17 +2012,17 @@ export default function OfficialDelistedReportPage() {
                     ) : (
                       <div className="text-sm text-gray-600">មិនមានម៉ាស៊ីននៅលើ backend — អ្នកអាចបញ្ចូលឈ្មោះដោយដៃ</div>
                     )}
-                    <div style={{marginTop:8}}>
+                    <div style={{ marginTop: 8 }}>
                       <label className="text-sm block mb-1">ឈ្មោះម៉ាស៊ីន (manual)</label>
                       <input className="w-full border rounded px-2 py-2" value={scannerNameInput} onChange={e => setScannerNameInput(e.target.value)} placeholder="ឈ្មោះម៉ាស៊ីន (ឧ. HP Scan)" />
                     </div>
-                    <div style={{marginTop:8, display:'flex', alignItems:'center', gap:8}}>
+                    <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input id="multiScanChk" type="checkbox" checked={multiScanActive} onChange={(e) => setMultiScanActive(!!e.target.checked)} />
                       <label htmlFor="multiScanChk" className="text-sm">សេស្យុងពហុទំព័រ (ស្កេនច្រើនទំព័រ និងបញ្ចូលជា PDF)</label>
                     </div>
                   </div>
                 )}
-                <div style={{display:'flex', justifyContent:'flex-end', gap:8, marginTop:12}}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
                   <button type="button" onClick={() => setShowScannerDevicesModal(false)} className="border rounded px-3 py-1">បោះបង់</button>
                   <button type="button" onClick={() => confirmAndTriggerScan('jpg')} className="border rounded px-3 py-1 bg-blue-600 text-white">{multiScanActive ? 'ស្កេន (បន្ថែមទំព័រ)' : 'ស្កេន'}</button>
                 </div>
@@ -1694,15 +2031,15 @@ export default function OfficialDelistedReportPage() {
           </div>
         )}
         {showScannerModal && (
-          <div className="no-print" style={{position:'fixed', left:0, top:0, right:0, bottom:0, background:'rgba(0,0,0,0.35)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10000}}>
-            <div style={{width:640, background:'#fff', borderRadius:6, padding:12, maxHeight:'80vh', overflow:'auto'}}>
-              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
-                <h4 style={{margin:0}}>Scanned files</h4>
-                <div style={{display:'flex', gap:8}}>
+          <div className="no-print" style={{ position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
+            <div style={{ width: 640, background: '#fff', borderRadius: 6, padding: 12, maxHeight: '80vh', overflow: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <h4 style={{ margin: 0 }}>Scanned files</h4>
+                <div style={{ display: 'flex', gap: 8 }}>
                   <button type="button" onClick={() => { setShowScannerModal(false); }} className="border rounded px-2 py-1">បិទ</button>
                   {multiScanActive ? (
                     <>
-                      <div style={{display:'flex', alignItems:'center', gap:8, marginRight:6}}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 6 }}>
                         <div className="text-sm">សេស្យុង:</div>
                         <div className="text-sm font-medium">{(multiScanFiles || []).length} ទំព័រ</div>
                       </div>
@@ -1720,22 +2057,22 @@ export default function OfficialDelistedReportPage() {
                   )}
                 </div>
               </div>
-              <div style={{minHeight:120}}>
+              <div style={{ minHeight: 120 }}>
                 {loadingScannerFiles ? <div>Loading...</div> : (
-                  <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {scannerFiles.length === 0 && <div className="text-gray-600">No scanned files found</div>}
                     {scannerFiles.map((f) => {
                       const name = (f && (f.name || f.url)) ? (f.name || f.url) : String(f);
                       return (
-                        <div key={name} style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, borderBottom:'1px solid #eee', padding:'6px 0'}}>
-                          <div style={{flex:1}}>
+                        <div key={name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottom: '1px solid #eee', padding: '6px 0' }}>
+                          <div style={{ flex: 1 }}>
                             {editingScan === name ? (
                               <input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} className="border px-2 py-1 text-sm w-64" />
                             ) : (
                               name
                             )}
                           </div>
-                          <div style={{display:'flex', gap:8}}>
+                          <div style={{ display: 'flex', gap: 8 }}>
                             {editingScan === name ? (
                               <>
                                 <button type="button" onClick={() => saveRenameScan(name)} className="px-2 py-1 border rounded text-sm">រក្សាទុក</button>
@@ -1743,10 +2080,10 @@ export default function OfficialDelistedReportPage() {
                               </>
                             ) : (
                               <>
-                                    <button type="button" onClick={async () => { try { const blob = await fetchScan(name); const url = URL.createObjectURL(blob); window.open(url,'_blank'); } catch (e) { console.error(e); alert('Failed to preview'); } }} className="px-2 py-1 border rounded text-sm">មើល</button>
-                                    <button type="button" onClick={() => attachScan(name)} className="px-2 py-1 border rounded text-sm bg-blue-600 text-white">នាំចូល</button>
-                                    <button type="button" onClick={async () => { if (multiScanActive) { setMultiScanFiles(s => (s||[]).concat([{ name, url: `/kshf_hospital_app/scanner/file/${encodeURIComponent(name)}` }])); setScannerFiles((s) => s); alert('បញ្ចូលទំព័រនេះចូលក្នុងសេស្យុង'); } else { setEditingScan(name); setRenameValue(name); } }} className="px-2 py-1 border rounded text-sm">{multiScanActive ? 'បន្ថែមទំព័រ' : 'កែឈ្មោះ'}</button>
-                                    <button type="button" onClick={() => handleDeleteScan(name)} className="px-2 py-1 border rounded text-sm text-red-600">លុប</button>
+                                <button type="button" onClick={async () => { try { const blob = await fetchScan(name); const url = URL.createObjectURL(blob); window.open(url, '_blank'); } catch (e) { console.error(e); alert('Failed to preview'); } }} className="px-2 py-1 border rounded text-sm">មើល</button>
+                                <button type="button" onClick={() => attachScan(name)} className="px-2 py-1 border rounded text-sm bg-blue-600 text-white">នាំចូល</button>
+                                <button type="button" onClick={async () => { if (multiScanActive) { setMultiScanFiles(s => (s || []).concat([{ name, url: `/kshf_hospital_app/scanner/file/${encodeURIComponent(name)}` }])); setScannerFiles((s) => s); alert('បញ្ចូលទំព័រនេះចូលក្នុងសេស្យុង'); } else { setEditingScan(name); setRenameValue(name); } }} className="px-2 py-1 border rounded text-sm">{multiScanActive ? 'បន្ថែមទំព័រ' : 'កែឈ្មោះ'}</button>
+                                <button type="button" onClick={() => handleDeleteScan(name)} className="px-2 py-1 border rounded text-sm text-red-600">លុប</button>
                               </>
                             )}
                           </div>
@@ -1761,8 +2098,8 @@ export default function OfficialDelistedReportPage() {
         )}
 
         {/* Footer area */}
-        <div style={{display:'flex', justifyContent:'space-between', marginTop:'16px', fontSize:'12px'}}>
-          <div style={{width:'33%'}}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', fontSize: '12px' }}>
+          <div style={{ width: '33%' }}>
             <div className="no-print">
               {(() => {
                 const totalN = (Number.isFinite(derived.total) ? derived.total : (derived.rows ? derived.rows.length : 0));
@@ -1771,29 +2108,29 @@ export default function OfficialDelistedReportPage() {
                 return `សរុប: ${toKhmerDigits(totalN)} នាក់ ( ប្រុស: ${toKhmerDigits(maleN)} នាក់ — ស្រី: ${toKhmerDigits(femaleN)} នាក់ )`;
               })()}
             </div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>បានឃើញ</div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>នាយកមន្ទីរពេទ្យ</div>
-            <div style={{height:'64px'}}></div>
-            <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>បានឃើញ</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>នាយកមន្ទីរពេទ្យ</div>
+            <div style={{ height: '64px' }}></div>
+            <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
-          <div style={{width:'33%', textAlign:'center'}}>
-            <div style={{marginTop:'16px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>បានពិនិត្យត្រឹមត្រូវ</div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>ប្រធានការិយាល័យរដ្ឋបាលនិងបុគ្គលិក</div>
-            <div style={{height:'82px'}}></div>
-            <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
+          <div style={{ width: '33%', textAlign: 'center' }}>
+            <div style={{ marginTop: '16px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>បានពិនិត្យត្រឹមត្រូវ</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក</div>
+            <div style={{ height: '82px' }}></div>
+            <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
-          <div style={{width:'33%', textAlign:'right'}}>
-            <div style={{marginTop:'12px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center'}}>
+          <div style={{ width: '33%', textAlign: 'right' }}>
+            <div style={{ marginTop: '12px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>
               {lunarText && lunarText.trim()
                 ? lunarText
                 : `ថ្ងៃ${khWeekday(new Date())}  ព.ស. ${toKhmerDigits(buddhistEraYear(new Date()))}`}
             </div>
-            <div style={{marginTop:'2px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center'}}>
+            <div style={{ marginTop: '2px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>
               រាជធានីភ្នំពេញ {fmtKhmerLongDate(footerDate)}
             </div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}> អ្នកធ្វើតារាង</div>
-            <div style={{height:'82px'}}></div>
-            <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}> អ្នកធ្វើតារាង</div>
+            <div style={{ height: '82px' }}></div>
+            <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
         </div>
       </div>

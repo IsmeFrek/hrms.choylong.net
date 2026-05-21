@@ -225,8 +225,10 @@ export default function ApprovalsPage() {
   };
 
   const handleReject = async (cr) => {
+    const note = prompt('សូមបញ្ចូលមូលហេតុនៃការបដិសេធ (Reason for rejection):');
+    if (note === null) return; // cancelled
     try {
-      await api.post(`/approvals/${cr._id}/reject`);
+      await api.post(`/approvals/${cr._id}/reject`, { reviewerNote: note });
       await load();
     } catch (e) {
       alert('បរាជ័យក្នុងការបដិសេធ: ' + (e?.response?.data?.message || e?.message));
@@ -246,6 +248,7 @@ export default function ApprovalsPage() {
             <th className="px-3 py-2 text-left">ទូរស័ព្ទ</th>
             <th className="px-3 py-2 text-left">មូលហេតុ</th>
             <th className="px-3 py-2 text-left">ស្ថានភាព</th>
+            <th className="px-3 py-2 text-left">ចំណាំ Admin</th>
             <th className="px-3 py-2 text-left">Requested By</th>
             <th className="px-3 py-2 text-left">Requested At</th>
             <th className="px-3 py-2 text-left">ព័ត៌មាន</th>
@@ -291,6 +294,7 @@ export default function ApprovalsPage() {
                       <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800 border border-yellow-200">រង់ចាំ</span>
                     )}
                   </td>
+                  <td className="px-3 py-2 text-xs text-red-600 font-medium">{cr.reviewerNote || '—'}</td>
                   <td className="px-3 py-2">{cr.requestedBy?.fullName || cr.requestedBy?.email || '—'}</td>
                   <td className="px-3 py-2">{new Date(cr.requestedAt).toLocaleString()}</td>
                   <td className="px-3 py-2">
@@ -350,6 +354,7 @@ export default function ApprovalsPage() {
             <th className="px-3 py-2 text-left" colSpan={2}>ចំណុចកែប្រែ (ចាស់ → ថ្មី)</th>
             <th className="px-3 py-2 text-left">ឯកសារភ្ជាប់</th>
             <th className="px-3 py-2 text-left">ស្ថានភាព</th>
+            <th className="px-3 py-2 text-left">ចំណាំ Admin</th>
             <th className="px-3 py-2 text-left">Requested By</th>
             <th className="px-3 py-2 text-left">Requested At</th>
             <th className="px-3 py-2 text-left">Actions</th>
@@ -531,6 +536,7 @@ export default function ApprovalsPage() {
                     <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800 border border-yellow-200">រង់ចាំ</span>
                   )}
                 </td>
+                <td className="px-3 py-2 text-xs text-red-600 font-medium">{cr.reviewerNote || '—'}</td>
                 <td className="px-3 py-2">{cr.requestedBy?.fullName || cr.requestedBy?.email || '—'}</td>
                 <td className="px-3 py-2">{new Date(cr.requestedAt).toLocaleString()}</td>
                 <td className="px-3 py-2 flex items-center gap-2">

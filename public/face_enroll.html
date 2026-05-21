@@ -23,8 +23,8 @@
     button.danger{background:#ef4444;color:#fff}
     button:disabled{opacity:0.55;cursor:not-allowed}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .videoWrap{position:relative;border-radius:14px;overflow:hidden;background:#000;border:1px solid rgba(148,163,184,0.22)}
-    video{width:100%;height:auto;display:block;transform:scaleX(-1)}
+    .videoWrap{position:relative;border-radius:9999px;overflow:hidden;background:#000;border:1px solid rgba(148,163,184,0.22);aspect-ratio:1/1;max-width:360px;margin:0 auto}
+    video{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1)}
     .hint{color:#94a3b8;font-size:0.9rem;line-height:1.35}
     .badge{display:inline-block;padding:6px 10px;border-radius:999px;font-size:0.85rem;border:1px solid rgba(148,163,184,0.22);background:rgba(2,6,23,0.6)}
     .ok{color:#86efac}
@@ -50,14 +50,11 @@
           <video id="video" playsinline autoplay muted></video>
         </div>
         <div class="row" style="margin-top:10px">
-          <button id="start" class="primary" type="button">បើកកាមេរ៉ា</button>
-          <button id="capture" class="secondary" type="button" disabled>ចាប់រូប + Enroll</button>
-          <button id="stop" class="secondary" type="button" disabled>បិទកាមេរ៉ា</button>
+          <button id="start" class="primary" type="button" style="display:none">បើកកាមេរ៉ា</button>
+          <button id="capture" class="secondary" type="button" disabled>យករូបពី HR + Enroll</button>
+          <button id="upload" class="secondary" type="button" disabled>យករូបពីឯកសារ + Enroll</button>
         </div>
-        <p class="hint" style="margin:10px 0 0">
-          សូមឈរឲ្យពន្លឺល្អ មុខត្រង់ កុំ戴ម៉ាស់/វ៉ែនតាខ្មៅ (បើអាច)។
-          ផ្ដល់យល់ព្រម (consent) មុនពេលរក្សាទុក face template។
-        </p>
+        <input id="fileInput" type="file" accept="image/*" style="display:none" />
       </section>
 
       <aside class="card">
@@ -84,7 +81,8 @@
         </div>
 
         <div class="row" style="margin-top:10px">
-          <button id="delete" class="danger" type="button">លុប Face Profile</button>
+          <button id="delete" class="danger" type="button" style="flex:1 1 120px">លុប Face Profile</button>
+          <button id="fixId" class="secondary" type="button" style="flex:1 1 120px" disabled>Fix ID (Face Profile)</button>
         </div>
 
         <div style="margin-top:10px">
@@ -98,6 +96,14 @@
         </p>
       </aside>
     </div>
+
+    <section class="card" style="margin-top:12px">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:4px">
+        <label style="margin:0">Face Profiles (បង្ហាញធំ ចំនុច show)</label>
+        <button id="autoEnrollAll" type="button" class="primary" style="flex:0 0 auto;width:auto;padding:6px 14px;font-size:0.85rem;background:#16a34a;color:#ecfdf5">Enroll អូតូ ពី HR</button>
+      </div>
+      <div id="profilesShow" class="hint mono" style="max-height:420px;overflow:auto;border-top:1px solid rgba(148,163,184,0.22);margin-top:4px;padding-top:4px"></div>
+    </section>
 
     <script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="/face_enroll.js"></script>

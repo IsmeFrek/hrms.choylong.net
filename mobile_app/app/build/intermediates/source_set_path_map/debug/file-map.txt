@@ -1,0 +1,67 @@
+com.ksfh.hrmobile.app-lifecycle-viewmodel-ktx-2.7.0-0 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\02c9d0c83a17fb1d805ddc114585e0b9\transformed\lifecycle-viewmodel-ktx-2.7.0\res
+com.ksfh.hrmobile.app-foundation-release-1 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\051e0752e3c71a93ede9b201323a556d\transformed\foundation-release\res
+com.ksfh.hrmobile.app-ui-geometry-release-2 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\05e65a53eaa7d84dcd6cca61058299fc\transformed\ui-geometry-release\res
+com.ksfh.hrmobile.app-annotation-experimental-1.4.0-3 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\07ee1270aef7ad132d5fb883afaaadc5\transformed\annotation-experimental-1.4.0\res
+com.ksfh.hrmobile.app-navigation-common-2.7.7-4 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\0a836c4dad682d481514eeb8d1c8a0a2\transformed\navigation-common-2.7.7\res
+com.ksfh.hrmobile.app-material-icons-core-release-5 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\0e5608a59e28ae45295d60f56c1ee75c\transformed\material-icons-core-release\res
+com.ksfh.hrmobile.app-material-ripple-release-6 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\1b2b8e0304c1328b29f2967214b17a2a\transformed\material-ripple-release\res
+com.ksfh.hrmobile.app-lifecycle-livedata-core-2.7.0-7 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\1d20d57359bd47fbe89c21f24fad6398\transformed\lifecycle-livedata-core-2.7.0\res
+com.ksfh.hrmobile.app-lifecycle-runtime-2.7.0-8 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\1e51dfd73d6bc8cb5045eef9c1c6413b\transformed\lifecycle-runtime-2.7.0\res
+com.ksfh.hrmobile.app-appcompat-1.6.1-9 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\21a27c9a81c57c137e0bbe33e4f0d444\transformed\appcompat-1.6.1\res
+com.ksfh.hrmobile.app-camera-video-1.3.1-10 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\2a1cdad093b38058d0a4053cb606ee7b\transformed\camera-video-1.3.1\res
+com.ksfh.hrmobile.app-profileinstaller-1.3.1-11 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\2d4f76d2193c83046a0f3da4c67642ff\transformed\profileinstaller-1.3.1\res
+com.ksfh.hrmobile.app-camera-camera2-1.3.1-12 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\2d917d6bab789dac6de445c04f827e71\transformed\camera-camera2-1.3.1\res
+com.ksfh.hrmobile.app-navigation-runtime-2.7.7-13 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\310b6db9d3eb0f8fc72f0b09d0d933be\transformed\navigation-runtime-2.7.7\res
+com.ksfh.hrmobile.app-ui-util-release-14 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\3431607765c767362a6bcc5a5932464f\transformed\ui-util-release\res
+com.ksfh.hrmobile.app-animation-core-release-15 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\3485cdcb51d3c48ab5f7e63969166c41\transformed\animation-core-release\res
+com.ksfh.hrmobile.app-customview-poolingcontainer-1.0.0-16 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\380f8cfc7989209355df6c89e7f9d34f\transformed\customview-poolingcontainer-1.0.0\res
+com.ksfh.hrmobile.app-ui-text-release-17 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\384e76b2935f1448ee5e36c5056eb019\transformed\ui-text-release\res
+com.ksfh.hrmobile.app-material3-release-18 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\3ab7a3886045841af7346e36f949c733\transformed\material3-release\res
+com.ksfh.hrmobile.app-material-icons-extended-release-19 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\3df76f51965809d4d300dc0090d55738\transformed\material-icons-extended-release\res
+com.ksfh.hrmobile.app-play-services-basement-18.1.0-20 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\50c6b958643fd1a77c9629e96eaf2555\transformed\play-services-basement-18.1.0\res
+com.ksfh.hrmobile.app-runtime-release-21 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\510a58f8a2b74485ff2618a5cba42944\transformed\runtime-release\res
+com.ksfh.hrmobile.app-ui-graphics-release-22 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\571f6a8c7ccd1dc0da0f06ba91ccde0c\transformed\ui-graphics-release\res
+com.ksfh.hrmobile.app-coil-base-2.5.0-23 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\649b4d5f0004a66f7b0546387ceee3a1\transformed\coil-base-2.5.0\res
+com.ksfh.hrmobile.app-animation-release-24 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\6c5a82414da49ff4b6263b157d50de1e\transformed\animation-release\res
+com.ksfh.hrmobile.app-play-services-base-18.1.0-25 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\6c6533c560a45a36cbe5f2ec073c8847\transformed\play-services-base-18.1.0\res
+com.ksfh.hrmobile.app-activity-1.8.2-26 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\74d9640f46574f878d5be6bee73891d5\transformed\activity-1.8.2\res
+com.ksfh.hrmobile.app-lifecycle-viewmodel-compose-2.7.0-27 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\7532fb0c9d5ed872c4bf2579bc98e78e\transformed\lifecycle-viewmodel-compose-2.7.0\res
+com.ksfh.hrmobile.app-ui-release-28 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\7820e95a8dae284a7eca1d207b6a10fd\transformed\ui-release\res
+com.ksfh.hrmobile.app-core-1.12.0-29 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\799f6285314f4c9a2849aeb1ea793359\transformed\core-1.12.0\res
+com.ksfh.hrmobile.app-activity-ktx-1.8.2-30 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\7a87b7c08e583b99f1e49a828ad772a3\transformed\activity-ktx-1.8.2\res
+com.ksfh.hrmobile.app-ui-test-manifest-1.6.1-31 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\7e1259cf8ec1201025ffa24dbfdecb4f\transformed\ui-test-manifest-1.6.1\res
+com.ksfh.hrmobile.app-lifecycle-livedata-2.7.0-32 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\82a7ca6fbaa4473556be067cba595b7f\transformed\lifecycle-livedata-2.7.0\res
+com.ksfh.hrmobile.app-navigation-runtime-ktx-2.7.7-33 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\8380a585acde88093c5d4699725d4a2b\transformed\navigation-runtime-ktx-2.7.7\res
+com.ksfh.hrmobile.app-lifecycle-livedata-core-ktx-2.7.0-34 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\84e795d151f8a6eece2c923bd35b13fb\transformed\lifecycle-livedata-core-ktx-2.7.0\res
+com.ksfh.hrmobile.app-ui-unit-release-35 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\89fc9be831a68454ede7e2797f45c7cd\transformed\ui-unit-release\res
+com.ksfh.hrmobile.app-foundation-layout-release-36 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\906dcf9698d99c6dae7d0ada8443aac6\transformed\foundation-layout-release\res
+com.ksfh.hrmobile.app-ui-tooling-data-release-37 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\928cc33e194b286c95ee6b5342e0e798\transformed\ui-tooling-data-release\res
+com.ksfh.hrmobile.app-camera-lifecycle-1.3.1-38 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\93019919d24f4dfc8a4aedd51812a5f6\transformed\camera-lifecycle-1.3.1\res
+com.ksfh.hrmobile.app-lifecycle-process-2.7.0-39 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\9db78e65f5852c5db641ce52e31bd422\transformed\lifecycle-process-2.7.0\res
+com.ksfh.hrmobile.app-appcompat-resources-1.6.1-40 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\9f47c9ce230217daac98875471fd513b\transformed\appcompat-resources-1.6.1\res
+com.ksfh.hrmobile.app-lifecycle-viewmodel-2.7.0-41 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\a03ebda9d6daddbcf8bb048185444dc0\transformed\lifecycle-viewmodel-2.7.0\res
+com.ksfh.hrmobile.app-navigation-compose-2.7.7-42 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\a5302c94b85e386c1bc8bb2c74f8c72f\transformed\navigation-compose-2.7.7\res
+com.ksfh.hrmobile.app-runtime-saveable-release-43 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\a901baa7ea1bafb3b621083985113ba7\transformed\runtime-saveable-release\res
+com.ksfh.hrmobile.app-navigation-common-ktx-2.7.7-44 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\ad64ab75782ac91cf06ef831e4eb8ca3\transformed\navigation-common-ktx-2.7.7\res
+com.ksfh.hrmobile.app-material-release-45 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\aef7d86865d8b80b2fa7c28ad2d43018\transformed\material-release\res
+com.ksfh.hrmobile.app-ui-tooling-preview-release-46 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\b04387e6fcf75ffc63301fb89205d926\transformed\ui-tooling-preview-release\res
+com.ksfh.hrmobile.app-emoji2-views-helper-1.3.0-47 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\b57eba5b46dc752a04e19745b069dbfc\transformed\emoji2-views-helper-1.3.0\res
+com.ksfh.hrmobile.app-fragment-1.3.6-48 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\cf981fb19932d5ddec05347aaf104eb7\transformed\fragment-1.3.6\res
+com.ksfh.hrmobile.app-camera-view-1.3.1-49 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\d0f58309f81bfebb3d5a12a0149c046b\transformed\camera-view-1.3.1\res
+com.ksfh.hrmobile.app-emoji2-1.3.0-50 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\d267166c321050da454e719ae42a796d\transformed\emoji2-1.3.0\res
+com.ksfh.hrmobile.app-core-runtime-2.2.0-51 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\d5dfef1de971bc91b0cec412ecad376f\transformed\core-runtime-2.2.0\res
+com.ksfh.hrmobile.app-core-ktx-1.12.0-52 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\d7c2de3eb792828c8d33673d10243d5c\transformed\core-ktx-1.12.0\res
+com.ksfh.hrmobile.app-ui-tooling-release-53 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\dc2fa5ead8050d846f20feb3588480ee\transformed\ui-tooling-release\res
+com.ksfh.hrmobile.app-activity-compose-1.8.2-54 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\de6ce5ffd82a05a7424c6bd01e8e59a6\transformed\activity-compose-1.8.2\res
+com.ksfh.hrmobile.app-lifecycle-viewmodel-savedstate-2.7.0-55 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\df56f009c66e67754e19b0c50a1ba78e\transformed\lifecycle-viewmodel-savedstate-2.7.0\res
+com.ksfh.hrmobile.app-savedstate-1.2.1-56 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\eec81ab4b3a2d82170144a7a2ce7a866\transformed\savedstate-1.2.1\res
+com.ksfh.hrmobile.app-startup-runtime-1.1.1-57 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\f5daf3816167f0fc6934bf7686cbd3e7\transformed\startup-runtime-1.1.1\res
+com.ksfh.hrmobile.app-camera-core-1.3.1-58 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\f7164258de34e64bdd76597592923e94\transformed\camera-core-1.3.1\res
+com.ksfh.hrmobile.app-lifecycle-runtime-ktx-2.7.0-59 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\f997cd441a2828b1aed2a5c26595c833\transformed\lifecycle-runtime-ktx-2.7.0\res
+com.ksfh.hrmobile.app-savedstate-ktx-1.2.1-60 C:\Users\Net Chantha\.gradle\caches\9.0-milestone-1\transforms\ffa48a8b9bd495868cddc9cc4892e02f\transformed\savedstate-ktx-1.2.1\res
+com.ksfh.hrmobile.app-resValues-61 D:\202026\web_2026_HomeV4\mobile_app\app\build\generated\res\resValues\debug
+com.ksfh.hrmobile.app-packageDebugResources-62 D:\202026\web_2026_HomeV4\mobile_app\app\build\intermediates\incremental\debug\packageDebugResources\merged.dir
+com.ksfh.hrmobile.app-packageDebugResources-63 D:\202026\web_2026_HomeV4\mobile_app\app\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
+com.ksfh.hrmobile.app-merged_res-64 D:\202026\web_2026_HomeV4\mobile_app\app\build\intermediates\merged_res\debug
+com.ksfh.hrmobile.app-debug-65 D:\202026\web_2026_HomeV4\mobile_app\app\src\debug\res
+com.ksfh.hrmobile.app-main-66 D:\202026\web_2026_HomeV4\mobile_app\app\src\main\res

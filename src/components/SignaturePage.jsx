@@ -300,9 +300,6 @@ const SignaturePage = () => {
                   ការពិពណ៌នា
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ផ្នែក
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   ស្ថានភាព
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -381,9 +378,7 @@ const SignaturePage = () => {
                         <div className="text-sm text-gray-400">-</div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {signature.department || '-'}
-                    </td>
+
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         signature.status === 'active' ? 'bg-green-100 text-green-800' :
@@ -494,7 +489,7 @@ const SignaturePage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ឈ្មោះ/លេខកូដ <span className="text-red-500">*</span>
+                    អត្តលេខកាតមន្ទីរពេទ្យ <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -521,35 +516,12 @@ const SignaturePage = () => {
 
                 
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ផ្នែក/នាយកដ្ឋាន
-                  </label>
-                  <input
-                    type="text"
-                    value={form.department}
-                    onChange={(e) => setForm(prev => ({ ...prev, department: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="ផ្នែករដ្ឋបាល, ផ្នែកហិរញ្ញវត្ថុ, ជាដើម"
-                  />
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    កាលបរិច្ឆេទផុតកំណត់
-                  </label>
-                  <input
-                    type="date"
-                    value={form.expiryDate}
-                    onChange={(e) => setForm(prev => ({ ...prev, expiryDate: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  ការពិពណ៌នា
+                គាត់ទទួលបន្ទុកអ្វី?
                 </label>
                 <input
                   type="text"
@@ -572,16 +544,6 @@ const SignaturePage = () => {
                     onChange={handleFileChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <div className="text-xs text-gray-500">
-                    ឬ បញ្ចូលផ្លូវឯកសារដោយដៃ:
-                  </div>
-                  <input
-                    type="text"
-                    value={form.filePath}
-                    onChange={(e) => setForm(prev => ({ ...prev, filePath: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="/Uploads/signature.jpg"
-                  />
                 </div>
                 {(form.signatureFile || (editing && form.filePath)) && (
                   <div className="mt-2">
@@ -603,18 +565,7 @@ const SignaturePage = () => {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  កំណត់សម្គាល់
-                </label>
-                <textarea
-                  value={form.notes}
-                  onChange={(e) => setForm(prev => ({ ...prev, notes: e.target.value }))}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="កំណត់សម្គាល់បន្ថែម..."
-                />
-              </div>
+
 
               <div className="flex justify-end space-x-3 pt-4">
                 <button

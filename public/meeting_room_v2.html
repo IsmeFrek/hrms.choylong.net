@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ប្រព័ន្ធគ្រប់គ្រងបន្ទប់ប្រជុំ Pro V2 - Dark Glassmorphism</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Siemreap&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-hover: rgba(255, 255, 255, 0.08);
+            --primary-glow: rgba(56, 189, 248, 0.3);
+        }
+        body { 
+            font-family: 'Siemreap', 'Inter', sans-serif;
+            background: radial-gradient(circle at top right, #1e293b, #0f172a, #020617);
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            background: var(--glass-hover);
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 12px 40px -12px var(--primary-glow);
+        }
+        .text-glow {
+            text-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
+        }
+        .timeline-cell {
+            min-width: 180px;
+            height: 140px;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        @keyframes pulse-soft {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.02); }
+        }
+        .animate-pulse-soft { animation: pulse-soft 2s infinite ease-in-out; }
+        
+        .time-indicator {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #ef4444;
+            z-index: 10;
+            box-shadow: 0 0 10px #ef4444;
+        }
+    </style>
+</head>
+<body class="p-0 m-0 overflow-x-hidden">
+
+    <!-- Header / Navigation -->
+    <nav class="sticky top-0 z-40 glass-panel border-b-0 px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 bg-sky-500 rounded-2xl flex items-center justify-center shadow-lg shadow-sky-500/20">
+                <i class="fa-solid fa-building-user text-white text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-black tracking-tight text-glow">ប្រព័ន្ធគ្រប់គ្រងបន្ទប់ប្រជុំ <span class="text-sky-400">PRO V2</span></h1>
+                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Management System • Premium Edition</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div id="current-time-clock" class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sky-400 font-mono font-bold text-lg shadow-inner">
+                00:00:00
+            </div>
+            <div class="h-10 w-10 rounded-xl bg-slate-800 flex items-center justify-center border border-white/5 cursor-pointer hover:bg-slate-700 transition-colors">
+                <i class="fa-solid fa-bell text-slate-400"></i>
+            </div>
+            <div class="h-10 w-10 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-500 p-0.5">
+                <img src="https://ui-avatars.com/api/?name=Admin&background=random" class="w-full h-full rounded-full object-cover border-2 border-slate-900" alt="Profile">
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-[1600px] mx-auto px-6 py-8">
+        
+        <!-- Summary Dashboard -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+            <div onclick="filterTimeline('all')" class="glass-card p-5 rounded-3xl cursor-pointer group relative overflow-hidden">
+                <div class="absolute -right-2 -bottom-2 text-white/5 text-4xl group-hover:scale-125 transition-transform"><i class="fa-solid fa-calendar-check"></i></div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase mb-2">ការកក់សរុប</div>
+                <div class="text-3xl font-black text-white" id="sum-total">0</div>
+                <div class="w-8 h-1 bg-sky-500 rounded-full mt-3"></div>
+            </div>
+            <div onclick="filterTimeline('ongoing')" class="glass-card p-5 rounded-3xl cursor-pointer group relative overflow-hidden">
+                <div class="absolute -right-2 -bottom-2 text-rose-500/10 text-4xl group-hover:scale-125 transition-transform"><i class="fa-solid fa-video"></i></div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase mb-2">កំពុងប្រជុំ</div>
+                <div class="text-3xl font-black text-rose-500" id="sum-ongoing">0</div>
+                <div class="w-8 h-1 bg-rose-500 rounded-full mt-3 animate-pulse"></div>
+            </div>
+            <div onclick="filterTimeline('pending_start')" class="glass-card p-5 rounded-3xl cursor-pointer group relative overflow-hidden">
+                <div class="absolute -right-2 -bottom-2 text-amber-500/10 text-4xl group-hover:scale-125 transition-transform"><i class="fa-solid fa-clock"></i></div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase mb-2">ជិតចូល</div>
+                <div class="text-3xl font-black text-amber-500" id="sum-pending-start">0</div>
+                <div class="w-8 h-1 bg-amber-500 rounded-full mt-3"></div>
+            </div>
+            <div onclick="filterTimeline('pending_end')" class="glass-card p-5 rounded-3xl cursor-pointer group relative overflow-hidden">
+                <div class="absolute -right-2 -bottom-2 text-orange-500/10 text-4xl group-hover:scale-125 transition-transform"><i class="fa-solid fa-hourglass-half"></i></div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase mb-2">ជិតបញ្ចប់</div>
+                <div class="text-3xl font-black text-orange-500" id="sum-pending-end">0</div>
+                <div class="w-8 h-1 bg-orange-500 rounded-full mt-3"></div>
+            </div>
+            <div onclick="filterTimeline('ended')" class="glass-card p-5 rounded-3xl cursor-pointer group relative overflow-hidden">
+                <div class="absolute -right-2 -bottom-2 text-slate-500/10 text-4xl group-hover:scale-125 transition-transform"><i class="fa-solid fa-check-double"></i></div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase mb-2">បានបញ្ចប់</div>
+                <div class="text-3xl font-black text-slate-500" id="sum-ended">0</div>
+                <div class="w-8 h-1 bg-slate-500 rounded-full mt-3"></div>
+            </div>
+            <div onclick="filterTimeline('free')" class="glass-card p-5 rounded-3xl cursor-pointer group relative overflow-hidden">
+                <div class="absolute -right-2 -bottom-2 text-emerald-500/10 text-4xl group-hover:scale-125 transition-transform"><i class="fa-solid fa-door-open"></i></div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase mb-2">បន្ទប់ទំនេរ</div>
+                <div class="text-3xl font-black text-emerald-500" id="sum-free">0 / 6</div>
+                <div class="w-8 h-1 bg-emerald-500 rounded-full mt-3"></div>
+            </div>
+        </div>
+
+        <!-- Controls Area -->
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
+            <div class="flex flex-wrap items-center gap-4">
+                <div class="flex items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/10">
+                    <button onclick="changeDate(-1)" class="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-xl transition-all"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                    <div class="px-4 py-2 text-sm font-bold bg-sky-500/10 text-sky-400 rounded-xl border border-sky-500/20" id="display-date">--</div>
+                    <button onclick="changeDate(1)" class="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-xl transition-all"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                </div>
+                <div class="relative group">
+                    <input type="date" id="date-select-input" onchange="onDateInputChange(this.value)" class="bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 text-sm font-bold text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-all cursor-pointer">
+                    <i class="fa-solid fa-calendar-days absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 group-hover:text-sky-400 transition-colors pointer-events-none"></i>
+                </div>
+                <div id="active-filter-badge" class="hidden text-[10px] bg-sky-500 text-white font-black px-3 py-1.5 rounded-full uppercase tracking-tighter"></div>
+            </div>
+
+            <div class="flex gap-3 w-full lg:w-auto">
+                <button onclick="generateTextSummaryReport()" class="flex-1 lg:flex-none px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all">
+                    <i class="fa-solid fa-file-contract text-sky-400"></i> របាយការណ៍សង្ខេប
+                </button>
+                <button class="flex-1 lg:flex-none px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-sky-600/20 transition-all active:scale-95">
+                    <i class="fa-solid fa-plus"></i> កក់បន្ទប់ថ្មី
+                </button>
+            </div>
+        </div>
+
+        <!-- Timeline Grid -->
+        <div class="glass-panel rounded-[2rem] overflow-hidden border border-white/5">
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr class="bg-white/5 border-b border-white/5">
+                            <th class="p-6 w-[280px] sticky left-0 z-20 glass-panel border-r border-white/5 text-left">
+                                <span class="text-xs font-black text-slate-500 uppercase tracking-widest">Room Information</span>
+                            </th>
+                            <th class="p-4 text-center border-r border-white/5 min-w-[200px]">
+                                <span class="block text-xs font-bold text-slate-400">Morning</span>
+                                <span class="text-sm font-black text-sky-400">08:00 - 10:00</span>
+                            </th>
+                            <th class="p-4 text-center border-r border-white/5 min-w-[200px]">
+                                <span class="block text-xs font-bold text-slate-400">Mid-Morning</span>
+                                <span class="text-sm font-black text-sky-400">10:00 - 12:00</span>
+                            </th>
+                            <th class="p-4 text-center border-r border-white/5 min-w-[200px]">
+                                <span class="block text-xs font-bold text-slate-400">Afternoon</span>
+                                <span class="text-sm font-black text-sky-400">12:00 - 14:00</span>
+                            </th>
+                            <th class="p-4 text-center border-r border-white/5 min-w-[200px]">
+                                <span class="block text-xs font-bold text-slate-400">Late Afternoon</span>
+                                <span class="text-sm font-black text-sky-400">14:00 - 16:00</span>
+                            </th>
+                            <th class="p-4 text-center min-w-[200px]">
+                                <span class="block text-xs font-bold text-slate-400">Evening</span>
+                                <span class="text-sm font-black text-sky-400">16:00 - 18:00</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="timeline-body" class="divide-y divide-white/5">
+                        <!-- Content generated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal System -->
+    <div id="detail-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-6 z-50">
+        <div class="glass-panel rounded-[2.5rem] max-w-xl w-full overflow-hidden shadow-2xl border-white/10 transform scale-95 transition-all">
+            <div class="bg-gradient-to-r from-sky-600 to-indigo-600 p-8 flex justify-between items-start">
+                <div>
+                    <h3 class="text-2xl font-black text-white mb-1" id="modal-title-text">Meeting Details</h3>
+                    <p class="text-sky-100/70 text-xs font-bold uppercase tracking-wider">Room Reservation Information</p>
+                </div>
+                <button onclick="closeModal()" class="w-10 h-10 rounded-full bg-black/20 text-white hover:bg-black/40 flex items-center justify-center transition-all">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="p-8 max-h-[65vh] overflow-y-auto space-y-6">
+                <div id="modal-view-mode" class="space-y-6">
+                    <!-- Dynamic Content -->
+                </div>
+                <form id="modal-edit-mode" class="hidden space-y-5">
+                    <!-- Edit Form -->
+                </form>
+            </div>
+
+            <div class="p-8 bg-black/20 border-t border-white/5 flex justify-between items-center">
+                <div id="view-actions" class="flex justify-between w-full">
+                    <button onclick="switchMode('edit')" class="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 font-black rounded-2xl text-xs flex items-center gap-2 transition-all">
+                        <i class="fa-solid fa-pen-to-square"></i> កែប្រែទិន្នន័យ
+                    </button>
+                    <button onclick="closeModal()" class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl text-xs transition-all">
+                        បិទ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Modal -->
+    <div id="report-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-6 z-50">
+        <div class="glass-panel rounded-[2.5rem] max-w-3xl w-full overflow-hidden shadow-2xl border-white/10">
+            <div class="p-8 flex justify-between items-center border-b border-white/5">
+                <h3 class="text-xl font-black text-white">📊 របាយការណ៍សង្ខេបប្រចាំថ្ងៃ</h3>
+                <button onclick="closeReportModal()" class="text-slate-400 hover:text-white transition-colors"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="p-8">
+                <div class="bg-black/40 rounded-3xl border border-white/5 p-6">
+                    <textarea id="report-text-area" rows="12" class="w-full bg-transparent border-none text-slate-300 text-sm font-mono focus:ring-0 resize-none leading-relaxed" readonly></textarea>
+                </div>
+            </div>
+            <div class="p-8 bg-black/20 flex justify-end gap-3 border-t border-white/5">
+                <button onclick="copyReportText()" class="px-8 py-3 bg-sky-600 hover:bg-sky-500 text-white font-black rounded-2xl text-xs flex items-center gap-2 transition-all">
+                    <i class="fa-solid fa-copy"></i> ចម្លង (Copy)
+                </button>
+                <button onclick="closeReportModal()" class="px-8 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl text-xs">បិទ</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentDate = new Date("2026-05-16");
+        let currentFilterMode = "all";
+
+        const columns = ["08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00", "14:00 - 16:00", "16:00 - 18:00"];
+        const rooms = [
+            { id: "bayon", name: "បន្ទប់បាយ័ន", capacity: 20, icon: "fa-crown", color: "sky", amenities: ["Projector", "TV", "Coffee"] },
+            { id: "neakpoan", name: "បន្ទប់នាគព័ន្ធ", capacity: 12, icon: "fa-dragon", color: "indigo", amenities: ["TV", "Sound System"] },
+            { id: "banteaysrei", name: "បន្ទប់បន្ទាយស្រី", capacity: 8, icon: "fa-gem", color: "rose", amenities: ["TV", "Whiteboard"] },
+            { id: "preahkhan", name: "បន្ទប់ព្រះខ័ណ", capacity: 25, icon: "fa-shield-halved", color: "emerald", amenities: ["Full Tech", "Stage"] },
+            { id: "administration", name: "បន្ទប់រដ្ឋបាល", capacity: 10, icon: "fa-briefcase", color: "amber", amenities: ["Printer", "Scanner"] },
+            { id: "waiting", name: "បន្ទប់រង់ចាំ", capacity: 15, icon: "fa-couch", color: "slate", amenities: ["Lounge", "Drinks"] }
+        ];
+
+        let databaseBookings = {
+            "2026-05-16": {
+                "bayon": {
+                    "08:00 - 10:00": { title: "ប្រជុំគណៈកម្មការនាយកប្រចាំសប្តាហ៍", user: "លោក អ៊ុក សំណាង", roomName: "បន្ទប់បាយ័ន", dateText: "សៅរ៍ 16 ឧសភា 2026", startTime: "08:00 AM", endTime: "09:30 AM", materials: "Projector, ក្តារខៀន", technician: "ត្រូវការ ១ នាក់", participants: "12 នាក់", note: "តែ និង នំខេក" },
+                    "14:00 - 16:00": { title: "សម្ភាសន៍ជ្រើសរើសបុគ្គលិកជាន់ខ្ពស់", user: "កញ្ញា លីដា (HR)", roomName: "បន្ទប់បាយ័ន", dateText: "សៅរ៍ 16 ឧសភា 2026", startTime: "02:00 PM", endTime: "04:00 PM", materials: "មិនមាន", technician: "មិនមាន", participants: "4 នាក់", note: "ទឹកសុទ្ធ" }
+                },
+                "neakpoan": {
+                    "10:00 - 12:00": { title: "Marketing Strategy 2026", user: "លោក ហេង មករា", roomName: "បន្ទប់នាគព័ន្ធ", dateText: "សៅរ៍ 16 ឧសភា 2026", startTime: "10:00 AM", endTime: "11:30 AM", materials: "Smart TV", technician: "មិនមាន", participants: "8 នាក់", note: "ទឹកក្រូចដប" }
+                },
+                "preahkhan": {
+                    "10:00 - 12:00": { title: "ប្រជុំពិភាក្សាប្រព័ន្ធ Checkin Me", user: "លោក នេត ចន្ថា", roomName: "បន្ទប់ប្រជុំ ព្រះខ័ន", dateText: "សៅរ៍ 16 ឧសភា 2026", startTime: "10:25 AM", endTime: "12:00 PM", materials: "បទបង្ហាញ, សម្លេង", technician: "មិនមាន", participants: "15 នាក់", note: "ទឹកសុទ្ធ" }
+                }
+            }
+        };
+
+        function onDateInputChange(value) { if(value) { currentDate = new Date(value); updateUI(); } }
+        function changeDate(days) { currentDate.setDate(currentDate.getDate() + days); updateUI(); }
+        function getYYYYMMDD(date) { return date.toISOString().split('T')[0]; }
+
+        function formatDateKhmer(date) {
+            const months = ["មករា", "កុម្ភៈ", "មីនា", "មេសា", "ឧសភា", "មិថុនា", "កក្កដា", "សីហា", "កញ្ញា", "តុលា", "វិច្ឆិកា", "ធ្នូ"];
+            const days = ["អាទិត្យ", "ច័ន្ទ", "អង្គារ", "ពុធ", "ព្រហស្បតិ៍", "សុក្រ", "សៅរ៍"];
+            return `${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+        }
+
+        function parseTimeString(timeStr) {
+            const now = new Date(); const [time, ampm] = timeStr.split(" "); let [hours, minutes] = time.split(":").map(Number);
+            if (ampm === "PM" && hours < 12) hours += 12; if (ampm === "AM" && hours === 12) hours = 0;
+            return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0);
+        }
+
+        function checkActualBookingStatus(bookingInfo) {
+            const now = new Date();
+            const start = parseTimeString(bookingInfo.startTime);
+            const end = parseTimeString(bookingInfo.endTime);
+            const diffToStart = (start - now) / (1000 * 60);
+            const diffToEnd = (end - now) / (1000 * 60);
+
+            if (now > end) return { type: "ended", label: "បញ្ចប់", style: "bg-slate-800 text-slate-500 border-white/5 opacity-60" };
+            if (now >= start && now <= end) {
+                if (diffToEnd <= 15) return { type: "ongoing", label: "ជិតបញ្ចប់", style: "bg-orange-500/20 text-orange-400 border-orange-500/30 animate-pulse-soft" };
+                return { type: "ongoing", label: "កំពុងប្រជុំ", style: "bg-rose-500/20 text-rose-400 border-rose-500/30" };
+            }
+            if (now < start) {
+                if (diffToStart <= 15 && diffToStart > 0) return { type: "pending_start", label: "ជិតចូល", style: "bg-amber-500/20 text-amber-400 border-amber-500/30 animate-pulse-soft" };
+                return { type: "booked", label: "កត់ត្រាទុក", style: "bg-sky-500/20 text-sky-400 border-sky-500/30" };
+            }
+        }
+
+        function filterTimeline(mode) {
+            currentFilterMode = mode;
+            const badge = document.getElementById('active-filter-badge');
+            if (mode === 'all') { badge.classList.add('hidden'); } 
+            else {
+                badge.classList.remove('hidden');
+                badge.innerText = `Filtering: ${mode.replace('_', ' ')}`;
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            const dateStr = getYYYYMMDD(currentDate);
+            document.getElementById('date-select-input').value = dateStr;
+            document.getElementById('display-date').innerText = formatDateKhmer(currentDate);
+            
+            const currentDayBookings = databaseBookings[dateStr] || {};
+            const tbody = document.getElementById('timeline-body'); tbody.innerHTML = ""; 
+
+            let totalBooked = 0, totalOngoing = 0, totalPendingStart = 0, totalPendingEnd = 0, totalEnded = 0;
+            let activeRoomsAtThisMoment = new Set();
+
+            rooms.forEach(room => {
+                columns.forEach(slot => {
+                    const bookingInfo = currentDayBookings[room.id] && currentDayBookings[room.id][slot];
+                    if (bookingInfo) {
+                        totalBooked++;
+                        const isToday = getYYYYMMDD(new Date()) === dateStr;
+                        const status = isToday ? checkActualBookingStatus(bookingInfo) : { type: "booked", label: "កត់ត្រាទុក" };
+                        if (status.type === "ongoing") { totalOngoing++; activeRoomsAtThisMoment.add(room.id); if(status.label === "ជិតបញ្ចប់") totalPendingEnd++; }
+                        if (status.type === "pending_start") totalPendingStart++;
+                        if (status.type === "ended") totalEnded++;
+                    }
+                });
+            });
+
+            rooms.forEach(room => {
+                if (currentFilterMode === 'free' && activeRoomsAtThisMoment.has(room.id)) return;
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-white/[0.02] transition-colors group";
+                
+                let rowHTML = `
+                    <td class="p-6 sticky left-0 z-20 glass-panel border-r border-white/5">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-2xl bg-${room.color}-500/10 border border-${room.color}-500/20 flex items-center justify-center text-${room.color}-400">
+                                <i class="fa-solid ${room.icon} text-lg"></i>
+                            </div>
+                            <div>
+                                <div class="font-black text-white text-base">${room.name}</div>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-[10px] text-slate-500 font-bold uppercase"><i class="fa-solid fa-users mr-1"></i> ${room.capacity} seats</span>
+                                    <span class="w-1 h-1 bg-slate-700 rounded-full"></span>
+                                    <span class="text-[10px] text-emerald-500 font-bold uppercase">${activeRoomsAtThisMoment.has(room.id) ? 'Busy' : 'Available'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                `;
+
+                columns.forEach(slot => {
+                    const bookingInfo = currentDayBookings[room.id] && currentDayBookings[room.id][slot];
+                    if (bookingInfo) {
+                        const isToday = getYYYYMMDD(new Date()) === dateStr;
+                        const status = isToday ? checkActualBookingStatus(bookingInfo) : { type: "booked", label: "កត់ត្រាទុក", style: "bg-sky-500/10 text-sky-400 border-sky-500/20" };
+
+                        if (currentFilterMode !== 'all' && currentFilterMode !== 'free' && currentFilterMode !== status.type) {
+                            rowHTML += `<td class="p-4 border-r border-white/5 text-slate-800 italic text-[10px] text-center select-none opacity-20">•</td>`;
+                            return;
+                        }
+
+                        rowHTML += `
+                            <td class="p-4 border-r border-white/5">
+                                <div onclick="showDetails('${room.id}', '${slot}')" class="p-4 rounded-2xl border ${status.style} cursor-pointer hover:scale-[1.02] transition-all relative overflow-hidden group/card min-h-[110px]">
+                                    <div class="font-black text-xs mb-2 line-clamp-2 leading-relaxed">${bookingInfo.title}</div>
+                                    <div class="flex items-center justify-between mt-auto pt-2 border-t border-white/5">
+                                        <span class="text-[9px] font-bold opacity-70"><i class="fa-solid fa-user-tie mr-1"></i> ${bookingInfo.user}</span>
+                                        <span class="text-[8px] bg-white/10 px-1.5 py-0.5 rounded uppercase font-black tracking-tighter">${status.label}</span>
+                                    </div>
+                                </div>
+                            </td>`;
+                    } else {
+                        rowHTML += `
+                            <td class="p-4 border-r border-white/5">
+                                <button class="w-full h-[100px] border-2 border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center text-slate-600 hover:border-sky-500/40 hover:bg-sky-500/5 hover:text-sky-400 transition-all group/add">
+                                    <i class="fa-solid fa-plus text-lg group-hover/add:scale-125 transition-transform"></i>
+                                    <span class="text-[9px] font-black uppercase tracking-widest mt-2">Book Now</span>
+                                </button>
+                            </td>`;
+                    }
+                });
+                tr.innerHTML = rowHTML; tbody.appendChild(tr);
+            });
+
+            document.getElementById('sum-total').innerText = totalBooked;
+            document.getElementById('sum-ongoing').innerText = totalOngoing;
+            document.getElementById('sum-pending-start').innerText = totalPendingStart;
+            document.getElementById('sum-pending-end').innerText = totalPendingEnd;
+            document.getElementById('sum-ended').innerText = totalEnded;
+            document.getElementById('sum-free').innerText = (rooms.length - activeRoomsAtThisMoment.size) + " / " + rooms.length;
+        }
+
+        function showDetails(roomID, slotID) {
+            const dateStr = getYYYYMMDD(currentDate); const info = databaseBookings[dateStr][roomID][slotID];
+            const viewContainer = document.getElementById('modal-view-mode');
+            viewContainer.innerHTML = `
+                <div class="bg-white/5 p-6 rounded-3xl border border-white/5">
+                    <div class="text-[10px] text-sky-400 font-black uppercase tracking-widest mb-2">Subject</div>
+                    <div class="text-xl font-black text-white leading-tight">${info.title}</div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-white/5 p-4 rounded-2xl border border-white/5">
+                        <div class="text-[9px] text-slate-500 font-bold uppercase mb-1">Moderator</div>
+                        <div class="text-sm font-bold text-slate-200">${info.user}</div>
+                    </div>
+                    <div class="bg-white/5 p-4 rounded-2xl border border-white/5">
+                        <div class="text-[9px] text-slate-500 font-bold uppercase mb-1">Participants</div>
+                        <div class="text-sm font-bold text-slate-200">${info.participants}</div>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-r from-sky-500/10 to-indigo-500/10 p-6 rounded-3xl border border-white/10 flex items-center justify-between">
+                    <div>
+                        <div class="text-[9px] text-slate-400 font-bold uppercase mb-1">Time Slot</div>
+                        <div class="text-lg font-black text-white">${info.startTime} - ${info.endTime}</div>
+                    </div>
+                    <i class="fa-solid fa-clock-rotate-left text-2xl text-sky-500/40"></i>
+                </div>
+                <div class="space-y-2">
+                    <div class="text-[9px] text-slate-500 font-bold uppercase ml-2">Notes & Remarks</div>
+                    <div class="bg-amber-500/5 p-4 rounded-2xl border border-amber-500/20 text-sm text-amber-200/80 italic">
+                        "${info.note || 'No special remarks'}"
+                    </div>
+                </div>
+            `;
+            document.getElementById('detail-modal').classList.remove('hidden');
+        }
+
+        function closeModal() { document.getElementById('detail-modal').classList.add('hidden'); }
+        function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
+
+        function generateTextSummaryReport() {
+            const dateStr = getYYYYMMDD(currentDate); const now = new Date();
+            let report = `📊 PREVIEW REPORT - MEETING ROOM SYSTEM\n`;
+            report += `📅 Date: ${formatDateKhmer(currentDate)}\n`;
+            report += `⏱️ Generated: ${now.toLocaleTimeString()}\n`;
+            report += `------------------------------------------\n`;
+            
+            const currentDayBookings = databaseBookings[dateStr] || {};
+            let count = 0;
+            rooms.forEach(room => {
+                columns.forEach(slot => {
+                    const info = currentDayBookings[room.id] && currentDayBookings[room.id][slot];
+                    if(info) {
+                        count++;
+                        report += `${count}. [${info.startTime}] ${info.roomName} - ${info.title} (${info.user})\n`;
+                    }
+                });
+            });
+
+            document.getElementById('report-text-area').value = report || "No data for this day.";
+            document.getElementById('report-modal').classList.remove('hidden');
+        }
+
+        function copyReportText() {
+            const textArea = document.getElementById('report-text-area');
+            textArea.select();
+            document.execCommand('copy');
+            alert('Copied to clipboard!');
+        }
+
+        setInterval(() => { 
+            const now = new Date(); 
+            document.getElementById('current-time-clock').innerText = now.toLocaleTimeString('km-KH', { hour12: false }); 
+        }, 1000);
+
+        updateUI();
+    </script>
+</body>
+</html>

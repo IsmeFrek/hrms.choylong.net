@@ -1,20 +1,20 @@
-
 import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Use memory storage — files are streamed directly to Cloudflare R2
+// instead of being written to local disk.
+const storage = multer.memoryStorage();
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, '../public/Uploads'));
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB max
+  fileFilter: (req, file, cb) => {
+    const ext = (require('path').extname(file.originalname) || '').toLowerCase();
+    const isImage = (file.mimetype || '').startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(file.originalname);
+    const isPdf   = (file.mimetype || '').toLowerCase() === 'application/pdf' || ext === '.pdf';
+    const isDoc   = /\.(docx?|xlsx?|pptx?|txt|csv)$/i.test(file.originalname);
+    if (isImage || isPdf || isDoc) return cb(null, true);
+    return cb(new Error('Only images, PDFs, or office document files are allowed!'));
   }
 });
 
-const upload = multer({ storage });
 export default upload;

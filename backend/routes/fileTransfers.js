@@ -11,6 +11,24 @@ import { htmlToPdfBuffer } from '../services/renderPdf.js';
 
 const router = express.Router();
 
+/**
+ * Parses a date string in DD/MM/YYYY or DD/MM/YYYY HH:mm format.
+ * Useful for sanitizing legacy or localized date strings that Mongoose fails to cast.
+ */
+const parseKhmerDate = (s) => {
+    if (!s || typeof s !== 'string') return null;
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2}))?/);
+    if (m) {
+        const day = parseInt(m[1], 10);
+        const month = parseInt(m[2], 10) - 1;
+        const year = parseInt(m[3], 10);
+        const hour = m[4] ? parseInt(m[4], 10) : 0;
+        const min = m[5] ? parseInt(m[5], 10) : 0;
+        return new Date(year, month, day, hour, min);
+    }
+    return null;
+};
+
 // GET /file-transfers
 // Query params: page (1-based), pageSize, type
 router.get('/file-transfers', authRequired, async (req, res, next) => {
@@ -67,7 +85,7 @@ router.get(
 router.put(
     '/file-transfers/:id',
     authRequired,
-    requireAnyPermission(['edit:fileTransfers', 'edit:documents']),
+    requireAnyPermission(['edit:fileTransfers', 'edit:documents', 'send:feedback']),
     async (req, res, next) => {
         try {
             const { id } = req.params;
@@ -97,6 +115,14 @@ router.put(
             for (const [key, value] of Object.entries(payload)) {
                 item[key] = value;
             }
+
+            // Sanitize dates if they are in problematic strings format (e.g. from legacy data/import)
+            ['date', 'entryDate'].forEach(f => {
+                if (item[f] && typeof item[f] === 'string') {
+                    const parsed = parseKhmerDate(item[f]);
+                    if (parsed && !isNaN(parsed.getTime())) item[f] = parsed;
+                }
+            });
 
             const saved = await item.save();
             return res.json({ success: true, item: saved });

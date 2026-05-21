@@ -5,7 +5,7 @@ import usePermission from '../hooks/usePermission';
 import headerBg from '../assets/3.JPG';
 
 function toKhmerDigits(n) {
-  const map = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+  const map = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
   return String(n).replace(/[0-9]/g, d => map[d]);
 }
 
@@ -13,8 +13,8 @@ function fmtDateSlash(d) {
   if (!d) return '';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '';
-  const dd = String(dt.getDate()).padStart(2,'0');
-  const mm = String(dt.getMonth()+1).padStart(2,'0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
   const yyyy = dt.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
 }
@@ -23,8 +23,8 @@ function fmtKhmerLongDate(d) {
   if (!d) return '';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '';
-  const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
-  const dd = toKhmerDigits(String(dt.getDate()).padStart(1,'0'));
+  const khMonths = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
+  const dd = toKhmerDigits(String(dt.getDate()).padStart(1, '0'));
   const mmName = khMonths[dt.getMonth()];
   const yyyy = toKhmerDigits(dt.getFullYear());
   return `ថ្ងៃទី ${dd} ខែ ${mmName} ឆ្នាំ ${yyyy}`;
@@ -68,7 +68,7 @@ function formatYMDIntervalKhmer(start, end) {
 }
 
 function khWeekday(d) {
-  const names = ['អាទិត្យ','ចន្ទ','អង្គារ','ពុធ','ព្រហស្បតិ៍','សុក្រ','សៅរ៍'];
+  const names = ['អាទិត្យ', 'ចន្ទ', 'អង្គារ', 'ពុធ', 'ព្រហស្បតិ៍', 'សុក្រ', 'សៅរ៍'];
   const dt = new Date(d);
   return names[dt.getDay()];
 }
@@ -126,9 +126,9 @@ function computeStudyStatus(stu) {
 
     if (daysToStart !== '' && daysToStart > 0) return 'ត្រៀមចូលសិក្សា';
     const nVal = (validityDays !== null && !isNaN(Number(validityDays))) ? Number(validityDays) : null;
-  if (nVal !== null && nVal >= 1) return 'កំពុងបន្តការសិក្សា';
-  if (nVal !== null && nVal < -30) return 'បានបញ្ចប់ការសិក្សាលើស១ខែ';
-  if (nVal !== null) return 'ចូលបម្រើការងារវិញ';
+    if (nVal !== null && nVal >= 1) return 'កំពុងបន្តការសិក្សា';
+    if (nVal !== null && nVal < -30) return 'បានបញ្ចប់ការសិក្សាលើស១ខែ';
+    if (nVal !== null) return 'ចូលបម្រើការងារវិញ';
     return null;
   } catch (e) { return null; }
 }
@@ -138,14 +138,14 @@ export default function RetirementReportPage() {
   const [list, setList] = useState([]);
   const [q, setQ] = useState('');
   const [dept, setDept] = useState('');
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [retireYear, setRetireYear] = useState(new Date().getFullYear());
   const printRef = useRef();
   const fileInputRef = useRef();
   const [lunarText, setLunarText] = useState('');
-  const [footerDate, setFooterDate] = useState(() => new Date().toISOString().slice(0,10));
+  const [footerDate, setFooterDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [editingHr, setEditingHr] = useState(null);
   const [originalStu, setOriginalStu] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -232,7 +232,7 @@ export default function RetirementReportPage() {
         return false;
       }
     };
-    const keywords = ['សិក្សា','ស្រាវជ្រាវ','ហាត់ការងារ','បណ្ដុះបណ្ដាល','training','study','scholarship'];
+    const keywords = ['សិក្សា', 'ស្រាវជ្រាវ', 'ហាត់ការងារ', 'បណ្ដុះបណ្ដាល', 'training', 'study', 'scholarship'];
     const term = (q || '').toString().trim().toLowerCase();
     const rows = (list || [])
       .map(hr => {
@@ -245,9 +245,9 @@ export default function RetirementReportPage() {
       .filter(x => {
         // Department filter (applies always)
         if (dept && (x.hr.Department_Kh || '').trim() !== dept.trim()) return false;
-  // If needed, additional filters (by study state) can be re-added here.
+        // If needed, additional filters (by study state) can be re-added here.
 
-  const sid = (x.hr.civilServantId || x.hr.staffId || x.hr.no || x.hr.cardNo || x.hr.cardNumber || '').toString().toLowerCase();
+        const sid = (x.hr.civilServantId || x.hr.staffId || x.hr.no || x.hr.cardNo || x.hr.cardNumber || '').toString().toLowerCase();
         const name = (x.hr.khmerName || x.hr.name || '').toString().toLowerCase();
 
         // If a search term is provided, match by sid or name OR the keyword reason
@@ -267,7 +267,7 @@ export default function RetirementReportPage() {
         );
         return reasonMatches || hasStudyData;
       })
-      .sort((a,b) => {
+      .sort((a, b) => {
         // desired order: ត្រៀមចូលសិក្សា, កំពុងបន្តការសិក្សា, ចូលបម្រើការងារវិញ, បានបញ្ចប់ការសិក្សាលើស១ខែ
         const order = {
           'ត្រៀមចូលសិក្សា': 0,
@@ -278,13 +278,13 @@ export default function RetirementReportPage() {
         const oa = (a.status && order.hasOwnProperty(a.status)) ? order[a.status] : 99;
         const ob = (b.status && order.hasOwnProperty(b.status)) ? order[b.status] : 99;
         if (oa !== ob) return oa - ob;
-        return (a.hr.no||0)-(b.hr.no||0);
+        return (a.hr.no || 0) - (b.hr.no || 0);
       });
     const male = rows.filter(r => r.hr.gender === 'Male').length;
     const female = rows.filter(r => r.hr.gender === 'Female').length;
     return { rows, male, female, total: rows.length };
   }, [list, dept, q]);
-  
+
 
   // Debug: log fetched list and computed rows for troubleshooting
   useEffect(() => {
@@ -292,7 +292,7 @@ export default function RetirementReportPage() {
       // eslint-disable-next-line no-console
       console.debug('[StudyLeaveReport] list count:', Array.isArray(list) ? list.length : 0, 'derived rows:', derived.rows ? derived.rows.length : 0);
       // eslint-disable-next-line no-console
-      console.debug('[StudyLeaveReport] sample rows:', (derived.rows || []).slice(0,5).map(r => ({ id: r.hr._id || r.hr.no || r.hr.staffId, name: r.hr.khmerName || r.hr.name }))); 
+      console.debug('[StudyLeaveReport] sample rows:', (derived.rows || []).slice(0, 5).map(r => ({ id: r.hr._id || r.hr.no || r.hr.staffId, name: r.hr.khmerName || r.hr.name })));
     } catch (err) { /* ignore */ }
   }, [list, derived]);
 
@@ -332,7 +332,7 @@ export default function RetirementReportPage() {
           if (!isNaN(st.getTime())) {
             const end = new Date(st);
             end.setDate(end.getDate() + Number(valid));
-            nextStu.studyEnd = end.toISOString().slice(0,10);
+            nextStu.studyEnd = end.toISOString().slice(0, 10);
           }
         }
       } catch (e) {
@@ -422,7 +422,7 @@ export default function RetirementReportPage() {
       const { data } = await api.post('/upload', fd, { headers: { 'Content-Type': undefined } });
       if (data && data.url) {
         // set the returned url into editingHr.stu.image
-        setEditingHr(prev => ({ ...prev, stu: { ...(prev.stu||{}), image: data.url } }));
+        setEditingHr(prev => ({ ...prev, stu: { ...(prev.stu || {}), image: data.url } }));
         setSelectedFile(null);
         // reset native file input so same file can be selected again
         try { if (fileInputRef && fileInputRef.current) fileInputRef.current.value = ''; } catch (e) { /* ignore */ }
@@ -565,7 +565,7 @@ export default function RetirementReportPage() {
       // compute validityDays from studyEnd (number of days from today to end)
       const validityDays = daysDiffFromToday(stu.studyEnd || stu.endDate) || stu.validity || '';
       return ([
-        idx+1,
+        idx + 1,
         row.hr.staffId || row.hr.cardNumber || row.hr.cardNo || row.hr.no || '',
         row.hr.civilServantId || row.hr.officerId || row.hr.staffId || row.hr.no || '',
         row.hr.khmerName || row.hr.name || '',
@@ -577,7 +577,7 @@ export default function RetirementReportPage() {
         row.hr.Department_Kh || row.hr.department || '',
         stu.studySkill || '',
         stu.studyPlace || '',
-  validityDays,
+        validityDays,
         stu.other || '',
         fmtDateSlash(stu.studyStart || stu.startDate),
         fmtDateSlash(stu.studyEnd || stu.endDate),
@@ -603,7 +603,7 @@ export default function RetirementReportPage() {
   // Small helper to render status badges with colors
   const renderStatusBadge = (s) => {
     if (!s) return null;
-    const style = { display:'inline-block', padding:'6px 10px', borderRadius:14, color:'#fff', fontSize:13, fontWeight:700, minWidth:40, textAlign:'center' };
+    const style = { display: 'inline-block', padding: '6px 10px', borderRadius: 14, color: '#fff', fontSize: 13, fontWeight: 700, minWidth: 40, textAlign: 'center' };
     const mapping = {
       'ត្រៀមចូលសិក្សា': { background: '#f39c12' }, // orange / amber
       'កំពុងបន្តការសិក្សា': { background: '#16a34a' }, // green
@@ -619,18 +619,18 @@ export default function RetirementReportPage() {
   const renderGroupTable = (title, rows, showHeader = true) => {
     if (!rows || rows.length === 0) return null;
     return (
-      <div style={{marginBottom:12}}>
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6}}>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           {(() => {
             const totalN = rows.length || 0;
             const maleN = rows.filter(r => r.hr && r.hr.gender === 'Male').length;
             const femaleN = rows.filter(r => r.hr && r.hr.gender === 'Female').length;
             return (
-              <h4 style={{fontSize:12, fontWeight:700, margin:0}}>{title} — {toKhmerDigits(totalN)} នាក់ ( ប្រុស: {toKhmerDigits(maleN)} — ស្រី: {toKhmerDigits(femaleN)} )</h4>
+              <h4 style={{ fontSize: 12, fontWeight: 700, margin: 0 }}>{title} — {toKhmerDigits(totalN)} នាក់ ( ប្រុស: {toKhmerDigits(maleN)} — ស្រី: {toKhmerDigits(femaleN)} )</h4>
             );
           })()}
         </div>
-        <table style={{width:'100%', borderCollapse:'collapse', fontSize:12, tableLayout:'fixed'}}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed' }}>
           {(() => {
             // Build column definitions similar to Unpaid report so widths and order are consistent
             const visible = { validity: true, status: true, duration: true, other: true, Start: true, End: true, image: true };
@@ -652,7 +652,7 @@ export default function RetirementReportPage() {
               ...(visible.Start ? [{ key: 'Start', label: 'ថ្ងៃចាប់ផ្ដើម', width: '80px' }] : []),
               ...(visible.End ? [{ key: 'End', label: 'ថ្ងៃបញ្ចប់', width: '80px' }] : []),
               ...(visible.image ? [{ key: 'image', label: 'ឯកសារយោង', width: '70px' }] : []),
-              { key: 'action', label: 'សកម្មភាព', width: '60px' }
+              ...((perms.isAdmin || perms.canEditStudyLeaveReport) ? [{ key: 'action', label: 'សកម្មភាព', width: '60px' }] : [])
             ];
             const orderedDefs = (columnDefs || []).map(c => c).filter(Boolean);
             const numCols = orderedDefs.length;
@@ -669,7 +669,7 @@ export default function RetirementReportPage() {
                   <thead>
                     <tr>
                       {orderedDefs.map(col => (
-                        <th key={col.key} style={{border:'1px solid #d1cfcf', padding:'6px', textAlign:'center'}} className="center">{col.label}</th>
+                        <th key={col.key} style={{ border: '1px solid #d1cfcf', padding: '6px', textAlign: 'center' }} className="center">{col.label}</th>
                       ))}
                     </tr>
                   </thead>
@@ -704,10 +704,10 @@ export default function RetirementReportPage() {
                 try {
                   const full = new URL(stu.image, window.location.origin).href;
                   const parts = (stu.image || '').split('/');
-                  const name = parts[parts.length-1] || stu.image;
+                  const name = parts[parts.length - 1] || stu.image;
                   const isImg = /\.(jpg|jpeg|png|gif)$/i.test(name);
                   imageLink = (
-                    <a href={full} target="_blank" rel="noopener noreferrer" style={{color:'#1f6feb'}}>
+                    <a href={full} target="_blank" rel="noopener noreferrer" style={{ color: '#1f6feb' }}>
                       {isImg ? 'View' : name}
                     </a>
                   );
@@ -716,7 +716,7 @@ export default function RetirementReportPage() {
 
               // Render row cells by matching the columnDefs order used for the header
               const cellMap = {
-                index: <td className="center">{toKhmerDigits(idx+1)}</td>,
+                index: <td className="center">{toKhmerDigits(idx + 1)}</td>,
                 staffId: <td className="center">{staffId ? staffId : null}</td>,
                 civilId: <td className="center">{civilId ? civilId : null}</td>,
                 name: <td>{fullName ? fullName : null}</td>,
@@ -733,11 +733,12 @@ export default function RetirementReportPage() {
                 Start: <td className="center">{startFmt ? startFmt : null}</td>,
                 End: <td className="center">{endFmt ? endFmt : null}</td>,
                 image: <td>{imageLink}</td>,
-                action: <td className="center"><button className="border px-2 py-1 text-sm rounded bg-yellow-200" onClick={()=> openEdit(row.hr)}>Edit</button></td>
+                action: <td className="center"><button className="border px-2 py-1 text-sm rounded bg-yellow-200" onClick={() => openEdit(row.hr)}>Edit</button></td>
               };
 
               // orderedDefs is in the surrounding closure from header rendering; re-create consistent order here
-              const orderedKeys = ['index','staffId','civilId','name','gender','role','position','dept','skill','place','validity','status','duration','other','Start','End','image','action'];
+              const orderedKeys = ['index', 'staffId', 'civilId', 'name', 'gender', 'role', 'position', 'dept', 'skill', 'place', 'validity', 'status', 'duration', 'other', 'Start', 'End', 'image'];
+              if (perms.isAdmin || perms.canEditStudyLeaveReport) orderedKeys.push('action');
               return (
                 <tr key={row.hr._id || idx}>
                   {orderedKeys.map((k, i) => React.cloneElement(cellMap[k] || <td key={`empty-${i}`}>-</td>, { key: k }))}
@@ -768,27 +769,27 @@ export default function RetirementReportPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <label className="text-sm">ស្វែងរក (ID ឬ ឈ្មោះ):</label>
-          <div style={{display:'inline-flex', alignItems:'center', gap:6}}>
-            <input type="text" className="rounded-md bg-gray-50 px-3 py-2 w-56 text-sm placeholder-gray-400 border border-gray-200" value={q} onChange={(e)=> setQ(e.target.value)} placeholder="វាយលេខកាត ឬ ឈ្មោះ: S0015 ឬ ឈ្មោះ" />
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <input type="text" className="rounded-md bg-gray-50 px-3 py-2 w-56 text-sm placeholder-gray-400 border border-gray-200" value={q} onChange={(e) => setQ(e.target.value)} placeholder="វាយលេខកាត ឬ ឈ្មោះ: S0015 ឬ ឈ្មោះ" />
             <button type="button" className="ml-1 border rounded px-2 py-1 text-sm bg-white text-gray-700" onClick={() => setQ('')}>Clear</button>
           </div>
-          
+
           <label className="text-sm">ចន្ទគតិ*:</label>
           <input
             type="text"
             className="border rounded px-2 py-1 w-72"
             placeholder="ឧ. ថ្ងៃសុក្រ ១៣កើត ខែភទ្របទ ឆ្នាំម្សាញ់ សប្តស័ក ព.ស. ២៥៦៩"
             value={lunarText}
-            onChange={(e)=> setLunarText(e.target.value)}
+            onChange={(e) => setLunarText(e.target.value)}
           />
           <label className="text-sm">ថ្ងៃខែឆ្នាំ:</label>
           <input
             type="date"
             className="border rounded px-2 py-1"
             value={footerDate}
-            onChange={(e)=> setFooterDate(e.target.value)}
+            onChange={(e) => setFooterDate(e.target.value)}
           />
-          
+
           {/* inline warnings */}
           {(!lunarText.trim()) && <span className="text-red-600 text-xs">សូមបំពេញចន្ទគតិ</span>}
           <button className={`border px-2 py-1 rounded ${loading ? 'bg-gray-100 text-gray-300' : 'bg-green-600 text-white border-green-600'}`} onClick={handleExportExcel} disabled={loading}>Export Excel</button>
@@ -800,17 +801,17 @@ export default function RetirementReportPage() {
 
       <div ref={printRef} className="bg-white p-4 border rounded print-scope">
         <style dangerouslySetInnerHTML={{ __html: SCREEN_CSS }} />
-        <div style={{textAlign:'center', marginBottom: '8px'}}>
-            <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'16px'}}>ព្រះរាជាណាចក្រកម្ពុជា</div>
-          <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'14px'}}>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
-            <div style={{position:'relative', textAlign:'left', padding:'6px 0'}}>
-              {/* background image behind the text */}
-              <img src={headerBg} alt="" aria-hidden="true"
-                   style={{position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)', width:'150px', height:'auto', opacity:88, pointerEvents:'none'}} />
-              <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12.5px', position:'relative', zIndex:1}}>ក្រសួងសុខាភិបាល</div>
-            </div>
-            <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'left'}}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</div>
-          <div style={{fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'13px',marginTop:'4px', fontWeight:600}}>បញ្ជីឈ្មោះមន្រ្តីរាជការចូលនិវត្តន៍របស់ មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត ឆ្នាំ {toKhmerDigits(retireYear)}</div>
+        <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+          <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '16px' }}>ព្រះរាជាណាចក្រកម្ពុជា</div>
+          <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '14px' }}>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
+          <div style={{ position: 'relative', textAlign: 'left', padding: '6px 0' }}>
+            {/* background image behind the text */}
+            <img src={headerBg} alt="" aria-hidden="true"
+              style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '150px', height: 'auto', opacity: 88, pointerEvents: 'none' }} />
+            <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12.5px', position: 'relative', zIndex: 1 }}>ក្រសួងសុខាភិបាល</div>
+          </div>
+          <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'left' }}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</div>
+          <div style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '13px', marginTop: '4px', fontWeight: 600 }}>បញ្ជីឈ្មោះមន្រ្តីរាជការចូលនិវត្តន៍របស់ មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត ឆ្នាំ {toKhmerDigits(retireYear)}</div>
         </div>
         {/* Render grouped sections by status in the order required (screen) */}
         <div className="no-print">
@@ -828,7 +829,7 @@ export default function RetirementReportPage() {
             return (
               <div>
                 {(() => {
-                  const groups = [ {title:'មិនទាន់មានស្ថានភាព', rows:g0}, {title:'ត្រៀមចូលសិក្សា', rows:g1}, {title:'កំពុងបន្តការសិក្សា', rows:g2}, {title:'ចូលបម្រើការងារវិញ', rows:g3}, {title:'បានបញ្ចប់ការសិក្សាលើស១ខែ', rows:g4} ];
+                  const groups = [{ title: 'មិនទាន់មានស្ថានភាព', rows: g0 }, { title: 'ត្រៀមចូលសិក្សា', rows: g1 }, { title: 'កំពុងបន្តការសិក្សា', rows: g2 }, { title: 'ចូលបម្រើការងារវិញ', rows: g3 }, { title: 'បានបញ្ចប់ការសិក្សាលើស១ខែ', rows: g4 }];
                   const firstNonEmpty = groups.findIndex(g => g.rows && g.rows.length > 0);
                   return groups.map((g, idx) => renderGroupTable(g.title, g.rows, idx === firstNonEmpty));
                 })()}
@@ -838,7 +839,7 @@ export default function RetirementReportPage() {
         </div>
 
         {/* Print-only simplified tables: one for 'កំពុងបន្តការសិក្សា' and one for 'ចូលបម្រើការងារវិញ' */}
-        <div className="print-only" style={{display:'none'}}>
+        <div className="print-only" style={{ display: 'none' }}>
           {(() => {
             const rowsAll = derived.rows || [];
             const rowsStudying = rowsAll.filter(r => r.status === 'កំពុងបន្តការសិក្សា');
@@ -846,14 +847,14 @@ export default function RetirementReportPage() {
 
             const renderSimpleTable = (title, rows) => {
               return (
-                <div style={{marginBottom:12}} key={title}>
-                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6}}>
+                <div style={{ marginBottom: 12 }} key={title}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     {(() => {
                       const totalN = rows.length || 0;
                       const maleN = rows.filter(r => r.hr && r.hr.gender === 'Male').length;
                       const femaleN = rows.filter(r => r.hr && r.hr.gender === 'Female').length;
                       return (
-                        <div style={{fontSize:12,fontWeight:700}}>{title} — {toKhmerDigits(totalN)} នាក់ ( ប្រុស: {toKhmerDigits(maleN)} — ស្រី: {toKhmerDigits(femaleN)} )</div>
+                        <div style={{ fontSize: 12, fontWeight: 700 }}>{title} — {toKhmerDigits(totalN)} នាក់ ( ប្រុស: {toKhmerDigits(maleN)} — ស្រី: {toKhmerDigits(femaleN)} )</div>
                       );
                     })()}
                   </div>
@@ -879,7 +880,7 @@ export default function RetirementReportPage() {
                         const stu = row.hr.stu || row.hr.study || {};
                         return (
                           <tr key={row.hr._id || idx}>
-                            <td className="center">{toKhmerDigits(idx+1)}</td>
+                            <td className="center">{toKhmerDigits(idx + 1)}</td>
                             <td className="center">{row.hr.staffId || row.hr.cardNumber || row.hr.cardNo || row.hr.no || ''}</td>
                             <td className="center">{row.hr.civilServantId || row.hr.officerId || row.hr.staffId || row.hr.no || ''}</td>
                             <td>{row.hr.khmerName || row.hr.name || ''}</td>
@@ -911,68 +912,68 @@ export default function RetirementReportPage() {
         </div>
         {/* Edit Modal */}
         {editingHr && (
-          <div role="dialog" aria-modal="true" style={{position:'fixed', left:0, top:0, right:0, bottom:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center'}}>
-            <div style={{background:'#fff', padding:16, width:720, maxWidth:'95%', borderRadius:6}}>
-              <h3 style={{margin:0, marginBottom:8}}>កែប្រែព័ត៌មានសិក្សា — {editingHr.khmerName || editingHr.name || editingHr.staffId}</h3>
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
+          <div role="dialog" aria-modal="true" style={{ position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', padding: 16, width: 720, maxWidth: '95%', borderRadius: 6 }}>
+              <h3 style={{ margin: 0, marginBottom: 8 }}>កែប្រែព័ត៌មានសិក្សា — {editingHr.khmerName || editingHr.name || editingHr.staffId}</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <div>
                   <label className="text-sm">ជំនាញសិក្សា</label>
-                  <input className="border rounded w-full px-2 py-1" value={editingHr.stu?.studySkill||''} onChange={(e)=> handleEditChange('studySkill', e.target.value)} />
+                  <input className="border rounded w-full px-2 py-1" value={editingHr.stu?.studySkill || ''} onChange={(e) => handleEditChange('studySkill', e.target.value)} />
                 </div>
                 <div>
                   <label className="text-sm">ទីកន្លែងសិក្សា</label>
-                  <input className="border rounded w-full px-2 py-1" value={editingHr.stu?.studyPlace||''} onChange={(e)=> handleEditChange('studyPlace', e.target.value)} />
+                  <input className="border rounded w-full px-2 py-1" value={editingHr.stu?.studyPlace || ''} onChange={(e) => handleEditChange('studyPlace', e.target.value)} />
                 </div>
                 {/* validity removed per request */}
                 <div>
                   <label className="text-sm">ផ្សេងៗ</label>
-                  <input className="border rounded w-full px-2 py-1" value={editingHr.stu?.other||''} onChange={(e)=> handleEditChange('other', e.target.value)} />
+                  <input className="border rounded w-full px-2 py-1" value={editingHr.stu?.other || ''} onChange={(e) => handleEditChange('other', e.target.value)} />
                 </div>
                 <div>
                   <label className="text-sm">ថ្ងៃចាប់ផ្ដើម</label>
-                  <input type="date" className="border rounded w-full px-2 py-1" value={editingHr.stu?.studyStart ? (new Date(editingHr.stu.studyStart).toISOString().slice(0,10)) : ''} onChange={(e)=> handleEditChange('studyStart', e.target.value)} />
+                  <input type="date" className="border rounded w-full px-2 py-1" value={editingHr.stu?.studyStart ? (new Date(editingHr.stu.studyStart).toISOString().slice(0, 10)) : ''} onChange={(e) => handleEditChange('studyStart', e.target.value)} />
                 </div>
                 <div>
                   <label className="text-sm">ថ្ងៃបញ្ចប់</label>
-                  <input type="date" className="border rounded w-full px-2 py-1" value={editingHr.stu?.studyEnd ? (new Date(editingHr.stu.studyEnd).toISOString().slice(0,10)) : ''} onChange={(e)=> handleEditChange('studyEnd', e.target.value)} />
+                  <input type="date" className="border rounded w-full px-2 py-1" value={editingHr.stu?.studyEnd ? (new Date(editingHr.stu.studyEnd).toISOString().slice(0, 10)) : ''} onChange={(e) => handleEditChange('studyEnd', e.target.value)} />
                 </div>
-                <div style={{gridColumn:'1 / -1'}}>
+                <div style={{ gridColumn: '1 / -1' }}>
                   <label className="text-sm">ឯកសារយោង</label>
-                  <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     {/* hidden native file input triggered by Browse button */}
-                    <input ref={fileInputRef} type="file" accept="image/*,.pdf" style={{display:'none'}} onChange={(e)=> handleFileSelect(e.target.files && e.target.files[0])} />
+                    <input ref={fileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={(e) => handleFileSelect(e.target.files && e.target.files[0])} />
                     <button type="button" className="border px-3 py-1 rounded bg-white" onClick={() => fileInputRef.current && fileInputRef.current.click()}>{selectedFile ? selectedFile.name : 'Browse...'}</button>
-                    <div style={{flex:1, fontSize:13, color:'#333'}}>{editingHr.stu?.image ? `Current: ${editingHr.stu.image}` : (selectedFile ? selectedFile.name : 'No file selected')}</div>
-                    <div style={{fontSize:11, color:'#666', marginLeft:8}}></div>
+                    <div style={{ flex: 1, fontSize: 13, color: '#333' }}>{editingHr.stu?.image ? `Current: ${editingHr.stu.image}` : (selectedFile ? selectedFile.name : 'No file selected')}</div>
+                    <div style={{ fontSize: 11, color: '#666', marginLeft: 8 }}></div>
                     {/* Upload is performed automatically when saving; keep Delete if existing image */}
                     {editingHr.stu?.image && (
-                      <button className="border px-2 py-1 rounded bg-red-600 text-white" onClick={handleDeleteReference} style={{marginLeft:6}}>លុប</button>
+                      <button className="border px-2 py-1 rounded bg-red-600 text-white" onClick={handleDeleteReference} style={{ marginLeft: 6 }}>លុប</button>
                     )}
                   </div>
                   {/* preview area: show selected file preview first, else stored image */}
                   {(selectedPreviewUrl || (selectedFile && selectedFile.type && selectedFile.type === 'application/pdf')) && (
-                    <div style={{marginTop:8}}>
+                    <div style={{ marginTop: 8 }}>
                       {selectedPreviewUrl && (
-                        <img src={selectedPreviewUrl} alt="preview" style={{maxWidth:200, maxHeight:120, marginTop:6, border:'1px solid #ddd'}} />
+                        <img src={selectedPreviewUrl} alt="preview" style={{ maxWidth: 200, maxHeight: 120, marginTop: 6, border: '1px solid #ddd' }} />
                       )}
                       {(!selectedPreviewUrl && selectedFile && selectedFile.type === 'application/pdf') && (
-                        <div style={{marginTop:6}}><a href={selectedPreviewUrl} target="_blank" rel="noopener noreferrer">{selectedFile.name}</a></div>
+                        <div style={{ marginTop: 6 }}><a href={selectedPreviewUrl} target="_blank" rel="noopener noreferrer">{selectedFile.name}</a></div>
                       )}
                     </div>
                   )}
                   {/* when no selected file preview, show existing stored image if any */}
                   {!selectedPreviewUrl && (!selectedFile) && editingHr.stu?.image && (
-                    <div style={{marginTop:8}}>
-                      <div style={{fontSize:12, color:'#333'}}>Current: {editingHr.stu.image}</div>
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ fontSize: 12, color: '#333' }}>Current: {editingHr.stu.image}</div>
                       {/* preview if image */}
                       {editingHr.stu.image.match(/\.(jpg|jpeg|png|gif)$/i) && (
-                        <img src={editingHr.stu.image} alt="preview" style={{maxWidth:200, maxHeight:120, marginTop:6, border:'1px solid #ddd'}} />
+                        <img src={editingHr.stu.image} alt="preview" style={{ maxWidth: 200, maxHeight: 120, marginTop: 6, border: '1px solid #ddd' }} />
                       )}
                     </div>
                   )}
                 </div>
               </div>
-              <div style={{display:'flex', justifyContent:'flex-end', gap:8, marginTop:12}}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
                 <button className="border px-3 py-1 rounded" onClick={closeEdit} disabled={saving || uploadingFile}>ចាកចេញ</button>
                 <button className="border px-3 py-1 rounded bg-green-600 text-white" onClick={handleSaveEdit} disabled={saving || uploadingFile}>{(uploadingFile && !saving) ? 'កំពុងផ្ទុក...' : (saving ? 'កំពុងរក្សា...' : 'រក្សាទុក')}</button>
               </div>
@@ -980,8 +981,8 @@ export default function RetirementReportPage() {
           </div>
         )}
         {/* footer/signature area */}
-        <div style={{display:'flex', justifyContent:'space-between', marginTop:'16px', fontSize:'12px'}}>
-          <div style={{width:'33%'}}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', fontSize: '12px' }}>
+          <div style={{ width: '33%' }}>
             <div className="no-print">
               {(() => {
                 const totalN = (Number.isFinite(derived.total) ? derived.total : (derived.rows ? derived.rows.length : 0));
@@ -990,29 +991,29 @@ export default function RetirementReportPage() {
                 return `សរុប: ${toKhmerDigits(totalN)} នាក់ ( ប្រុស: ${toKhmerDigits(maleN)} នាក់ — ស្រី: ${toKhmerDigits(femaleN)} នាក់ )`;
               })()}
             </div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>បានឃើញ</div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>នាយកមន្ទីរពេទ្យ</div>
-            <div style={{height:'64px'}}></div>
-            <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>បានឃើញ</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>នាយកមន្ទីរពេទ្យ</div>
+            <div style={{ height: '64px' }}></div>
+            <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
-          <div style={{width:'33%', textAlign:'center'}}>
-            <div style={{marginTop:'16px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>បានពិនិត្យត្រឹមត្រូវ</div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>ប្រធានការិយាល័យរដ្ឋបាលនិងបុគ្គលិក</div>
-            <div style={{height:'82px'}}></div>
-            <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
+          <div style={{ width: '33%', textAlign: 'center' }}>
+            <div style={{ marginTop: '16px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>បានពិនិត្យត្រឹមត្រូវ</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក</div>
+            <div style={{ height: '82px' }}></div>
+            <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
-          <div style={{width:'33%', textAlign:'right'}}>
-            <div style={{marginTop:'12px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center'}}>
+          <div style={{ width: '33%', textAlign: 'right' }}>
+            <div style={{ marginTop: '12px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>
               {lunarText && lunarText.trim()
                 ? lunarText
                 : `ថ្ងៃ${khWeekday(new Date())}  ព.ស. ${toKhmerDigits(buddhistEraYear(new Date()))}`}
             </div>
-            <div style={{marginTop:'2px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center'}}>
+            <div style={{ marginTop: '2px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>
               រាជធានីភ្នំពេញ {fmtKhmerLongDate(footerDate)}
             </div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}> អ្នកធ្វើតារាង</div>
-            <div style={{height:'82px'}}></div>
-            <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}> អ្នកធ្វើតារាង</div>
+            <div style={{ height: '82px' }}></div>
+            <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
         </div>
       </div>

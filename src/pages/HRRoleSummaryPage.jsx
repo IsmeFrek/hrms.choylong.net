@@ -52,7 +52,7 @@ export default function HRRoleSummaryPage() {
   const summary = summarizeByDeptAndRole(filteredList);
 
   return (
-  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0' }}>
       {/* Main report content - left side */}
       <div style={{ flex: 1 }}>
         {reportType === 'byDept' && (
@@ -173,7 +173,7 @@ export default function HRRoleSummaryPage() {
             </div>
           </div>
         )}
-        
+
         {reportType === 'byChief' && (
           <div className="a4-portrait" style={{ fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif", padding: '22px', maxWidth: '794px', minHeight: '1122px', margin: '0 auto', background: '#fff', boxShadow: '0 0 8px #eee' }}>
             {/* Header */}
@@ -640,7 +640,7 @@ export default function HRRoleSummaryPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label style={{ fontWeight: 'bold', fontSize: '15px', marginRight: '8px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif" }}>ប្រភេទរបាយការណ៍តួនាទី:</label>
-                <select value={["byDept","byRole","byChief","byDeputyChief","bySchoolChief","byDeputySchoolChief","byChiefAndDeputy","bySchoolChiefAndDeputy","byAllChiefsAndDeputies"].includes(reportType) ? reportType : ''} onChange={e => setReportType(e.target.value)} style={{ fontSize: '15px', padding: '6px', border: '1px solid #ccc', borderRadius: '4px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif" }}>
+                <select value={["byDept", "byRole", "byChief", "byDeputyChief", "bySchoolChief", "byDeputySchoolChief", "byChiefAndDeputy", "bySchoolChiefAndDeputy", "byAllChiefsAndDeputies"].includes(reportType) ? reportType : ''} onChange={e => setReportType(e.target.value)} style={{ fontSize: '15px', padding: '6px', border: '1px solid #ccc', borderRadius: '4px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif" }}>
                   <option value="">-- ជ្រើសរើស --</option>
                   <option value="byDept">របាយការណ៍បូកសរុបតួនាទី តាមផ្នែក</option>
                   <option value="byRole">របាយការណ៍បូកសរុបតួនាទី</option>
@@ -661,70 +661,70 @@ export default function HRRoleSummaryPage() {
                 </select>
               </div>
             </div>
-        {reportType === 'bySkill' ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', width: '100%' }}>
-            <div className="a4-portrait" style={{ fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif", padding: '22px', width: '794px', minHeight: '1122px', background: '#fff', boxShadow: '0 0 8px #eee' }}>
-            <div className="report-header" style={{ textAlign: 'center', marginBottom: '8px' }}>
-              <div style={{ fontFamily: 'Khmer OS Muol Light, Khmer OS Muol, Noto Serif Khmer, Noto Sans Khmer, Arial, sans-serif', fontSize: '16px', fontWeight: 'normal', marginBottom: '2px', lineHeight: '1.2' }}>
-                <div style={{ textAlign: 'center', marginBottom: '8px' }}> ព្រះរាជាណាចក្រកម្ពុជា</div>
-                <div>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
+            {reportType === 'bySkill' ? (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', width: '100%' }}>
+                <div className="a4-portrait" style={{ fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif", padding: '22px', width: '794px', minHeight: '1122px', background: '#fff', boxShadow: '0 0 8px #eee' }}>
+                  <div className="report-header" style={{ textAlign: 'center', marginBottom: '8px' }}>
+                    <div style={{ fontFamily: 'Khmer OS Muol Light, Khmer OS Muol, Noto Serif Khmer, Noto Sans Khmer, Arial, sans-serif', fontSize: '16px', fontWeight: 'normal', marginBottom: '2px', lineHeight: '1.2' }}>
+                      <div style={{ textAlign: 'center', marginBottom: '8px' }}> ព្រះរាជាណាចក្រកម្ពុជា</div>
+                      <div>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
+                    </div>
+                  </div>
+                  <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBotom: '18px', textAlign: 'center' }}>
+                    របាយការណ៍ជំនាញ
+                  </h2>
+                  <div style={{ textAlign: 'center', marginBottom: '12px', color: '#555' }}>កាលបរិច្ឆេទ៖ {new Date().toLocaleDateString('km-KH')}</div>
+                  <div style={{ marginTop: '24px', fontWeight: 'bold', fontSize: '15px', color: '#222', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif" }}>
+                    <div>សង្ខេបជំនាញ និងប្រភេទមន្រ្តី:</div>
+                    {(() => {
+                      // Skill summary logic (reuse from chief/deputy block)
+                      const skillOfficerSummary = {};
+                      filteredList.forEach(hr => {
+                        const skill = hr.skill || 'មិនបញ្ជាក់';
+                        const officerType = hr.officerType || 'មិនបញ្ជាក់';
+                        if (!skillOfficerSummary[skill]) skillOfficerSummary[skill] = { Civil: 0, Contract: 0, Other: 0 };
+                        if (officerType === 'មន្រ្តីរាជការ' || officerType === 'Civil Servant') skillOfficerSummary[skill].Civil++;
+                        else if (officerType === 'កិច្ចសន្យា' || officerType === 'Contract') skillOfficerSummary[skill].Contract++;
+                        else skillOfficerSummary[skill].Other++;
+                      });
+                      return (
+                        <table className="a4-report-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', background: '#fff', marginTop: '0' }}>
+                          <thead>
+                            <tr style={{ background: '#f3f3f3' }}>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>ជំនាញ</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>មន្រ្តីរាជការ</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>កិច្ចសន្យា</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>ផ្សេងៗ</th>
+                              <th style={{ border: '1px solid #ddd', padding: '8px' }}>សរុប</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Object.entries(skillOfficerSummary).map(([skill, counts]) => (
+                              <tr key={skill}>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{skill}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{counts.Civil}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{counts.Contract}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{counts.Other > 0 ? counts.Other : ''}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{counts.Civil + counts.Contract + counts.Other}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
+                  </div>
+                  <hr style={{ margin: '32px 0 18px 0', border: 'none', borderTop: '2px solid #222', width: '100%' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif", fontSize: '16px', fontWeight: 'bold', color: '#222' }}>
+                    <span>ប្រភេទជំនាញ ការងារ បន្ថែម</span>
+                    <input type="text" style={{ flex: '1', fontSize: '15px', padding: '6px 12px', border: '1px solid #ccc', borderRadius: '4px', minWidth: '220px' }} placeholder="បញ្ចូល..." />
+                  </div>
+                  <div className="report-footer" style={{ textAlign: 'center', marginTop: '32px', color: '#444', fontSize: '14px' }}>
+                    <div>ទំនាក់ទំនង៖ ០២៣ ៧២៣ ១២៣ | hr@mpwt.gov.kh</div>
+                    <div>© ក្រសួងសាធារណការ និងដឹកជញ្ជូន</div>
+                  </div>
+                </div>
               </div>
-            </div>
-            <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBotom: '18px', textAlign: 'center' }}>
-              របាយការណ៍ជំនាញ
-            </h2>
-            <div style={{ textAlign: 'center', marginBottom: '12px', color: '#555' }}>កាលបរិច្ឆេទ៖ {new Date().toLocaleDateString('km-KH')}</div>
-            <div style={{ marginTop: '24px', fontWeight: 'bold', fontSize: '15px', color: '#222', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif" }}>
-              <div>សង្ខេបជំនាញ និងប្រភេទមន្រ្តី:</div>
-              {(() => {
-                // Skill summary logic (reuse from chief/deputy block)
-                const skillOfficerSummary = {};
-                filteredList.forEach(hr => {
-                  const skill = hr.skill || 'មិនបញ្ជាក់';
-                  const officerType = hr.officerType || 'មិនបញ្ជាក់';
-                  if (!skillOfficerSummary[skill]) skillOfficerSummary[skill] = { Civil: 0, Contract: 0, Other: 0 };
-                  if (officerType === 'មន្រ្តីរាជការ' || officerType === 'Civil Servant') skillOfficerSummary[skill].Civil++;
-                  else if (officerType === 'កិច្ចសន្យា' || officerType === 'Contract') skillOfficerSummary[skill].Contract++;
-                  else skillOfficerSummary[skill].Other++;
-                });
-                return (
-                  <table className="a4-report-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', background: '#fff', marginTop: '0' }}>
-                    <thead>
-                      <tr style={{ background: '#f3f3f3' }}>
-                        <th style={{ border: '1px solid #ddd', padding: '8px' }}>ជំនាញ</th>
-                        <th style={{ border: '1px solid #ddd', padding: '8px' }}>មន្រ្តីរាជការ</th>
-                        <th style={{ border: '1px solid #ddd', padding: '8px' }}>កិច្ចសន្យា</th>
-                        <th style={{ border: '1px solid #ddd', padding: '8px' }}>ផ្សេងៗ</th>
-                        <th style={{ border: '1px solid #ddd', padding: '8px' }}>សរុប</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(skillOfficerSummary).map(([skill, counts]) => (
-                        <tr key={skill}>
-                          <td style={{ border: '1px solid #ddd', padding: '8px' }}>{skill}</td>
-                          <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{counts.Civil}</td>
-                          <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{counts.Contract}</td>
-                          <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{counts.Other > 0 ? counts.Other : ''}</td>
-                          <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{counts.Civil + counts.Contract + counts.Other}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                );
-              })()}
-            </div>
-            <hr style={{ margin: '32px 0 18px 0', border: 'none', borderTop: '2px solid #222', width: '100%' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif", fontSize: '16px', fontWeight: 'bold', color: '#222' }}>
-              <span>ប្រភេទជំនាញ ការងារ បន្ថែម</span>
-              <input type="text" style={{ flex: '1', fontSize: '15px', padding: '6px 12px', border: '1px solid #ccc', borderRadius: '4px', minWidth: '220px' }} placeholder="បញ្ចូល..." />
-            </div>
-            <div className="report-footer" style={{ textAlign: 'center', marginTop: '32px', color: '#444', fontSize: '14px' }}>
-              <div>ទំនាក់ទំនង៖ ០២៣ ៧២៣ ១២៣ | hr@mpwt.gov.kh</div>
-              <div>© ក្រសួងសាធារណការ និងដឹកជញ្ជូន</div>
-            </div>
-            </div>
-          </div>
-        ) : null}
+            ) : null}
             {/* Dropdowns and skill report block end here. */}
           </div>
           {(filterDept || filterRole || filterGender || search) && (

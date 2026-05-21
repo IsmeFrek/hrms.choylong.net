@@ -3,7 +3,7 @@ import api from '../services/api';
 import usePermission from '../hooks/usePermission';
 
 function toKhmerDigits(n) {
-  const map = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+  const map = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
   return String(n).replace(/[0-9]/g, d => map[d]);
 }
 
@@ -16,8 +16,8 @@ function fmtDate(d) {
   if (!d) return '';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '';
-  const dd = String(dt.getDate()).padStart(2,'0');
-  const mm = String(dt.getMonth()+1).padStart(2,'0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
   const yyyy = dt.getFullYear();
   return `${dd}-${mm}-${yyyy}`;
 }
@@ -27,8 +27,8 @@ function fmtDateSlash(d) {
   if (!d) return '';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '';
-  const dd = String(dt.getDate()).padStart(2,'0');
-  const mm = String(dt.getMonth()+1).padStart(2,'0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
   const yyyy = dt.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
 }
@@ -104,12 +104,12 @@ export default function EmployeeReportPage() {
       by.get(key).push(hr);
     }
     const entries = Array.from(by.entries())
-      .sort((a,b) => {
+      .sort((a, b) => {
         if (a[0] === '—') return 1;
         if (b[0] === '—') return -1;
         return a[0].localeCompare(b[0], 'km');
       })
-    .map(([dept, items]) => ({ dept, items: items.sort((x,y) => (x.no||0)-(y.no||0)) }));
+      .map(([dept, items]) => ({ dept, items: items.sort((x, y) => (x.no || 0) - (y.no || 0)) }));
     return entries;
   }, [filteredList]);
 
@@ -170,7 +170,7 @@ export default function EmployeeReportPage() {
     }
     const rows = Array.from(rowsMap.values())
       .map(r => ({ ...r, total: r.male + r.female }))
-      .sort((a,b) => a.name.localeCompare(b.name, 'km'));
+      .sort((a, b) => a.name.localeCompare(b.name, 'km'));
     const totals = rows.reduce((acc, r) => ({
       male: acc.male + r.male,
       female: acc.female + r.female,
@@ -255,22 +255,22 @@ export default function EmployeeReportPage() {
       </div>
 
       {/* Report selector */}
-        <div className="mb-3 flex items-center gap-2">
-          <label className="text-sm text-gray-700 border-blue-600">ជ្រើសរើសប្រភេទរបាយការណ៍:</label>
-          <select
-            className="border rounded px-3 py-1 text-gray-900 bg-white"
-            value={reportType}
-            onChange={(e) => setReportType(e.target.value)}
-          >
-            <option value="total">សរុបបុគ្គលិក</option>
-            <option value="technical">ជំនាញបច្ចេកទេស</option>
-            <option value="civil">មន្ត្រីរាជការ</option>
-            <option value="state">កិច្ចសន្យារដ្ឋ</option>
-            <option value="hospitalPlus">កិច្ចសន្យាមន្ទីរពេទ្យ</option>
-            
-          </select>
-          {/* retirement year control moved to RetirementReportPage */}
-        </div>
+      <div className="mb-3 flex items-center gap-2">
+        <label className="text-sm text-gray-700 border-blue-600">ជ្រើសរើសប្រភេទរបាយការណ៍:</label>
+        <select
+          className="border rounded px-3 py-1 text-gray-900 bg-white"
+          value={reportType}
+          onChange={(e) => setReportType(e.target.value)}
+        >
+          <option value="total">សរុបបុគ្គលិក</option>
+          <option value="technical">ជំនាញបច្ចេកទេស</option>
+          <option value="civil">មន្ត្រីរាជការ</option>
+          <option value="state">កិច្ចសន្យារដ្ឋ</option>
+          <option value="hospitalPlus">កិច្ចសន្យាមន្ទីរពេទ្យ</option>
+
+        </select>
+        {/* retirement year control moved to RetirementReportPage */}
+      </div>
 
       {error && <div className="mb-2 text-red-600 text-sm">{error}</div>}
 
@@ -344,7 +344,7 @@ export default function EmployeeReportPage() {
             <table>
               <thead>
                 <tr>
-                  <th style={{width:'40px'}}>ល.រ</th>
+                  <th style={{ width: '40px' }}>ល.រ</th>
                   <th>ជំនាញបច្ចេកទេស</th>
                   <th className="center">ប្រុស</th>
                   <th className="center">ស្រី</th>
@@ -359,7 +359,7 @@ export default function EmployeeReportPage() {
                 )}
                 {technicalSummary.rows.map((r, idx) => (
                   <tr key={r.name || idx}>
-                    <td className="center">{toKhmerDigits(idx+1)}</td>
+                    <td className="center">{toKhmerDigits(idx + 1)}</td>
                     <td>{r.name}</td>
                     <td className="center">{toKhmerDigits(r.male)}</td>
                     <td className="center">{toKhmerDigits(r.female)}</td>
@@ -377,44 +377,44 @@ export default function EmployeeReportPage() {
               </tbody>
             </table>
           ) : (
-          <table>
-            <thead>
-              <tr>
-                <th style={{width:'50px'}}>ល.រ</th>
-                <th>គោត្តនាម និងនាម</th>
-                <th style={{width:'20px'}}>ភេទ</th>
-                <th style={{width:'100px'}}>ថ្ងៃខែឆ្នាំកំណើត</th>
-                <th style={{width:'130px'}}>{(reportType==='hospitalPlus' || reportType==='state') ? 'ប្រភេទមន្ត្រី' : 'អត្តលេខមន្ត្រី'}</th>
-                <th>ជំនាញបច្ចេកទេស</th>
-                <th>តួនាទី</th>
-              </tr>
-            </thead>
-            <tbody>
-              {grouped.length === 0 && (
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={7} className="center text-gray-600">មិនមានទិន្នន័យ</td>
+                  <th style={{ width: '50px' }}>ល.រ</th>
+                  <th>គោត្តនាម និងនាម</th>
+                  <th style={{ width: '20px' }}>ភេទ</th>
+                  <th style={{ width: '100px' }}>ថ្ងៃខែឆ្នាំកំណើត</th>
+                  <th style={{ width: '130px' }}>{(reportType === 'hospitalPlus' || reportType === 'state') ? 'ប្រភេទមន្ត្រី' : 'អត្តលេខមន្ត្រី'}</th>
+                  <th>ជំនាញបច្ចេកទេស</th>
+                  <th>តួនាទី</th>
                 </tr>
-              )}
-              {grouped.map((g, gi) => (
-                <React.Fragment key={g.dept || gi}>
-                  <tr className="section-row">
-                    <th className="no-border" colSpan={7}>{toKhmerRoman(gi+1)}&nbsp;&nbsp;{g.dept}</th>
+              </thead>
+              <tbody>
+                {grouped.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="center text-gray-600">មិនមានទិន្នន័យ</td>
                   </tr>
-                  {g.items.map((r, idx) => (
-                    <tr key={r._id || idx}>
-                      <td className="center">{toKhmerDigits(idx+1)}</td>
-                      <td>{r.khmerName || r.name || ''}</td>
-                      <td className="center">{r.gender === 'Male' ? 'ប' : r.gender === 'Female' ? 'ស' : ''}</td>
-                      <td className="center">{fmtDate(r.dob)}</td>
-                      <td className="center">{(reportType==='hospitalPlus' || reportType==='state') ? (r.officerType || '') : (r.civilServantId || r.officerId || '')}</td>
-                      <td>{r.civilServantRole || ''}</td>
-                      <td>{r.position || ''}</td>
+                )}
+                {grouped.map((g, gi) => (
+                  <React.Fragment key={g.dept || gi}>
+                    <tr className="section-row">
+                      <th className="no-border" colSpan={7}>{toKhmerRoman(gi + 1)}&nbsp;&nbsp;{g.dept}</th>
                     </tr>
-                  ))}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+                    {g.items.map((r, idx) => (
+                      <tr key={r._id || idx}>
+                        <td className="center">{toKhmerDigits(idx + 1)}</td>
+                        <td>{r.khmerName || r.name || ''}</td>
+                        <td className="center">{r.gender === 'Male' ? 'ប' : r.gender === 'Female' ? 'ស' : ''}</td>
+                        <td className="center">{fmtDate(r.dob)}</td>
+                        <td className="center">{(reportType === 'hospitalPlus' || reportType === 'state') ? (r.officerType || '') : (r.civilServantId || r.officerId || '')}</td>
+                        <td>{r.civilServantRole || ''}</td>
+                        <td>{r.position || ''}</td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
           )}
 
           <div className="footer-notes">
@@ -423,9 +423,9 @@ export default function EmployeeReportPage() {
           </div>
 
           <div className="signatures">
-            <div className="center">បានឃើញ និងឯកភាព<br/>នាយកមន្ទីរពេទ្យ</div>
-            <div className="center">បានឃើញ និង​ពិនិត្យត្រឹមត្រូវ<br/>ប្រធានការិយាល័យរដ្ឋបាលនិងបុគ្កលិក</div>
-            <div className="center">អ្នកធ្វើរបាយការណ៍<br/>លោក នេត ចន្ថា</div>
+            <div className="center">បានឃើញ និងឯកភាព<br />នាយកមន្ទីរពេទ្យ</div>
+            <div className="center">បានឃើញ និង​ពិនិត្យត្រឹមត្រូវ<br />ប្រធានការិយាល័យរដ្ឋបាលនិងបុគ្កលិក</div>
+            <div className="center">អ្នកធ្វើរបាយការណ៍<br />លោក នេត ចន្ថា</div>
           </div>
         </div>
       )}

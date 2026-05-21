@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import api from '../services/api';
 import { departmentAPI } from '../services/departmentAPI';
 import { skillAPI } from '../services/skillAPI';
@@ -8,7 +9,7 @@ import { isExplicitlyRemoved as _isExplicitlyRemoved, hasResignData as _hasResig
 import { Bold, Indent } from 'lucide-react';
 
 function toKhmerDigits(n) {
-  const map = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+  const map = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
   return String(n).replace(/[0-9]/g, d => map[d]);
 }
 
@@ -19,7 +20,7 @@ function formatCurrencyKhmer(v) {
   const parts = Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   // convert each latin digit to khmer digits while preserving commas
   return parts.replace(/[0-9]/g, d => {
-    const map = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+    const map = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
     return map[Number(d)];
   });
 }
@@ -33,10 +34,10 @@ function fmtDate(d) {
   if (!d) return '';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '';
-  const dd = String(dt.getDate()).padStart(2,'0');
-  const mm = String(dt.getMonth()+1).padStart(2,'0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
   const yyyy = dt.getFullYear();
-  return  `${dd}-${mm}-${yyyy}`;
+  return `${dd}-${mm}-${yyyy}`;
 }
 
 // Extra formatting helpers for picture-style report
@@ -44,8 +45,8 @@ function fmtDateSlash(d) {
   if (!d) return '';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '';
-  const dd = String(dt.getDate()).padStart(2,'0');
-  const mm = String(dt.getMonth()+1).padStart(2,'0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
   const yyyy = dt.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
 }
@@ -91,8 +92,8 @@ function fmtDateLong(d) {
   if (!d) return '';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '';
-  const dd = String(dt.getDate()).padStart(2,'0');
-  const mm = String(dt.getMonth()+1).padStart(2,'0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
   const yyyy = dt.getFullYear();
   return (
     <div style={{ fontFamily: '"Khmer OS Siemreap", "Noto Serif Khmer", serif', fontWeight: 'bold', fontSize: '13px' }}>
@@ -108,6 +109,30 @@ function normSkill(s) {
 
 // (Removed unused helpers fmtDateWithKhmerMonth and computeRetirementDate)
 
+// Move listColumns definition to top-level (outside of EmployeeReportPage) to ensure it's initialized before use
+const listColumns = [
+  { key: 'serialOverall', label: 'ស.រ', width: '35px', align: 'center' },
+  { key: 'serialDept', label: 'ល.រ', width: '30px', align: 'center' },
+  { key: 'name', label: 'គោត្តនាម និងនាម', width: '110px', align: 'left' },
+  { key: 'gender', label: 'ភេទ', width: '30px', align: 'center' },
+  { key: 'dob', label: 'ថ្ងៃខែឆ្នាំកំណើត', width: '90px', align: 'center' },
+  { key: 'salaryLevel', label: 'កាំប្រាក់', width: '55px', align: 'center' },
+  { key: 'idOrOfficerType', label: 'អត្តលេខមន្ត្រី', width: '90px', align: 'center' },
+  { key: 'skill', label: 'ជំនាញ', width: '140px', align: 'left' },
+  { key: 'position', label: 'តួនាទី', width: '140px', align: 'left' },
+  { key: 'department', label: 'ផ្នែក', width: '140px', align: 'left' },
+  { key: 'staffId', label: 'អត្តលេខកាត់', width: '80px', align: 'center' },
+  { key: 'totalMonthlyAttendance', label: 'សរុបវត្តមានប្រចាំខែ', width: '80px', align: 'center' },
+  { key: 'performanceResult', label: 'លទ្ធផលការងារសម្រេចបាន', width: '120px', align: 'center' },
+  { key: 'otherNotes', label: 'ផ្សេងៗ', width: '120px', align: 'left' },
+  { key: 'latinName', label: 'ឈ្មោះឡាតាំង', width: '120px', align: 'left' },
+  { key: 'phone', label: 'លេខទូរស័ព្ទ', width: '110px', align: 'center' },
+  { key: 'joinDate', label: 'កាលបរិច្ឆេទចូល', width: '110px', align: 'center' },
+  { key: 'birthplace', label: 'ទីកន្លែងកំណើត/បច្ចុប្បន្ន', width: '180px', align: 'left' },
+  { key: 'nid', label: 'លេខអត្តសញ្ញាណ', width: '120px', align: 'center' },
+  { key: 'bankAccount', label: 'លេខគណនីធនាគារ', width: '140px', align: 'left' },
+];
+
 export default function EmployeeReportPage() {
   const perms = usePermission();
   const [includeArchived, setIncludeArchived] = useState(false); // <-- new: include resigned/deleted when true
@@ -115,6 +140,15 @@ export default function EmployeeReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lunarText, setLunarText] = useState('');
+  const [reportType, setReportType] = useState('total');
+  const [orientation, setOrientation] = useState('portrait'); // 'portrait' or 'landscape'
+  const [filterText, setFilterText] = useState('');
+  const [asOfDate, setAsOfDate] = useState(() => {
+    const d = new Date();
+    // default to today (ISO date string yyyy-mm-dd for input[type=date])
+    return d.toISOString().slice(0, 10);
+  });
+  const [showColsMenu, setShowColsMenu] = useState(false);
   const printRef = useRef();
   // Column widths for the summary table (px). Persist in sessionStorage during the session.
   const [colWidths, setColWidths] = useState(() => {
@@ -124,6 +158,21 @@ export default function EmployeeReportPage() {
     } catch { void 0; }
     return [380, 40, 76, 76, 76];
   });
+  const filterCardRef = useRef(null);
+  const [filterHeight, setFilterHeight] = useState(0);
+
+  useEffect(() => {
+    const measure = () => {
+      if (filterCardRef.current) {
+        setFilterHeight(filterCardRef.current.offsetHeight);
+      }
+    };
+    measure();
+    // Re-measure on window resize
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [reportType, showColsMenu]); // Re-measure if content changes
+
   const resizingRef = useRef(null);
   // Row height for preview/print (px). Persist in sessionStorage during the session.
   const [rowHeight, setRowHeight] = useState(() => {
@@ -152,10 +201,18 @@ export default function EmployeeReportPage() {
     phone: true,
     joinDate: true,
     birthplace: true,
-    actions: true, // new: edit/action column
+    totalMonthlyAttendance: true,
+    performanceResult: true,
+    otherNotes: true,
     nid: true,
     bankAccount: true,
   };
+  if (perms.isAdmin || perms.canEditEmployeeReport) {
+    if (!listColumns.find(c => c.key === 'actions')) {
+      listColumns.push({ key: 'actions', label: 'កែ', width: '60px', align: 'center' });
+    }
+    defaultColumns.actions = true;
+  }
   const [visibleCols, setVisibleCols] = useState(() => {
     try {
       const v = sessionStorage.getItem('employee_report_visible_cols');
@@ -165,17 +222,63 @@ export default function EmployeeReportPage() {
   });
   useEffect(() => { try { sessionStorage.setItem('employee_report_visible_cols', JSON.stringify(visibleCols)); } catch { void 0; } }, [visibleCols]);
   const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
+
+  // Auto-switch columns based on report type
+  useEffect(() => {
+    if (reportType === 'civil') {
+      const civilSet = {
+        serialOverall: true,
+        serialDept: true,
+        name: true,
+        gender: true,
+        dob: true,
+        salaryLevel: true,
+        idOrOfficerType: true,
+        skill: true,
+        position: true,
+      };
+      // For civil, we only want these 9 columns visible by default
+      const newCols = {};
+      Object.keys(defaultColumns).forEach(k => {
+        newCols[k] = !!civilSet[k];
+      });
+      setVisibleCols(newCols);
+    } else if (reportType === 'evaluation') {
+      const evaluationSet = {
+        serialDept: true,
+        name: true,
+        skill: true,
+        position: true,
+        totalMonthlyAttendance: true,
+        performanceResult: true,
+        otherNotes: true,
+        staffId: true,
+      };
+      const newCols = {};
+      Object.keys(defaultColumns).forEach(k => {
+        newCols[k] = !!evaluationSet[k];
+      });
+      setVisibleCols(newCols);
+    } else if (['state', 'hospital', 'worker', 'hospitalPlus', 'hospitalPartTime', 'retiredThenContract'].includes(reportType)) {
+      const contractSet = {
+        serialOverall: true,
+        serialDept: true,
+        name: true,
+        gender: true,
+        dob: true,
+        salaryLevel: true,
+        idOrOfficerType: true, // Will show "ប្រភេទមន្ត្រី"
+        skill: true,
+        position: true,
+      };
+      const newCols = {};
+      Object.keys(defaultColumns).forEach(k => {
+        newCols[k] = !!contractSet[k];
+      });
+      setVisibleCols(newCols);
+    }
+  }, [reportType]);
   const visibleCount = Object.values(visibleCols).filter(Boolean).length || 1;
-  const [showColsMenu, setShowColsMenu] = useState(false);
-  // Report variants: 'civil' (មន្ត្រីរាជការ), 'state' (កិច្ចសន្យារដ្ឋ), 'hospitalPlus' (កិច្ចសន្យាមន្ទីរពេទ្យ)
-  const [reportType, setReportType] = useState('total');
-  const [orientation, setOrientation] = useState('portrait'); // 'portrait' or 'landscape'
-  const [filterText, setFilterText] = useState('');
-  const [asOfDate, setAsOfDate] = useState(() => {
-    const d = new Date();
-    // default to today (ISO date string yyyy-mm-dd for input[type=date])
-    return d.toISOString().slice(0,10);
-  });
 
   useEffect(() => {
     let mounted = true;
@@ -183,9 +286,60 @@ export default function EmployeeReportPage() {
       if (!(perms.canViewHR || perms.canViewEmployees)) { setLoading(false); return; }
       setLoading(true); setError('');
       try {
-        const { data } = await api.get('/hr');
+        // Fetch HR data
+        const { data: hrData } = await api.get('/hr');
         if (!mounted) return;
-        setList(Array.isArray(data) ? data : []);
+        // Fetch attendance monthly summary (the source of truth)
+        let attendanceMap = {};
+        try {
+          const dt = new Date(asOfDate);
+          const year = dt.getFullYear();
+          const month = dt.getMonth() + 1;
+          const { data: attData } = await api.get('/attendance/summary', { params: { year, month } });
+          
+          if (Array.isArray(attData)) {
+            attData.forEach(row => {
+              const sid = String(row.staffId || '').trim();
+              if (!sid) return;
+
+              const dayWorkCount = Number(row.dayWorkCount || 0);
+              const attendanceCount = Number(row.attendanceCount || 0);
+              const leaveCount = Number(row.leaveCount || 0);
+              const A = Number(row.A || 0);
+              const checkinLateCount = Number(row.checkinLateCount || 0);
+              const checkoutEarlyCount = Number(row.checkoutEarlyCount || 0);
+              const lateEarlyEvents = checkinLateCount + checkoutEarlyCount;
+              const plechEvents = Number(row.plech || 0);
+
+              let totalAbsent = A + (lateEarlyEvents / 3) + (plechEvents / 3);
+              totalAbsent = Math.round(totalAbsent * 100) / 100;
+              
+              let overallPercent = 0;
+              if (dayWorkCount > 0) {
+                overallPercent = Math.round(((dayWorkCount - (totalAbsent + leaveCount)) / dayWorkCount) * 100);
+              }
+
+              let result = '';
+              if (overallPercent >= 85) result = 'ល្អ';
+              else if (overallPercent >= 65) result = 'ល្អបង្គួរ';
+              else if (overallPercent >= 45) result = 'មធ្យម';
+              else if (dayWorkCount > 0) result = 'ខ្សោយ';
+
+              attendanceMap[sid] = result;
+            });
+          }
+        } catch (e) {
+          console.error('Attendance summary fetch failed', e);
+        }
+
+        const merged = (Array.isArray(hrData) ? hrData : []).map(hr => {
+          const sid = String(hr.staffId || '').trim();
+          const resultFromAttendance = attendanceMap[sid] || '';
+          // totalMonthlyAttendance now shows the Performance Result text (ល្អ, ល្អបង្គួរ...)
+          // performanceResult field is kept empty for manual use as requested before.
+          return { ...hr, totalMonthlyAttendance: resultFromAttendance, performanceResult: '' };
+        });
+        setList(merged);
       } catch (e) {
         if (!mounted) return;
         setError(e?.response?.data?.message || e?.message || 'Load failed');
@@ -197,9 +351,20 @@ export default function EmployeeReportPage() {
     return () => { mounted = false; };
   }, [perms.canViewHR, perms.canViewEmployees]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ot = params.get('officerType');
+    if (ot === 'មន្រ្តីរាជការ' || ot === 'មន្ត្រីរាជការ') {
+      setReportType('civil');
+    }
+  }, []);
+
   // load departments to obtain Department_Id ordering when available
   const [departments, setDepartments] = useState([]);
   const [selectedDept, setSelectedDept] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState('');
+  const [groupQuery, setGroupQuery] = useState('');
+  const [showGroupList, setShowGroupList] = useState(false);
   const [deptQuery, setDeptQuery] = useState('');
   const [showDeptList, setShowDeptList] = useState(false);
   const [skills, setSkills] = useState([]);
@@ -246,7 +411,7 @@ export default function EmployeeReportPage() {
       return new Set();
     }
   }, [skillGroups, selectedEditGroupIndex]);
- 
+
   // all skill names source: prefer skills list from API, fallback to HR list-derived skills
   const allSkillNames = useMemo(() => {
     try {
@@ -276,7 +441,7 @@ export default function EmployeeReportPage() {
       return next;
     });
   };
- 
+
   // create new group or save edits to an existing group
   const createSkillGroup = () => {
     const members = Array.from(groupSelection).map(s => String(s));
@@ -293,9 +458,9 @@ export default function EmployeeReportPage() {
     // reset modal state
     setGroupNameInput(''); setGroupSelection(new Set()); setSelectedEditGroupIndex(null); setShowGroupModal(false);
   };
- 
+
   const removeSkillGroup = (idx) => {
-    setSkillGroups(prev => prev.filter((g,i) => i !== idx));
+    setSkillGroups(prev => prev.filter((g, i) => i !== idx));
     // if we were editing that group, reset edit state
     if (selectedEditGroupIndex != null) {
       if (selectedEditGroupIndex === idx) {
@@ -358,26 +523,26 @@ export default function EmployeeReportPage() {
   // Determine if a record should be considered active as of a given date.
   // Active means status==='active', not deleted, joined on/before asOf and not resigned on/before asOf.
   const isActiveAsOf = (hr, asOf) => {
-      // Use shared HR filter rules so counts match HR listing
-      if (!hr) return false;
-      // If explicit 'Deleted' or 'Resigned' statuses, exclude
-      const st = (hr.status || '').toString();
-      if (st === 'Deleted' || st === 'Resigned' || st === 'deleted' || st === 'resigned') return false;
-      const asDate = parseDate(asOf);
-      // If asOf provided, exclude if explicit removal/resignation occurred on or before asOf
-      if (asDate) {
-        const removed = parseDate(hr.dateRemoved) || (hr.delisted && (parseDate(hr.delisted.dateRemoved) || parseDate(hr.delisted.date_removed))) || parseDate(hr.dateRemovedFromDataset) || parseDate(hr.removalDate) || null;
-        if (removed && removed <= asDate) return false;
-        const resign = parseDate(hr.resignDate) || parseDate(hr.resignationDate) || null;
-        if (resign && resign <= asDate) return false;
-      }
-      // If record has resign/removal data and is NOT prepared-for-deletion, exclude
-      const hasResign = _hasResignData(hr);
-      const hasExplicitRemoval = _isExplicitlyRemoved(hr);
-      const prepared = _isPreparedForDeletion(hr) && !hasExplicitRemoval;
-      if (hasResign && !prepared) return false;
-      // Otherwise include (do not require status === 'active' to match HR listing semantics)
-      return true;
+    // Use shared HR filter rules so counts match HR listing
+    if (!hr) return false;
+    // If explicit 'Deleted' or 'Resigned' statuses, exclude
+    const st = (hr.status || '').toString();
+    if (st === 'Deleted' || st === 'Resigned' || st === 'deleted' || st === 'resigned') return false;
+    const asDate = parseDate(asOf);
+    // If asOf provided, exclude if explicit removal/resignation occurred on or before asOf
+    if (asDate) {
+      const removed = parseDate(hr.dateRemoved) || (hr.delisted && (parseDate(hr.delisted.dateRemoved) || parseDate(hr.delisted.date_removed))) || parseDate(hr.dateRemovedFromDataset) || parseDate(hr.removalDate) || null;
+      if (removed && removed <= asDate) return false;
+      const resign = parseDate(hr.resignDate) || parseDate(hr.resignationDate) || null;
+      if (resign && resign <= asDate) return false;
+    }
+    // If record has resign/removal data and is NOT prepared-for-deletion, exclude
+    const hasResign = _hasResignData(hr);
+    const hasExplicitRemoval = _isExplicitlyRemoved(hr);
+    const prepared = _isPreparedForDeletion(hr) && !hasExplicitRemoval;
+    if (hasResign && !prepared) return false;
+    // Otherwise include (do not require status === 'active' to match HR listing semantics)
+    return true;
   };
 
   // Apply as-of filtering first, then by report type
@@ -428,7 +593,7 @@ export default function EmployeeReportPage() {
     }
     if (reportType === 'hospitalOver60') {
       // hospital contract staff aged 60 or older, excluding those marked as retired→contract
-      const textFields = (hr) => (`${hr.position||''} ${hr.note||''} ${hr.status||''} ${hr.remark||''} ${hr.title||''} ${hr.officerType||''} ${hr.comments||''}`);
+      const textFields = (hr) => (`${hr.position || ''} ${hr.note || ''} ${hr.status || ''} ${hr.remark || ''} ${hr.title || ''} ${hr.officerType || ''} ${hr.comments || ''}`);
       const isMarkedRetire = (hr) => /(?:retir|retired|និវត្ត|ចូលនិវត្ត|ចូលនិវត្តន៍)/i.test(textFields(hr)) || !!(hr.resignDate) || !!hr.isRetiredThenContract;
       const ageOf = (hr) => {
         const pd = parseDate(hr.dob);
@@ -456,12 +621,12 @@ export default function EmployeeReportPage() {
         return null;
       };
       const nameKeyOf = (hr) => {
-        const k = `${hr.khmerName||''} ${(hr.name||'')}`;
+        const k = `${hr.khmerName || ''} ${(hr.name || '')}`;
         const c = collapse(k);
         if (c) return `name:${c}`;
         return null;
       };
-      const textFields = (hr) => (`${hr.position||''} ${hr.note||''} ${hr.status||''} ${hr.remark||''} ${hr.title||''} ${hr.officerType||''} ${hr.comments||''}`);
+      const textFields = (hr) => (`${hr.position || ''} ${hr.note || ''} ${hr.status || ''} ${hr.remark || ''} ${hr.title || ''} ${hr.officerType || ''} ${hr.comments || ''}`);
       const isMarkedRetire = (hr) => /(?:retir|retired|និវត្ត|ចូលនិវត្ត|ចូលនិវត្តន៍)/i.test(textFields(hr)) || !!(hr.resignDate);
       const civilRetiredIdKeys = new Set();
       const civilRetiredNameKeys = new Set();
@@ -485,24 +650,53 @@ export default function EmployeeReportPage() {
         return !!matched;
       });
     }
-    // civil servants: exclude all contract types
-    let base = asOfFiltered.filter(hr => {
-      // treat as civil unless it matches any contract type
-      return !isStateType(hr.officerType) && !isHospitalType(hr.officerType) && !isPartTimeType(hr.officerType) && !isWorkerType(hr.officerType);
-    });
-    // apply simple text filter across khmer name, latin name, staffId, department
+    // default: include all unless specifically a 'civil' servant report
+    let base = asOfFiltered;
+    if (reportType === 'civil') {
+      base = asOfFiltered.filter(hr => !isStateType(hr.officerType) && !isHospitalType(hr.officerType) && !isPartTimeType(hr.officerType) && !isWorkerType(hr.officerType));
+    }
+    // apply simple text filter across khmer name, latin name, staffId, department, position
     if (filterText && String(filterText).trim()) {
       const t = String(filterText).toLowerCase();
       base = base.filter(hr => {
-        return ((hr.khmerName||'').toString().toLowerCase().includes(t)
-          || (hr.name||'').toString().toLowerCase().includes(t)
-          || (hr.staffId||'').toString().toLowerCase().includes(t)
-          || (hr.Department_Kh||'').toString().toLowerCase().includes(t)
+        return ((hr.khmerName || '').toString().toLowerCase().includes(t)
+          || (hr.name || '').toString().toLowerCase().includes(t)
+          || (hr.staffId || '').toString().toLowerCase().includes(t)
+          || (hr.Department_Kh || '').toString().toLowerCase().includes(t)
+          || (hr.position || '').toString().toLowerCase().includes(t)
         );
       });
     }
+
+    // apply group filter if selected
+    if (selectedGroup) {
+      base = base.filter(hr => {
+        const role = (hr.position || '').toString().trim();
+        const deptName = (hr.Department_Kh || hr.department || '').toString().trim();
+        const isLead = (role.includes('ប្រធានការិយាល័យ') && !role.includes('អនុប្រធាន')) || role.includes('ក្ដាប់រួម');
+        
+        let virtualKey = '';
+        if (isLead) {
+          if (deptName.includes('រដ្ឋបាល')) virtualKey = 'ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក';
+          else if (deptName.includes('ហិរញ្ញវត្ថុ')) virtualKey = 'ប្រធានការិយាល័យហិរញ្ញវត្ថុ';
+          else if (deptName.includes('បច្ចេកទេស')) virtualKey = 'ប្រធានការិយាល័យបច្ចេកទេស';
+          else virtualKey = deptName; // Fallback to dept name if lead of other dept
+        } else {
+          const serviceRoles = ['បុគ្គលិកអនាម័យ', 'សន្តិសុខ', 'ផ្ទះបាយ', 'ថែសួន', 'ប្រមូលសម្រាម'];
+          if (deptName.includes('រដ្ឋបាល') && serviceRoles.some(sr => role.includes(sr))) {
+            virtualKey = 'ការិយាល័យរដ្ឋបាល និងបុគ្គលិក បុគ្គលិកអនាម័យ';
+          }
+          const techServiceRoles = ['ចំហុយសម្ភារៈ', 'ផ្នែកបោកអ៊ុត'];
+          if (deptName.includes('បច្ចេកទេស') && techServiceRoles.some(sr => role.includes(sr))) {
+            virtualKey = 'ការិយាល័យបច្ចេកទេស ចំហុយសម្ភារៈ និង ផ្នែកបោកអ៊ុត';
+          }
+          if (!virtualKey) virtualKey = deptName; // Fallback to department name for others
+        }
+        return virtualKey === selectedGroup;
+      });
+    }
     return base;
-  }, [list, reportType, asOfDate, filterText, isIncludedAsOf]);
+  }, [list, reportType, asOfDate, filterText, isIncludedAsOf, selectedGroup]);
 
   // Map each record to its global index in the filtered list so serials match the on-screen ordering
   const overallIndexMap = useMemo(() => {
@@ -550,12 +744,42 @@ export default function EmployeeReportPage() {
         if (!key) key = s;
       }
       if (!key) key = '—';
+
+      // Special logic: Separate leadership roles (Heads and Deputy in Charge)
+      const role = (hr.position || '').toString().trim();
+      const deptName = (hr.Department_Kh || hr.department || '').toString().trim();
+      
+      // A leader is someone who is a Head (but not a normal deputy) or is a Deputy in Charge (ក្ដាប់រួម)
+      const isLead = (role.includes('ប្រធានការិយាល័យ') && !role.includes('អនុប្រធាន')) || 
+                     role.includes('ក្ដាប់រួម');
+
+      if (isLead) {
+        if (deptName.includes('រដ្ឋបាល')) {
+          key = 'ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក';
+        } else if (deptName.includes('ហិរញ្ញវត្ថុ')) {
+          key = 'ប្រធានការិយាល័យហិរញ្ញវត្ថុ';
+        } else if (deptName.includes('បច្ចេកទេស')) {
+          key = 'ប្រធានការិយាល័យបច្ចេកទេស';
+        }
+      } else {
+        // Special logic for Service Staff in Admin office
+        const serviceRoles = ['បុគ្គលិកអនាម័យ', 'សន្តិសុខ', 'ផ្ទះបាយ', 'ថែសួន', 'ប្រមូលសម្រាម'];
+        if (deptName.includes('រដ្ឋបាល') && serviceRoles.some(sr => role.includes(sr))) {
+          key = 'ការិយាល័យរដ្ឋបាល និងបុគ្គលិក បុគ្គលិកអនាម័យ';
+        }
+        // Special logic for Sterilization and Laundry in Technical office
+        const techServiceRoles = ['ចំហុយសម្ភារៈ', 'ផ្នែកបោកអ៊ុត'];
+        if (deptName.includes('បច្ចេកទេស') && techServiceRoles.some(sr => role.includes(sr))) {
+          key = 'ការិយាល័យបច្ចេកទេស ចំហុយសម្ភារៈ និង ផ្នែកបោកអ៊ុត';
+        }
+      }
+
       if (!by.has(key)) by.set(key, []);
       by.get(key).push(hr);
     }
 
     const entries = Array.from(by.entries())
-      .sort((a,b) => {
+      .sort((a, b) => {
         // keep empty/unknown group at the end
         if (a[0] === '—') return 1;
         if (b[0] === '—') return -1;
@@ -578,9 +802,26 @@ export default function EmployeeReportPage() {
         if (na != null && nb != null) return na - nb;
         if (na != null) return -1;
         if (nb != null) return 1;
+        
+        // Ensure special leadership groups are at the top
+        const leadershipOrder = [
+          'ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក',
+          'ប្រធានការិយាល័យហិរញ្ញវត្ថុ',
+          'ប្រធានការិយាល័យបច្ចេកទេស',
+          'ការិយាល័យរដ្ឋបាល និងបុគ្គលិក បុគ្គលិកអនាម័យ',
+          'ការិយាល័យបច្ចេកទេស ចំហុយសម្ភារៈ និង ផ្នែកបោកអ៊ុត'
+        ];
+        
+        const idxA = leadershipOrder.indexOf(depA);
+        const idxB = leadershipOrder.indexOf(depB);
+        
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+
         return depA.localeCompare(depB, 'km');
       })
-    .map(([dept, items]) => ({ dept, items: items.sort((x,y) => (x.no||0)-(y.no||0)) }));
+      .map(([dept, items]) => ({ dept, items: items.sort((x, y) => (x.no || 0) - (y.no || 0)) }));
     return entries;
   }, [filteredList, departments]);
 
@@ -627,17 +868,17 @@ export default function EmployeeReportPage() {
     const worker = asOfFiltered.filter(hr => isWorkerType(hr.officerType));
     return {
       // Match dashboard: use only active employees for the grand "all" total
-        all: count((list || []).filter(hr => isActiveAsOf(hr, asOf))),
+      all: count((list || []).filter(hr => isActiveAsOf(hr, asOf))),
       civil: count(civil),
       state: count(state),
       hospital: count(hospital),
       partTime: count(partTime),
       worker: count(worker),
-      hospitalPlus: (function(){
+      hospitalPlus: (function () {
         const seen = new Set();
         const items = [];
         for (const hr of hospital.concat(partTime, worker)) {
-          const key = hr._id || hr.staffId || hr.officerId || hr.cardNumber || (hr.name?hr.name.trim():null) || JSON.stringify(hr);
+          const key = hr._id || hr.staffId || hr.officerId || hr.cardNumber || (hr.name ? hr.name.trim() : null) || JSON.stringify(hr);
           if (seen.has(key)) continue;
           seen.add(key);
           items.push(hr);
@@ -659,7 +900,7 @@ export default function EmployeeReportPage() {
     const asOfFiltered = list.filter(hr => isActiveAsOf(hr, asOf));
     const arr = asOfFiltered.filter(hr => isHospitalType(hr.officerType) || isPartTimeType(hr.officerType));
 
-    const textFields = (hr) => (`${hr.position||''} ${hr.note||''} ${hr.status||''} ${hr.remark||''} ${hr.title||''} ${hr.officerType||''} ${hr.comments||''}`);
+    const textFields = (hr) => (`${hr.position || ''} ${hr.note || ''} ${hr.status || ''} ${hr.remark || ''} ${hr.title || ''} ${hr.officerType || ''} ${hr.comments || ''}`);
     const isMarkedRetire = (hr) => /(?:retir|retired|និវត្ត|ចូលនិវត្ត|ចូលនិវត្តន៍)/i.test(textFields(hr)) || !!(hr.resignDate) || !!hr.isRetiredThenContract;
 
     const ageOf = (hr) => {
@@ -704,7 +945,7 @@ export default function EmployeeReportPage() {
     const norm = (s) => (typeof s === 'string' ? s.trim() : s);
     const otypes = { HOSPITAL: 'កិច្ចសន្យាមន្ទីរពេទ្យ', PART_TIME: 'កិច្ចសន្យាក្រៅម៉ោង' };
     // Exclude records that are marked as retired (text marker, resignDate, or explicit flag)
-    const textFields = (hr) => (`${hr.position||''} ${hr.note||''} ${hr.status||''} ${hr.remark||''} ${hr.title||''} ${hr.officerType||''} ${hr.comments||''}`);
+    const textFields = (hr) => (`${hr.position || ''} ${hr.note || ''} ${hr.status || ''} ${hr.remark || ''} ${hr.title || ''} ${hr.officerType || ''} ${hr.comments || ''}`);
     const isMarkedRetire = (hr) => /(?:retir|retired|និវត្ត|ចូលនិវត្ត|ចូលនិវត្តន៍)/i.test(textFields(hr)) || !!(hr.resignDate) || !!hr.isRetiredThenContract;
     const arr = asOfFiltered.filter(hr => (isHospitalType(hr.officerType) || isPartTimeType(hr.officerType)) && !isMarkedRetire(hr));
     const ageOf = (hr) => {
@@ -736,7 +977,7 @@ export default function EmployeeReportPage() {
     const asOfFiltered = list.filter(hr => isActiveAsOf(hr, asOf));
     const arr = asOfFiltered.filter(hr => isWorkerType(hr.officerType));
 
-    const textFields = (hr) => (`${hr.position||''} ${hr.note||''} ${hr.status||''} ${hr.remark||''} ${hr.title||''} ${hr.officerType||''} ${hr.comments||''}`);
+    const textFields = (hr) => (`${hr.position || ''} ${hr.note || ''} ${hr.status || ''} ${hr.remark || ''} ${hr.title || ''} ${hr.officerType || ''} ${hr.comments || ''}`);
     const isMarkedRetire = (hr) => /(?:retir|retired|និវត្ត|ចូលនិវត្ត|ចូលនិវត្តន៍)/i.test(textFields(hr)) || !!(hr.resignDate) || !!hr.isRetiredThenContract;
 
     const ageOf = (hr) => {
@@ -781,7 +1022,7 @@ export default function EmployeeReportPage() {
     const norm = (s) => (typeof s === 'string' ? s.trim() : s);
     const collapse = (s) => (typeof s === 'string' ? s.replace(/\s+/g, ' ').trim().toLowerCase() : '');
 
-    const textFields = (hr) => (`${hr.position||''} ${hr.note||''} ${hr.status||''} ${hr.remark||''} ${hr.title||''} ${hr.officerType||''} ${hr.comments||''}`);
+    const textFields = (hr) => (`${hr.position || ''} ${hr.note || ''} ${hr.status || ''} ${hr.remark || ''} ${hr.title || ''} ${hr.officerType || ''} ${hr.comments || ''}`);
     // broaden retirement tokens (Khmer + English variants) and treat records with a resignDate as retired
     const isMarkedRetire = (hr) => /(?:retir|retired|និវត្ត|ចូលនិវត្ត|ចូលនិវត្តន៍)/i.test(textFields(hr)) || !!(hr.resignDate);
 
@@ -792,7 +1033,7 @@ export default function EmployeeReportPage() {
     };
 
     const nameKeyOf = (hr) => {
-      const k = `${hr.khmerName||''} ${(hr.name||'')}`;
+      const k = `${hr.khmerName || ''} ${(hr.name || '')}`;
       const c = collapse(k);
       if (c) return `name:${c}`;
       return null;
@@ -815,7 +1056,7 @@ export default function EmployeeReportPage() {
       }
     }
 
-    const counts = { hospitalPlus: { total:0, male:0, female:0 }, worker: { total:0, male:0, female:0 } };
+    const counts = { hospitalPlus: { total: 0, male: 0, female: 0 }, worker: { total: 0, male: 0, female: 0 } };
     const seen = new Set();
     const matchedRecords = [];
     for (const hr of asOfFiltered) {
@@ -826,7 +1067,7 @@ export default function EmployeeReportPage() {
       // also count if the contract record itself was flagged manually
       const matched = matchedByCivil || !!hr.isRetiredThenContract;
       if (!matched) continue;
-      const uniqueKey = idk || nk || JSON.stringify([hr.khmerName||'', hr.name||'', hr.cardNumber||'']);
+      const uniqueKey = idk || nk || JSON.stringify([hr.khmerName || '', hr.name || '', hr.cardNumber || '']);
       if (seen.has(uniqueKey)) continue; // avoid double-counting same person
       // capture debug info for UI inspection
       matchedRecords.push({ key: uniqueKey, idKey: idk, nameKey: nk, khmerName: hr.khmerName, name: hr.name, officerType: hr.officerType, gender: hr.gender, cardNumber: hr.cardNumber });
@@ -870,6 +1111,7 @@ export default function EmployeeReportPage() {
 
       const rows = [];
       const emittedGroups = new Set();
+      const processedSkills = new Set();
 
       // iterate skills in given order; if skill belongs to a group, emit the group row here (once),
       // otherwise emit the individual skill row
@@ -892,10 +1134,10 @@ export default function EmployeeReportPage() {
               if (hr.gender === 'Male' || hr.gender === 'ប្រុស') male++;
               else if (hr.gender === 'Female' || hr.gender === 'ស្រី') female++;
             }
-            rows.push({ name: (skillGroups[gi].name || `Group ${gi+1}`), male, female, total: male + female, civil, contract, isGroup: true });
+            rows.push({ name: (skillGroups[gi].name || `Group ${gi + 1}`), male, female, total: male + female, civil, contract, isGroup: true });
             emittedGroups.add(gi);
           }
-          // skip emitting the individual skill row because it's grouped
+          processedSkills.add(skillNorm); // Track that this member is handled
           continue;
         }
 
@@ -910,6 +1152,7 @@ export default function EmployeeReportPage() {
           else if (hr.gender === 'Female' || hr.gender === 'ស្រី') female++;
         }
         rows.push({ name: skillName, male, female, total: male + female, civil, contract, skills_Id: skill.skills_Id, skills_En: skill.skills_En });
+        processedSkills.add(skillNorm);
       }
 
       // append any groups that were not emitted because none of their members appeared in skills[]
@@ -917,23 +1160,48 @@ export default function EmployeeReportPage() {
         if (emittedGroups.has(gi)) continue;
         const groupSet = groupNormSets[gi] || new Set();
         let male = 0, female = 0, civil = 0, contract = 0;
+        let groupHasMembersInData = false;
         for (const hr of sourceList || []) {
           const hs = hrSkillNormOf(hr);
           if (!hs) continue;
           if (!groupSet.has(hs)) continue;
+          groupHasMembersInData = true;
           if (hr.civilServantId) civil++; else contract++;
           if (hr.gender === 'Male' || hr.gender === 'ប្រុស') male++;
           else if (hr.gender === 'Female' || hr.gender === 'ស្រី') female++;
+          processedSkills.add(hs); // Mark members as processed
         }
-        rows.push({ name: (skillGroups[gi].name || `Group ${gi+1}`), male, female, total: male + female, civil, contract, isGroup: true });
+        if (groupHasMembersInData) {
+          rows.push({ name: (skillGroups[gi].name || `Group ${gi + 1}`), male, female, total: male + female, civil, contract, isGroup: true });
+          emittedGroups.add(gi);
+        }
+      }
+
+      // NEW: Collect any remaining individual skills from employees not in the canonical list or any group
+      let otherMale = 0, otherFemale = 0, otherCivil = 0, otherContract = 0;
+      let hasOthers = false;
+      for (const hr of sourceList || []) {
+        const hs = hrSkillNormOf(hr);
+        if (!hs) continue;
+        if (processedSkills.has(hs)) continue;
+        if (memberToGroup.has(hs)) continue; // Should have been caught by group loop above
+
+        hasOthers = true;
+        if (hr.civilServantId) otherCivil++; else otherContract++;
+        if (hr.gender === 'Male' || hr.gender === 'ប្រុស') otherMale++;
+        else if (hr.gender === 'Female' || hr.gender === 'ស្រី') otherFemale++;
+      }
+
+      if (hasOthers) {
+        rows.unshift({ name: 'ផ្សេងៗ', male: otherMale, female: otherFemale, total: otherMale + otherFemale, civil: otherCivil, contract: otherContract, isGroup: false });
       }
 
       const totals = rows.reduce((acc, r) => ({
-        male: acc.male + (r.male||0),
-        female: acc.female + (r.female||0),
-        total: acc.total + (r.total||0),
-        civil: (acc.civil||0) + (r.civil||0),
-        contract: (acc.contract||0) + (r.contract||0),
+        male: acc.male + (r.male || 0),
+        female: acc.female + (r.female || 0),
+        total: acc.total + (r.total || 0),
+        civil: (acc.civil || 0) + (r.civil || 0),
+        contract: (acc.contract || 0) + (r.contract || 0),
       }), { male: 0, female: 0, total: 0, civil: 0, contract: 0 });
 
       return { rows, totals };
@@ -949,13 +1217,13 @@ export default function EmployeeReportPage() {
       if (hr.gender === 'Male' || hr.gender === 'ប្រុស') row.male += 1;
       else if (hr.gender === 'Female' || hr.gender === 'ស្រី') row.female += 1;
     }
-    const rows = Array.from(rowsMap.values()).map(r => ({ ...r, total: r.male + r.female })).sort((a,b) => a.name.localeCompare(b.name, 'km'));
+    const rows = Array.from(rowsMap.values()).map(r => ({ ...r, total: r.male + r.female })).sort((a, b) => a.name.localeCompare(b.name, 'km'));
     const totals = rows.reduce((acc, r) => ({
       male: acc.male + r.male,
       female: acc.female + r.female,
       total: acc.total + r.total,
-      civil: acc.civil + (r.civil||0),
-      contract: acc.contract + (r.contract||0),
+      civil: acc.civil + (r.civil || 0),
+      contract: acc.contract + (r.contract || 0),
     }), { male: 0, female: 0, total: 0, civil: 0, contract: 0 });
     return { rows, totals };
   }, [list, skills, skillGroups, asOfDate, includeArchived, isIncludedAsOf, isActiveAsOf]);
@@ -996,7 +1264,7 @@ export default function EmployeeReportPage() {
     if (reportType === 'hospitalPartTime') return 'បញ្ជីរាយនាម កិច្ចសន្យាមន្ទីរពេទ្យ (ក្រៅម៉ោង) នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត';
     if (reportType === 'hospitalPlus') return 'បញ្ជីរាយនាម កិច្ចសន្យាមន្ទីរពេទ្យ​ នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត';
     if (reportType === 'retiredThenContract') return 'បញ្ជីរាយនាម មន្រ្តីចូលនិវត្តន៍ បន្តកិច្ចសន្យា​ នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត';
-    if (reportType === 'evaluation') return 'របាយការណ៍វាយតំលៃការបំពេញមុខងារ និងការទទួលខុសត្រូវការងាររបស់បុគ្គលិក មន្រ្តីរាជការ';
+    if (reportType === 'evaluation') return 'របាយការណ៍វាយតម្លៃការបំពេញមុខងារ និងការទទួលខុសត្រូវការងាររបស់បុគ្គលិក មន្ត្រីរាជការ';
     if (reportType === 'femaleCount') return 'តារាងប្រាក់ឧបត្ថម្ភសម្រាប់បុគ្គលិក និងមន្រ្តីរាជការជានារី - មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត ';
     return 'បញ្ជីរាយនាម មន្រ្តីចូលនិវត្តន៍ បន្តកិច្ចសន្យា នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត';
   }, [reportType]);
@@ -1006,22 +1274,22 @@ export default function EmployeeReportPage() {
     // use grandSummary for predefined groups, technicalSummary for technical report,
     // otherwise fall back to filteredList totals computed above.
     try {
-      if (reportType === 'total') return grandSummary.all || { total:0, male:0, female:0 };
-      if (reportType === 'technical') return (technicalSummary && technicalSummary.totals) ? technicalSummary.totals : { total:0, male:0, female:0 };
-      if (reportType === 'civil') return grandSummary.civil || { total:0, male:0, female:0 };
-      if (reportType === 'state') return grandSummary.state || { total:0, male:0, female:0 };
-      if (reportType === 'hospital') return grandSummary.hospital || { total:0, male:0, female:0 };
-      if (reportType === 'hospitalPlus') return grandSummary.hospitalPlus || { total:0, male:0, female:0 };
-      if (reportType === 'worker') return grandSummary.worker || { total:0, male:0, female:0 };
-      if (reportType === 'allhr') return totals || { total:0, male:0, female:0 };
-      if (reportType === 'evaluation') return { total: (filteredList || []).length || 0, male: 0, female: 0 };
+      if (reportType === 'total') return grandSummary.all || { total: 0, male: 0, female: 0 };
+      if (reportType === 'technical') return (technicalSummary && technicalSummary.totals) ? technicalSummary.totals : { total: 0, male: 0, female: 0 };
+      if (reportType === 'civil') return grandSummary.civil || { total: 0, male: 0, female: 0 };
+      if (reportType === 'state') return grandSummary.state || { total: 0, male: 0, female: 0 };
+      if (reportType === 'hospital') return grandSummary.hospital || { total: 0, male: 0, female: 0 };
+      if (reportType === 'hospitalPlus') return grandSummary.hospitalPlus || { total: 0, male: 0, female: 0 };
+      if (reportType === 'worker') return grandSummary.worker || { total: 0, male: 0, female: 0 };
+      if (reportType === 'allhr') return totals || { total: 0, male: 0, female: 0 };
+      if (reportType === 'evaluation') return totals || { total: 0, male: 0, female: 0 };
       if (reportType === 'femaleCount') {
         const f = femaleOnlyList || [];
         return { total: f.length, male: 0, female: f.length };
       }
       // fallback: counts of current filteredList
-      return totals || { total:0, male:0, female:0 };
-    } catch { return { total:0, male:0, female:0 }; }
+      return totals || { total: 0, male: 0, female: 0 };
+    } catch { return { total: 0, male: 0, female: 0 }; }
   }, [reportType, grandSummary, technicalSummary, totals]);
 
   // Evaluation summary based on per-row selections (hr.evaluation or session `evaluations` state)
@@ -1048,9 +1316,9 @@ export default function EmployeeReportPage() {
   const [footerRightTitle, setFooterRightTitle] = useState(() => {
     try { return sessionStorage.getItem('employee_report_footer_right') || 'នាយផ្នែក/នាយមណ្ឌល'; } catch { return 'នាយផ្នែក/នាយមណ្ឌល'; }
   });
-  useEffect(() => { try { sessionStorage.setItem('employee_report_footer_left', footerLeftTitle); } catch {} }, [footerLeftTitle]);
-  useEffect(() => { try { sessionStorage.setItem('employee_report_footer_right', footerRightTitle); } catch {} }, [footerRightTitle]);
-  
+  useEffect(() => { try { sessionStorage.setItem('employee_report_footer_left', footerLeftTitle); } catch { } }, [footerLeftTitle]);
+  useEffect(() => { try { sessionStorage.setItem('employee_report_footer_right', footerRightTitle); } catch { } }, [footerRightTitle]);
+
   // Auto-set footer right title based on selected department
   useEffect(() => {
     if (reportType === 'evaluation' && selectedDept) {
@@ -1068,8 +1336,8 @@ export default function EmployeeReportPage() {
       }
     }
   }, [selectedDept, reportType]);
-  useEffect(() => { try { sessionStorage.setItem('employee_report_evaluator_comments', JSON.stringify(evaluatorComments || {})); } catch {} }, [evaluatorComments]);
-  useEffect(() => { try { sessionStorage.setItem('employee_report_evaluations', JSON.stringify(evaluations || {})); } catch {} }, [evaluations]);
+  useEffect(() => { try { sessionStorage.setItem('employee_report_evaluator_comments', JSON.stringify(evaluatorComments || {})); } catch { } }, [evaluatorComments]);
+  useEffect(() => { try { sessionStorage.setItem('employee_report_evaluations', JSON.stringify(evaluations || {})); } catch { } }, [evaluations]);
 
   const evaluationSummary = useMemo(() => {
     const opts = EVALUATION_OPTIONS || [];
@@ -1099,15 +1367,15 @@ export default function EmployeeReportPage() {
     .print-scope .title h2 { font-family: "Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif; font-size: 15px; }
     .print-scope .subtitle { text-align: center; margin-bottom: 8px; }
     .print-scope table { width: 100%; border-collapse: collapse; border: 1px solid #222; }
-  .print-scope th, .print-scope td { border: 1px solid #222; padding: 6px 4px; font-size: 13px; vertical-align: middle; }
-    .print-scope th { background: #f7f7f7; }
+  .print-scope th, .print-scope td { border: 1px solid #222; padding: 6px 4px; font-size: 13px; vertical-align: middle; text-align: center; }
+    .print-scope th { background: #f7f7f7; font-family: "Khmer OS Siemreap", serif; font-weight: bold; text-align: center; }
   /* First column is label, second is small spacer, third is sub-label, last three are numbers */
   .print-scope th:first-child, .print-scope td:first-child { /* auto width - remaining space */ }
   /* Right-hand numeric columns use fixed pixel widths so numbers align */
   .print-scope th:nth-child(4), .print-scope th:nth-child(5), .print-scope th:nth-child(6),
   .print-scope td:nth-child(4), .print-scope td:nth-child(5), .print-scope td:nth-child(6) { width: 76px; }
     .print-scope td.center, .print-scope th.center { text-align: center; }
-    .print-scope .section-row th { background: #efefef; text-align: left; font-weight: 700; }
+    .print-scope .section-row th { background: #efefef; text-align: left; font-weight: normal; font-family: "Khmer OS Muol Light", serif; font-size: 11px; }
     .print-scope .no-border { border: 0 none; }
     .print-scope .footer-notes { margin-top: 12px; font-size: 12px; }
     .print-scope .signatures { display: flex; justify-content: space-between; margin-top: 20px; font-family: "Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif; font-size: 12px; text-align: center; }
@@ -1125,7 +1393,7 @@ export default function EmployeeReportPage() {
       position: relative;
       padding: 10mm; /* inner margin for content */
       box-sizing: border-box;
-      overflow: hidden;
+      overflow: visible;
     }
     .a4-landscape {
       width: 297mm;
@@ -1136,7 +1404,22 @@ export default function EmployeeReportPage() {
       position: relative;
       padding: 10mm;
       box-sizing: border-box;
-      overflow: hidden;
+      overflow: visible;
+    }
+    .print-scope thead th {
+      position: sticky;
+      top: ${filterHeight - 24}px; 
+      z-index: 30;
+      background: #f7f7f7 !important;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    /* Special offset for technical report header which might need to stick above others */
+    .print-scope table {
+      border-collapse: separate; /* Required for some sticky border fixes */
+      border-spacing: 0;
+    }
+    .print-scope th, .print-scope td {
+      border: 1px solid #222;
     }
     /* column resizer handle for screen preview */
     .print-scope th { position: relative; padding-right: 12px; }
@@ -1166,13 +1449,13 @@ export default function EmployeeReportPage() {
   .title h2 { font-family: "Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif; font-size: 15px; }
   .subtitle { text-align: center; margin-bottom: 8px; }
   table { width: 100%; border-collapse: collapse; border: 1px solid #222; }
-  th, td { border: 1px solid #222; padding: 8px 6px; font-size: 13px; vertical-align: middle; }
-  th { background: #f7f7f7; }
+  th, td { border: 1px solid #222; padding: 8px 6px; font-size: 13px; vertical-align: middle; text-align: center; }
+  th { background: #f7f7f7; font-family: "Khmer OS Siemreap", serif; font-weight: bold; text-align: center; }
   /* Let first columns size automatically; fix numeric right columns */
   th:first-child, td:first-child { }
   th:nth-child(4), th:nth-child(5), th:nth-child(6), td:nth-child(4), td:nth-child(5), td:nth-child(6) { width: 76px; }
   .center { text-align: center; }
-  .section-row th { background: #efefef; text-align: left; font-weight: 700; }
+  .section-row th { background: #efefef; text-align: left; font-weight: normal; font-family: "Khmer OS Muol Light", serif; font-size: 11px; }
   .no-border { border: 0 none; }
   .footer-notes { margin-top: 12px; font-size: 12px; }
   .signatures { display: flex; justify-content: space-between; margin-top: 20px; font-family: "Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif; fontSize: 12px; text-align: center; }
@@ -1183,7 +1466,7 @@ export default function EmployeeReportPage() {
   /* Dynamic row height / padding overrides - allow wrapping for multi-line cells */
   .print-scope tbody tr { min-height: ${rowHeight}px; }
   .print-scope tbody tr > td, .print-scope tbody tr > th { vertical-align: middle !important; white-space: normal !important; overflow: visible !important; text-overflow: unset !important; }
-  .print-scope th, .print-scope td { padding: ${Math.max(6, Math.round(rowHeight/4))}px ${Math.max(4, Math.round(rowHeight/8))}px !important; line-height: ${Math.max(12, Math.round(rowHeight*0.6))}px !important; }
+  .print-scope th, .print-scope td { padding: ${Math.max(6, Math.round(rowHeight / 4))}px ${Math.max(4, Math.round(rowHeight / 8))}px !important; line-height: ${Math.max(12, Math.round(rowHeight * 0.6))}px !important; }
       </style>
     `;
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"/>${PRINT_STYLES}</head><body>${printRef.current.innerHTML}</body></html>`);
@@ -1258,7 +1541,7 @@ export default function EmployeeReportPage() {
                 <div className="col-resizer" onMouseDown={(e) => startColResize(0, e)} />
               </th>
               <th style={{ fontFamily: "Khmer OS Muol Light", fontSize: 13, fontWeight: 'normal' }}>
-                
+
                 <div className="col-resizer" onMouseDown={(e) => startColResize(1, e)} />
               </th>
               <th style={{ fontFamily: "Khmer OS Muol Light", fontSize: 13, fontWeight: 'normal' }} className="center">សរុប<div className="col-resizer" onMouseDown={(e) => startColResize(2, e)} /></th>
@@ -1274,7 +1557,7 @@ export default function EmployeeReportPage() {
               <td className="center">{toKhmerDigits(grandSummary.civil.male)}</td>
               <td className="center">{toKhmerDigits(grandSummary.civil.female)}</td>
             </tr>
-             <tr style={{ fontFamily: "Khmer OS Muol Light", fontSize: 11, fontWeight: 'normal' }}>
+            <tr style={{ fontFamily: "Khmer OS Muol Light", fontSize: 11, fontWeight: 'normal' }}>
               <td>កិច្ចសន្យារដ្ឋ</td>
               <td></td>
               <td className="center">{toKhmerDigits(grandSummary.state.total)}</td>
@@ -1283,18 +1566,18 @@ export default function EmployeeReportPage() {
             </tr>
             <tr style={{ fontFamily: "Khmer OS Siemreap", fontSize: 13, fontWeight: 'bold' }}>
               <td rowSpan={4}>កិច្ចសន្យាមន្ទីរពេទ្យ <p style={{ marginTop: 10 }}>ចូលនិវត្តន៍ (បន្តជា​កិច្ចសន្យា)</p> <p style={{ marginTop: 10 }}></p>និងកិច្ចសន្យាក្រៅម៉ោង</td>
-              <td style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: 13,  }}>ចូលនិវត្តន៍ (បន្តជា​កិច្ចសន្យា)</td>
+              <td style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: 13, }}>ចូលនិវត្តន៍ (បន្តជា​កិច្ចសន្យា)</td>
               <td className="center" style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif' }}>{toKhmerDigits(retiredThenContract.hospitalPlus.total)}</td>
               <td className="center" style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif' }}>{toKhmerDigits(retiredThenContract.hospitalPlus.male)}</td>
               <td className="center" style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif' }}>{toKhmerDigits(retiredThenContract.hospitalPlus.female)}</td>
             </tr>
-            <tr style={{ fontFamily: "Khmer OS Siemreap", fontSize: 13,  }}>
+            <tr style={{ fontFamily: "Khmer OS Siemreap", fontSize: 13, }}>
               <td style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: 13, }}>អាយុលើស ៦០ឆ្នាំ</td>
               <td className="center">{toKhmerDigits(hospitalPlusAgeOver60.total)}</td>
               <td className="center">{toKhmerDigits(hospitalPlusAgeOver60.male)}</td>
               <td className="center">{toKhmerDigits(hospitalPlusAgeOver60.female)}</td>
             </tr>
-            <tr style={{ fontFamily: "Khmer OS Siemreap", fontSize: 13,  }}>
+            <tr style={{ fontFamily: "Khmer OS Siemreap", fontSize: 13, }}>
               <td style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: 13, }}>អាយុក្រោម ៦០ឆ្នាំ</td>
               <td className="center">{toKhmerDigits(hospitalPlusBreakdown.under60.total)}</td>
               <td className="center">{toKhmerDigits(hospitalPlusBreakdown.under60.male)}</td>
@@ -1314,13 +1597,13 @@ export default function EmployeeReportPage() {
               <td className="center" style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif' }}>{toKhmerDigits(retiredThenContract.worker.male)}</td>
               <td className="center" style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif' }}>{toKhmerDigits(retiredThenContract.worker.female)}</td>
             </tr>
-            <tr style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: 13,  }}>
+            <tr style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: 13, }}>
               <td>អាយុលើស ៦០ ឆ្នាំ</td>
               <td className="center">{toKhmerDigits(workerBreakdown.over60.total)}</td>
               <td className="center">{toKhmerDigits(workerBreakdown.over60.male)}</td>
               <td className="center">{toKhmerDigits(workerBreakdown.over60.female)}</td>
             </tr>
-            <tr style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: 13,  }}>
+            <tr style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: 13, }}>
               <td>អាយុក្រោម ៦០ឆ្នាំ</td>
               <td className="center">{toKhmerDigits(workerBreakdown.under60.total)}</td>
               <td className="center">{toKhmerDigits(workerBreakdown.under60.male)}</td>
@@ -1332,7 +1615,7 @@ export default function EmployeeReportPage() {
               <td className="center">{toKhmerDigits(workerBreakdown.all.male)}</td>
               <td className="center">{toKhmerDigits(workerBreakdown.all.female)}</td>
             </tr>
-           
+
             <tr style={{ fontFamily: "Khmer OS Muol Light", fontSize: 11, fontWeight: 'normal' }}>
               <td>សរុបកិច្ចសន្យា (មន្ទីរពេទ្យ + ក្រៅម៉ោង + កម្មករ)</td>
               <td></td>
@@ -1357,7 +1640,7 @@ export default function EmployeeReportPage() {
         <table>
           <thead>
             <tr>
-              <th style={{width:'40px'}}>ល.រ</th>
+              <th style={{ width: '40px' }}>ល.រ</th>
               <th>ជំនាញបច្ចេកទេស</th>
               <th className="center">មន្រ្តីរាជការ</th>
               <th className="center">មន្រ្តីកិច្ចសន្យា</th>
@@ -1374,7 +1657,7 @@ export default function EmployeeReportPage() {
             )}
             {technicalSummary.rows.map((r, idx) => (
               <tr key={r.name || idx}>
-                <td className="center">{toKhmerDigits(idx+1)}</td>
+                <td className="center">{toKhmerDigits(idx + 1)}</td>
                 <td style={{ textAlign: 'left' }}>{r.name}</td>
                 <td className="center">{toKhmerDigits(r.civil || 0)}</td>
                 <td className="center">{toKhmerDigits(r.contract || 0)}</td>
@@ -1382,7 +1665,7 @@ export default function EmployeeReportPage() {
                 <td className="center">{toKhmerDigits(r.male || 0)}</td>
                 <td className="center">{toKhmerDigits(r.female || 0)}</td>
               </tr>
-                       ))}
+            ))}
             {technicalSummary.rows.length > 0 && (
               <>
                 <tr>
@@ -1400,73 +1683,121 @@ export default function EmployeeReportPage() {
       );
     }
     if (reportType === 'evaluation') {
-      // Render evaluation summary table: per-option counts and per-employee marks
+      const evalOrder = ['serialDept', 'name', 'skill', 'position', 'totalMonthlyAttendance', 'performanceResult', 'otherNotes', 'staffId'];
+      const visibleListCols = evalOrder
+        .map(key => listColumns.find(c => c.key === key))
+        .filter(c => c);
+      
+      const colCount = visibleListCols.length;
+
       return (
-        <table>
+        <table style={{ tableLayout: 'auto', textAlign: 'center' }}>
           <thead>
             <tr>
-              <th rowSpan={2} className="center" style={{width:'40px'}}>ល.រ</th>
-              <th rowSpan={2} className="center" style={{width:'150px'}}>គោត្តនាម និងនាម</th>
-              <th rowSpan={2} className="center" style={{width:'150px'}}>តួនាទី</th>
-              <th colSpan={4} className="center">មូលវិចារណាយផ្នែក/ការិយាល័យ</th>
-              <th rowSpan={2} className="center"style={{width:'160px'}}>ផ្សេងៗ</th>
-            </tr>
-            <tr>
-              <th className="center" style={{width:'50px'}}>ល្អ</th>
-              <th className="center" style={{width:'50px'}}>ល្អបង្គួរ</th>
-              <th className="center" style={{width:'50px'}}>មធ្យម</th>
-              <th className="center" style={{width:'70px'}}>ខ្សោយ</th>
+              {visibleListCols.map(c => {
+                let headerContent = c.label;
+                if (c.key === 'totalMonthlyAttendance') {
+                  headerContent = (
+                    <div style={{ lineHeight: '1.2', fontWeight: 'bold' }}>
+                      <div>សរុបវត្តមាន</div>
+                      <div>ប្រចាំខែ</div>
+                    </div>
+                  );
+                } else if (c.key === 'performanceResult') {
+                  headerContent = (
+                    <div style={{ lineHeight: '1.2', fontWeight: 'bold' }}>
+                      <div>លទ្ធផលការងារ</div>
+                      <div>សម្រេចបាន</div>
+                    </div>
+                  );
+                } else if (c.key === 'staffId') {
+                  headerContent = (
+                    <div style={{ lineHeight: '1.2', fontWeight: 'bold' }}>
+                      <div>អត្តលេខ</div>
+                      <div>កាត់</div>
+                    </div>
+                  );
+                } else if (c.key === 'serialDept') {
+                  headerContent = <div style={{ fontWeight: 'bold' }}>ល.រ</div>;
+                } else {
+                  headerContent = <div style={{ fontWeight: 'bold' }}>{c.label}</div>;
+                }
+                
+                return (
+                  <th key={c.key} style={{ width: c.width, textAlign: 'center', padding: '10px 4px' }}>
+                    {headerContent}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-                    {(filteredList || []).map((hr, idx) => {
-                      const keyId = hr._id || hr.staffId || hr.officerId || hr.cardNumber || '';
-                      const val = (hr.evaluation) || (evaluations && evaluations[keyId]) || '';
-                      const comment = (hr.evaluatorComment) || (evaluatorComments && evaluatorComments[keyId]) || '';
-                      return (
-                        <tr key={hr._id || idx}>
-                          <td className="center">{toKhmerDigits(idx+1)}</td>
-                          <td style={{ textAlign: 'left' }}>{hr.khmerName || hr.name || ''}</td>
-                          <td style={{ textAlign: 'left' }}>{hr.position || ''}</td>
-                          <td className="center" style={{background: val === 'ល្អ' ? '#fff3cd' : '#fff'}}>
-                            <button type="button" onClick={() => setEvaluations(prev => ({ ...(prev||{}), [keyId]: 'ល្អ' }))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: val === 'ល្អ' ? 'bold' : 'normal' }}>{val === 'ល្អ' ? '✓' : ''}</button>
-                          </td>
-                          <td className="center" style={{background: val === 'ល្អបង្គួរ' ? '#fff3cd' : '#fff'}}>
-                            <button type="button" onClick={() => setEvaluations(prev => ({ ...(prev||{}), [keyId]: 'ល្អបង្គួរ' }))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: val === 'ល្អបង្គួរ' ? 'bold' : 'normal' }}>{val === 'ល្អបង្គួរ' ? '✓' : ''}</button>
-                          </td>
-                          <td className="center" style={{background: val === 'មធ្យម' ? '#fff3cd' : '#fff'}}>
-                            <button type="button" onClick={() => setEvaluations(prev => ({ ...(prev||{}), [keyId]: 'មធ្យម' }))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: val === 'មធ្យម' ? 'bold' : 'normal' }}>{val === 'មធ្យម' ? '✓' : ''}</button>
-                          </td>
-                          <td className="center" style={{background: val === 'ខ្សោយ' ? '#fff3cd' : '#fff'}}>
-                            <button type="button" onClick={() => setEvaluations(prev => ({ ...(prev||{}), [keyId]: 'ខ្សោយ' }))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: val === 'ខ្សោយ' ? 'bold' : 'normal' }}>{val === 'ខ្សោយ' ? '✓' : ''}</button>
-                          </td>
-                          <td style={{ textAlign: 'left' }}>{comment || ''}</td>
-                        </tr>
-                      );
+            {grouped.length === 0 && (
+              <tr>
+                <td colSpan={colCount} className="center text-gray-600">មិនមានទិន្នន័យ</td>
+              </tr>
+            )}
+            {grouped.map((g, gi) => (
+              <React.Fragment key={g.dept || gi}>
+                <tr className="section-row">
+                  <th colSpan={colCount} style={{ textAlign: 'left', padding: '8px 12px', background: '#f8fafc', fontFamily: '"Khmer OS Muol Light", serif', borderBottom: '2px solid #cbd5e1' }}>
+                    {g.dept}
+                  </th>
+                </tr>
+                {g.items.map((r, idx) => (
+                  <tr style={{ textAlign: 'center' }} key={r._id || idx}>
+                    {visibleListCols.map(c => {
+                      if (c.key === 'serialDept') {
+                        return <td key={c.key} className="center">{toKhmerDigits(idx + 1)}</td>;
+                      }
+                      if (c.key === 'name') {
+                        return <td key={c.key} style={{ textAlign: 'left', paddingLeft: '12px' }}>{r.khmerName || r.name || ''}</td>;
+                      }
+                      if (c.key === 'skill') {
+                        return <td key={c.key} style={{ textAlign: 'left' }}>{r.skill || r.technicalRole || ''}</td>;
+                      }
+                      if (c.key === 'position') {
+                        return <td key={c.key} style={{ textAlign: 'left' }}>{r.position || ''}</td>;
+                      }
+                      if (c.key === 'totalMonthlyAttendance') {
+                        return <td key={c.key} className="center">{r.totalMonthlyAttendance || ''}</td>;
+                      }
+                      if (c.key === 'performanceResult') {
+                        return <td key={c.key} className="center">{r.performanceResult || ''}</td>;
+                      }
+                      if (c.key === 'otherNotes') {
+                        return <td key={c.key} style={{ textAlign: 'left' }}>{r.otherNotes || ''}</td>;
+                      }
+                      if (c.key === 'staffId') {
+                        return <td key={c.key} className="center">{r.staffId || ''}</td>;
+                      }
+                      return <td key={c.key}>{''}</td>;
                     })}
+                  </tr>
+                ))}
+              </React.Fragment>
+            ))}
           </tbody>
-          
         </table>
       );
     }
-    // Female-only grants table for International Women's Day
     if (reportType === 'femaleCount') {
       return (
         <table>
           <thead>
             <tr>
-              <th style={{width:'60px', textAlign:'center'}}>អត្តលេខកាត់</th>
-              <th style={{width:'60px', textAlign:'center'}}>ស.រ</th>
-              <th style={{width:'60px', textAlign:'center'}}>ល.រ</th>
-              <th style={{textAlign:'center'}}>គោត្តនាម និងនាម</th>
-              <th style={{textAlign:'center'}}>អក្សរឡាតាំង</th>
-              <th style={{width:'60px', textAlign:'center'}}>ភេទ</th>
-              <th style={{textAlign:'center'}}>តួនាទី</th>
-              <th style={{width:'100px', textAlign:'center'}}>ថ្ងៃខែឆ្នាំកណើត</th>
-              <th style={{textAlign:'center'}}>លេខធនាគា</th>
-              <th style={{textAlign:'center'}}>មុខងារ</th>
-              <th style={{width:'140px', textAlign:'center'}}>ប្រាក់ឧបត្ថម្ភ</th>
-              <th style={{width:'140px', textAlign:'center'}}>ផ្នែក</th>
+              <th style={{ width: '60px', textAlign: 'center' }}>អត្តលេខកាត់</th>
+              <th style={{ width: '60px', textAlign: 'center' }}>ស.រ</th>
+              <th style={{ width: '60px', textAlign: 'center' }}>ល.រ</th>
+              <th style={{ textAlign: 'center' }}>គោត្តនាម និងនាម</th>
+              <th style={{ textAlign: 'center' }}>អក្សរឡាតាំង</th>
+              <th style={{ width: '60px', textAlign: 'center' }}>ភេទ</th>
+              <th style={{ textAlign: 'center' }}>តួនាទី</th>
+              <th style={{ width: '100px', textAlign: 'center' }}>ថ្ងៃខែឆ្នាំកណើត</th>
+              <th style={{ textAlign: 'center' }}>លេខធនាគា</th>
+              <th style={{ textAlign: 'center' }}>មុខងារ</th>
+              <th style={{ width: '140px', textAlign: 'center' }}>ប្រាក់ឧបត្ថម្ភ</th>
+              <th style={{ width: '140px', textAlign: 'center' }}>ផ្នែក</th>
             </tr>
           </thead>
           <tbody>
@@ -1485,18 +1816,18 @@ export default function EmployeeReportPage() {
               const grant = r.grantAmount || r.bonus || r.allowance || r.extraGrant || r.grant || '';
               return (
                 <tr key={key}>
-                  <td style={{textAlign:'left'}}>{r.staffId || ''}</td>
+                  <td style={{ textAlign: 'left' }}>{r.staffId || ''}</td>
                   <td className="center">{toKhmerDigits(overall)}</td>
                   <td className="center">{toKhmerDigits(deptIdx)}</td>
-                  <td style={{textAlign:'left'}}>{r.khmerName || r.name || ''}</td>
-                  <td style={{textAlign:'left'}}>{r.name || r.nameEn || r.englishName || ''}</td>
+                  <td style={{ textAlign: 'left' }}>{r.khmerName || r.name || ''}</td>
+                  <td style={{ textAlign: 'left' }}>{r.name || r.nameEn || r.englishName || ''}</td>
                   <td className="center">{r.gender === 'Female' || r.gender === 'ស្រី' ? 'ស' : ''}</td>
-                  <td style={{textAlign:'left'}}>{r.position || ''}</td>
+                  <td style={{ textAlign: 'left' }}>{r.position || ''}</td>
                   <td className="center">{fmtDate(r.dob)}</td>
-                  <td style={{textAlign:'left'}}>{r.bankAccount || r.bank_account || r.bank || ''}</td>
-                  <td style={{textAlign:'left'}}>{r.skill || ''}</td>
-                  <td style={{textAlign:'right'}}>{formatCurrencyKhmer(grant)}50 000រៀល</td>
-                  <td style={{textAlign:'left'}}>{r.department || ''}</td>
+                  <td style={{ textAlign: 'left' }}>{r.bankAccount || r.bank_account || r.bank || ''}</td>
+                  <td style={{ textAlign: 'left' }}>{r.skill || ''}</td>
+                  <td style={{ textAlign: 'right' }}>{formatCurrencyKhmer(grant)}50 000រៀល</td>
+                  <td style={{ textAlign: 'left' }}>{r.department || ''}</td>
                 </tr>
               );
             })}
@@ -1505,59 +1836,40 @@ export default function EmployeeReportPage() {
       );
     }
     // default: list of staff (render columns conditionally based on `visibleCols`)
-    const listColumns = [
-      { key: 'staffId', label: 'អត្តលេខកាត់', width: '80px', align: 'center' },
-      { key: 'serialOverall', label: 'ស.រ', width: '30px', align: 'center' },
-      { key: 'serialDept', label: 'ល.រ', width: '30px', align: 'center' },
-      { key: 'name', label: 'គោត្តនាម និងនាម', width: '120px', align: 'left' },
-      { key: 'latinName', label: 'ឈ្មោះឡាតាំង', width: '120px', align: 'left' },
-      { key: 'gender', label: 'ភេទ', width: '25px', align: 'center' },
-      { key: 'dob', label: 'ថ្ងៃខែឆ្នាំកំណើត', width: '85px', align: 'right' },
-      { key: 'salaryLevel', label: 'កាំប្រាក់', width: '45px', align: 'center' },
-      { key: 'idOrOfficerType', label: (reportType === 'hospitalPlus' || reportType === 'state' || reportType === 'hospital' || reportType === 'hospitalPartTime' || reportType === 'hospitalOver60' || reportType === 'retiredThenContract' || reportType === 'worker') ? 'ប្រភេទមន្ត្រី' : 'អត្តលេខមន្ត្រី', width: '100px', align: 'center' },
-      { key: 'skill', label: 'ជំនាញបច្ចេកទេស', width: '130px', align: 'left' },
-      { key: 'position', label: 'តួនាទី', width: '140px', align: 'left' },
-      { key: 'department', label: 'ផ្នែក', width: '140px', align: 'left' },
-      { key: 'phone', label: 'លេខទូរស័ព្ទ', width: '110px', align: 'center' },
-      { key: 'joinDate', label: 'កាលបរិច្ឆេទចូល', width: '110px', align: 'center' },
-      { key: 'birthplace', label: 'ទីកន្លែងកំណើត/បច្ចុប្បន្ន', width: '180px', align: 'left' },
-        { key: 'nid', label: 'លេខអត្តសញ្ញាណ', width: '120px', align: 'center' },
-        { key: 'bankAccount', label: 'លេខគណនីធនាគារ', width: '140px', align: 'left' },
-      { key: 'actions', label: 'កែ', width: '60px', align: 'center' }, // added edit column
-     ];
-     const visibleListCols = listColumns.filter(c => !!visibleCols[c.key]);
- 
-     return (
-       <table style={{ tableLayout: 'fixed', textAlign: 'center' }}>
-         <thead>
-           <tr>
-             {visibleListCols.map(c => (
-               <th key={c.key} style={{ width: c.width, textAlign: c.align || 'center' }}>{c.label}</th>
-             ))}
-           </tr>
-         </thead>
-         <tbody>
-           {grouped.length === 0 && (
-             <tr>
-               <td colSpan={visibleCount} className="center text-gray-600">មិនមានទិន្នន័យ</td>
-             </tr>
-           )}
-           {grouped.map((g, gi) => (
-             <React.Fragment key={g.dept || gi}>
-               <tr className="section-row">
-                 <th className="no-border" colSpan={visibleCount}>{toKhmerRoman(gi+1)}&nbsp;&nbsp;{g.dept}</th>
-               </tr>
-               {g.items.map((r, idx) => (
-                 <tr style={{ textAlign: 'center' }} key={r._id || idx}>
-                   {visibleListCols.map(c => {
-                     if (c.key === 'serialOverall') {
-                       const key = r._id || r.staffId || r.officerId || r.name || String(idx);
-                       const overall = overallIndexMap[key] || (grouped.slice(0, gi).reduce((s, gp) => s + (gp.items?.length || 0), 0) + idx + 1);
-                       return <td key={c.key} className="center">{toKhmerDigits(overall)}</td>;
-                     }
-                     if (c.key === 'serialDept') {
-                       return <td key={c.key} className="center">{toKhmerDigits(idx + 1)}</td>;
-                     }
+    const visibleListCols = listColumns.filter(c => !!visibleCols[c.key]);
+
+    return (
+      <table style={{ tableLayout: 'auto', textAlign: 'center' }}>
+        <thead>
+          <tr>
+            {visibleListCols.map(c => {
+              const label = (c.key === 'idOrOfficerType' && ['state', 'hospital', 'worker', 'hospitalPlus', 'hospitalPartTime', 'retiredThenContract'].includes(reportType)) ? 'ប្រភេទមន្ត្រី' : c.label;
+              return <th key={c.key} style={{ width: c.width, textAlign: 'center' }}>{label}</th>;
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {grouped.length === 0 && (
+            <tr>
+              <td colSpan={visibleCount} className="center text-gray-600">មិនមានទិន្នន័យ</td>
+            </tr>
+          )}
+          {grouped.map((g, gi) => (
+            <React.Fragment key={g.dept || gi}>
+              <tr className="section-row">
+                <th className="no-border" colSpan={visibleCount}>{toKhmerRoman(gi + 1)}&nbsp;&nbsp;{g.dept}</th>
+              </tr>
+              {g.items.map((r, idx) => (
+                <tr style={{ textAlign: 'center' }} key={r._id || idx}>
+                  {visibleListCols.map(c => {
+                    if (c.key === 'serialOverall') {
+                      const key = r._id || r.staffId || r.officerId || r.name || String(idx);
+                      const overall = overallIndexMap[key] || (grouped.slice(0, gi).reduce((s, gp) => s + (gp.items?.length || 0), 0) + idx + 1);
+                      return <td key={c.key} className="center">{toKhmerDigits(overall)}</td>;
+                    }
+                    if (c.key === 'serialDept') {
+                      return <td key={c.key} className="center">{toKhmerDigits(idx + 1)}</td>;
+                    }
                     if (c.key === 'name') {
                       return <td key={c.key} style={{ textAlign: 'left' }}>{r.khmerName || r.name || ''}</td>;
                     }
@@ -1567,27 +1879,77 @@ export default function EmployeeReportPage() {
                     if (c.key === 'staffId') {
                       return <td key={c.key} className="center">{r.staffId || r.cardNumber || r.staffCode || ''}</td>;
                     }
-                     if (c.key === 'gender') {
-                       return <td key={c.key} className="center">{r.gender === 'Male' ? 'ប' : r.gender === 'Female' ? 'ស' : ''}</td>;
-                     }
-                     if (c.key === 'dob') {
-                       return <td key={c.key} className="center" style={{ textAlign: 'right' }}>{fmtDate(r.dob)}</td>;
-                     }
-                     if (c.key === 'salaryLevel') {
-                       return <td key={c.key} className="center">{r.salaryLevel || ''}</td>;
-                     }
-                     if (c.key === 'idOrOfficerType') {
-                       // For contract-style reports show the `officerType` in the ID column
-                       const showType = (reportType === 'hospitalPlus' || reportType === 'state' || reportType === 'hospital' || reportType === 'hospitalPartTime' || reportType === 'retiredThenContract' || reportType === 'worker');
-                       return <td key={c.key} className="center">{showType ? (r.officerType || r.civilServantId || r.officerId || '') : (r.civilServantId || r.officerId || r.officerType || '')}</td>;
-                     }
+                    if (c.key === 'gender') {
+                      return <td key={c.key} className="center">{r.gender === 'Male' ? 'ប' : r.gender === 'Female' ? 'ស' : ''}</td>;
+                    }
+                    if (c.key === 'dob') {
+                      return <td key={c.key} className="center" style={{ textAlign: 'right' }}>{fmtDate(r.dob)}</td>;
+                    }
+                    if (c.key === 'salaryLevel') {
+                      return <td key={c.key} className="center">{r.salaryLevel || ''}</td>;
+                    }
+                    if (c.key === 'idOrOfficerType') {
+                      const isContract = ['state', 'hospital', 'worker', 'hospitalPlus', 'hospitalPartTime', 'retiredThenContract'].includes(reportType);
+                      const displayVal = isContract ? (r.officerType || '') : (r.civilServantId || r.officerId || r.staffId || r.idCardNumber || r.officerCardNumber || r.cardNumber || '');
+                      return <td key={c.key} className="center">{displayVal}</td>;
+                    }
                     if (c.key === 'skill') {
-                      // show skill from HR (hrs collection) first, then fall back to other fields
                       const skillVal = r.skill || r.technicalRole || r.civilServantRole || r.specialty || '';
                       return <td key={c.key} style={{ textAlign: 'left' }}>{skillVal}</td>;
                     }
                     if (c.key === 'position') {
                       return <td key={c.key} style={{ textAlign: 'left' }}>{r.position || ''}</td>;
+                    }
+                    if (c.key === 'totalMonthlyAttendance') {
+                      return (
+                        <td key={c.key} className="center">
+                          <input
+                            type="number"
+                            min="0"
+                            style={{ width: 60, textAlign: 'center' }}
+                            value={r.totalMonthlyAttendance || ''}
+                            onChange={e => {
+                              const val = e.target.value;
+                              grouped[gi].items[idx].totalMonthlyAttendance = val;
+                              setList([...list]);
+                            }}
+                          />
+                        </td>
+                      );
+                    }
+                    if (c.key === 'performanceResult') {
+                      return (
+                        <td key={c.key} className="center">
+                          <select
+                            value={r.performanceResult || ''}
+                            onChange={e => {
+                              grouped[gi].items[idx].performanceResult = e.target.value;
+                              setList([...list]);
+                            }}
+                          >
+                            <option value="">--ជ្រើសរើស--</option>
+                            <option value="ល្អ">ល្អ</option>
+                            <option value="ល្អបង្គួរ">ល្អបង្គួរ</option>
+                            <option value="មធ្យម">មធ្យម</option>
+                            <option value="ខ្សោយ">ខ្សោយ</option>
+                          </select>
+                        </td>
+                      );
+                    }
+                    if (c.key === 'otherNotes') {
+                      return (
+                        <td key={c.key} style={{ textAlign: 'left' }}>
+                          <input
+                            type="text"
+                            style={{ width: 100 }}
+                            value={r.otherNotes || ''}
+                            onChange={e => {
+                              grouped[gi].items[idx].otherNotes = e.target.value;
+                              setList([...list]);
+                            }}
+                          />
+                        </td>
+                      );
                     }
                     if (c.key === 'department') {
                       return <td key={c.key} style={{ textAlign: 'left' }}>{r.Department_Kh || r.department || r.unit || ''}</td>;
@@ -1621,193 +1983,260 @@ export default function EmployeeReportPage() {
               ))}
             </React.Fragment>
           ))}
-          </tbody>
-        </table>
-      );
-    })();
+        </tbody>
+      </table>
+    );
+  })();
 
   // Export current filteredList as CSV (Excel-friendly)
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     try {
-      // Build CSV columns from the same visible column definitions used for rendering so
-      // the export matches what the user sees on screen.
-      const rows = [];
-      // Reconstruct listColumns here (must match the columns used for rendering)
-      const listColumnsLocal = [
-        { key: 'staffId', label: 'អត្តលេខកាត់' },
-        { key: 'serialOverall', label: 'ស.រ' },
-        { key: 'serialDept', label: 'ល.រ' },
-        { key: 'name', label: 'គោត្តនាម និងនាម' },
-        { key: 'latinName', label: 'ឈ្មោះឡាតាំង' },
-        { key: 'gender', label: 'ភេទ' },
-        { key: 'dob', label: 'ថ្ងៃខែឆ្នាំកំណើត' },
-        { key: 'salaryLevel', label: 'កាំប្រាក់' },
-        { key: 'idOrOfficerType', label: (reportType === 'hospitalPlus' || reportType === 'state' || reportType === 'hospital' || reportType === 'hospitalPartTime' || reportType === 'hospitalOver60' || reportType === 'retiredThenContract' || reportType === 'worker') ? 'ប្រភេទមន្ត្រី' : 'អត្តលេខមន្ត្រី' },
-        { key: 'skill', label: 'ជំនាញ' },
-        { key: 'position', label: 'តួនាទី' },
-        { key: 'department', label: 'ផ្នែក' },
-        { key: 'phone', label: 'លេខទូរស័ព្ទ' },
-        { key: 'joinDate', label: 'កាលបរិច្ឆេទចូល' },
-        { key: 'birthplace', label: 'ទីកន្លែងកំណើត/បច្ចុប្បន្ន' },
-          { key: 'nid', label: 'លេខអត្តសញ្ញាណ' },
-          { key: 'bankAccount', label: 'លេខគណនីធនាគារ' },
-        { key: 'actions', label: 'ស្ថានភាព' }
-      ];
-
-      // If exporting the femaleCount report, build a tailored column order and
-      // include a department summary followed by the detailed female list.
-      let visibleOrder = listColumnsLocal.filter(c => !!visibleCols[c.key]);
+      const isCivil = (reportType === 'civil');
       const isFemaleExport = (reportType === 'femaleCount');
-      const femaleSummaryCols = [
-        { key: 'idx', label: 'ល.រ' },
-        { key: 'dept', label: 'ផ្នែក' },
-        { key: 'count', label: 'ចំនួនស្រី' },
-      ];
-      const femaleDetailCols = [
-        { key: 'staffId', label: 'អត្តលេខកាត់' },
-        { key: 'serialOverall', label: 'ស.រ' },
-        { key: 'serialDept', label: 'ល.រ' },
-        { key: 'name', label: 'គោត្តនាម និងនាម' },
-        { key: 'latinName', label: 'អក្សរឡាតាំង' },
-        { key: 'gender', label: 'ភេទ' },
-        { key: 'position', label: 'តួនាទី' },
-        { key: 'dob', label: 'ថ្ងៃខែឆ្នាំកណើត' },
-        { key: 'bankAccount', label: 'លេខធនាគា' },
-        { key: 'skill', label: 'មុខងារ' },
-        { key: 'grant', label: 'ប្រាក់ឧបត្ថម្ភ' },
-        { key: 'department', label: 'ផ្នែក' },
-      ];
-      if (isFemaleExport) visibleOrder = femaleDetailCols;
-      // Always include serial columns at start
-      const headerRow = visibleOrder.map(c => c.label);
-      // top title and date rows to mirror printed report
-      const footerDate = asOfDate || new Date().toISOString().slice(0,10);
-      const titleText = (typeof computedTitle !== 'undefined' && computedTitle) ? computedTitle : '';
-      const dateText = asOfDate ? fmtDateLong(asOfDate) : '';
-      const titleRow = visibleOrder.map((c, i) => (i === 0 ? titleText : ''));
-      const dateRow = visibleOrder.map((c, i) => (i === 0 ? dateText : ''));
-      rows.push(titleRow);
-      rows.push(dateRow);
-      rows.push(visibleOrder.map(() => ''));
-      rows.push(headerRow);
 
-      // For femaleCount export, first include a department summary
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('EmployeeReport');
+
+      // 1. Define column structure
+      const listColumnsLocal = [
+        { key: 'serialOverall', label: 'ស.រ', width: 5.7 },
+        { key: 'serialDept', label: 'ល.រ', width: 4.7 },
+        { key: 'name', label: 'គោត្តនាម និងនាម', width: 17.1 },
+        { key: 'gender', label: 'ភេទ', width: 4.8 },
+        { key: 'dob', label: 'ថ្ងៃខែឆ្នាំកំណើត', width: 15.3 },
+        { key: 'salaryLevel', label: 'កាំប្រាក់', width: 9.1 },
+        { key: 'idOrOfficerType', label: 'អត្តលេខមន្ត្រី', width: 16.3 },
+        { key: 'skill', label: 'ជំនាញ', width: 26.7 },
+        { key: 'position', label: 'តួនាទី', width: 26.1 },
+        { key: 'department', label: 'ផ្នែក', width: 25 },
+        { key: 'staffId', label: 'អត្តលេខកាត់', width: 15 },
+        { key: 'totalMonthlyAttendance', label: 'សរុបវត្តមានប្រចាំខែ', width: 15 },
+        { key: 'performanceResult', label: 'លទ្ធផលការងារសម្រេចបាន', width: 20 },
+        { key: 'otherNotes', label: 'ផ្សេងៗ', width: 20 },
+        { key: 'latinName', label: 'ឈ្មោះឡាតាំង', width: 20 },
+        { key: 'phone', label: 'លេខទូរស័ព្ទ', width: 15 },
+        { key: 'joinDate', label: 'កាលបរិច្ឆេទចូល', width: 15 },
+        { key: 'birthplace', label: 'ទីកន្លែងកំណើត/បច្ចុប្បន្ន', width: 30 },
+        { key: 'nid', label: 'លេខអត្តសញ្ញាណ', width: 15 },
+        { key: 'bankAccount', label: 'លេខគណនីធនាគារ', width: 20 }
+      ];
+
+      const civilCols = [
+        { key: 'serialOverall', label: 'ស.រ', width: 6 },
+        { key: 'serialDept', label: 'ល.រ', width: 6 },
+        { key: 'name', label: 'គោត្តនាម និងនាម', width: 22 },
+        { key: 'gender', label: 'ភេទ', width: 6 },
+        { key: 'dob', label: 'ថ្ងៃខែឆ្នាំកំណើត', width: 14 },
+        { key: 'salaryLevel', label: 'កាំប្រាក់', width: 10 },
+        { key: 'skill', label: 'ជំនាញ', width: 20 },
+        { key: 'position', label: 'តួនាទី', width: 20 },
+      ];
+
+      const femaleDetailCols = [
+        { key: 'staffId', label: 'អត្តលេខកាត់', width: 15 },
+        { key: 'serialOverall', label: 'ស.រ', width: 8 },
+        { key: 'serialDept', label: 'ល.រ', width: 8 },
+        { key: 'name', label: 'គោត្តនាម និងនាម', width: 25 },
+        { key: 'latinName', label: 'អក្សរឡាតាំង', width: 20 },
+        { key: 'gender', label: 'ភេទ', width: 8 },
+        { key: 'position', label: 'តួនាទី', width: 25 },
+        { key: 'dob', label: 'ថ្ងៃខែឆ្នាំកណើត', width: 15 },
+        { key: 'bankAccount', label: 'លេខធនាគា', width: 20 },
+        { key: 'skill', label: 'មុខងារ', width: 20 },
+        { key: 'grant', label: 'ប្រាក់ឧបត្ថម្ភ', width: 15 },
+        { key: 'department', label: 'ផ្នែក', width: 25 },
+      ];
+
+      let visibleOrder = [];
       if (isFemaleExport) {
-        // Build department grouping from femaleOnlyList so export matches the
-        // visible female table (femaleOnlyList is derived from HR `list`).
+        visibleOrder = femaleDetailCols;
+      } else {
+        visibleOrder = listColumnsLocal.filter(c => !!visibleCols[c.key]);
+      }
+
+      // Set Keys and Widths
+      sheet.columns = visibleOrder.map(c => ({ key: c.key, width: c.width || 15 }));
+
+      const footerDateStr = asOfDate || new Date().toISOString().slice(0, 10);
+      const titleText = (typeof computedTitle === 'string' && computedTitle) ? computedTitle : (isCivil ? 'បញ្ជីរាយនាម មន្រ្តីរាជការ នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត' : '');
+      const dateText = footerDateStr ? `គិតត្រឹម ${fmtKhmerLongDate(footerDateStr)}` : '';
+
+      // 1. Add Row 1 Empty
+      sheet.addRow([]);
+
+      // 2. Add Title & Date
+      const titleRow = sheet.addRow([titleText]);
+      titleRow.getCell(1).font = { name: 'Khmer OS Muol Light', size: 10 };
+      titleRow.getCell(1).alignment = { horizontal: 'center' };
+      sheet.mergeCells(2, 1, 2, visibleOrder.length);
+
+      const dateRow = sheet.addRow([dateText]);
+      dateRow.getCell(1).font = { name: 'Khmer OS Siemreap', size: 11, bold: true };
+      dateRow.getCell(1).alignment = { horizontal: 'center' };
+      sheet.mergeCells(3, 1, 3, visibleOrder.length);
+
+      sheet.addRow([]); // spacer (Row 4)
+
+      // 3. Female Summary (if applicable)
+      if (isFemaleExport) {
+        const femaleSummaryCols = [
+          { key: 'idx', label: 'ល.រ', width: 8 },
+          { key: 'dept', label: 'ផ្នែក', width: 40 },
+          { key: 'count', label: 'ចំនួនស្រី', width: 15 },
+        ];
+        const hRow = sheet.addRow(femaleSummaryCols.map(c => c.label));
+        hRow.eachCell(c => {
+          c.font = { name: 'Khmer OS Siemreap', bold: true };
+          c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+          c.alignment = { horizontal: 'center' };
+        });
+
         const femaleBase = femaleOnlyList || [];
-        const getDeptLabel = (hr) => (hr.Department_Kh || hr.department || hr.unit || '—');
         const map = new Map();
-        (femaleBase || []).forEach(hr => {
-          const d = getDeptLabel(hr) || '—';
+        femaleBase.forEach(hr => {
+          const d = hr.Department_Kh || hr.department || hr.unit || '—';
           if (!map.has(d)) map.set(d, []);
           map.get(d).push(hr);
         });
-        const deptEntries = Array.from(map.entries());
-        // push summary headers
-        rows.push(femaleSummaryCols.map(c => c.label));
-        deptEntries.forEach((entry, i) => {
-          const dept = entry[0];
-          const count = (entry[1] || []).length;
-          if (count === 0) return;
-          rows.push([String(i+1), dept, String(count)]);
-        });
-        rows.push(['']);
-        // detailed header
-        rows.push(femaleDetailCols.map(c => c.label));
-        let overallIdx = 0;
-        deptEntries.forEach((entry, di) => {
-          const dept = entry[0];
-          const items = entry[1] || [];
-          if (!items.length) return;
-          // dept header row (use Khmer romanized index)
-          rows.push([`${toKhmerRoman(di+1)} ${dept}`]);
-          let deptIdx = 0;
-          items.forEach(hr => {
-            overallIdx += 1; deptIdx += 1;
-            const grantVal = hr.grantAmount || hr.bonus || hr.allowance || hr.extraGrant || hr.grant || '';
-            const row = [
-              hr.staffId || hr.cardNumber || hr.staffCode || '',
-              String(overallIdx),
-              String(deptIdx),
-              hr.khmerName || hr.name || '',
-              hr.nameLatin || hr.nameEn || hr.englishName || hr.name || '',
-              (hr.gender === 'Female' || hr.gender === 'ស្រី') ? 'ស' : (hr.gender || ''),
-              hr.position || '',
-              fmtDateSlash(hr.dob || hr.birthDate || ''),
-              hr.bankAccount || hr.bank_account || hr.bank || '',
-              hr.skill || hr.technicalRole || '',
-              formatCurrencyKhmer(grantVal) ? (formatCurrencyKhmer(grantVal) + ' រៀល') : '',
-              hr.Department_Kh || hr.department || hr.unit || '',
-            ];
-            rows.push(row);
+        Array.from(map.entries()).forEach((entry, i) => {
+          const r = sheet.addRow([String(i + 1), entry[0], String(entry[1].length)]);
+          r.eachCell(c => {
+            c.font = { name: 'Khmer OS Siemreap' };
+            c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
           });
         });
-      } else {
-        // default export path for other report types
-        let overallIdx = 0;
-        (grouped || []).forEach((g, gi) => {
-          // department header row (put dept name in first column, leave others blank)
-          const deptLabel = `${toKhmerRoman(gi+1)} ${g.dept || ''}`.trim();
-          const deptHeaderRow = visibleOrder.map((c, i) => (i === 0 ? deptLabel : ''));
-          rows.push(deptHeaderRow);
-          let deptIdx = 0;
-          (g.items || []).forEach(hr => {
-            overallIdx += 1;
-            deptIdx += 1;
-            const row = visibleOrder.map(c => {
-              const k = c.key;
-              if (k === 'serialOverall') return String(overallIdx);
-              if (k === 'serialDept') return String(deptIdx);
-              if (k === 'name') return hr.khmerName || hr.name || '';
-              if (k === 'latinName') return hr.nameLatin || hr.nameEn || hr.englishName || hr.name || '';
-              if (k === 'staffId') return hr.staffId || hr.cardNumber || hr.staffCode || '';
-              if (k === 'gender') {
-                const gval = (hr.gender || '').toString();
-                const gl = gval.toLowerCase();
-                if (gval === 'ប' || gl === 'male' || gl.startsWith('m')) return 'ប';
-                if (gval === 'ស' || gl === 'female' || gl.startsWith('f')) return 'ស';
-                return gval;
-              }
-              if (k === 'dob') return fmtDateSlash(hr.dob || hr.birthDate || '');
-              if (k === 'salaryLevel') return hr.salaryLevel || hr.kamPrak || '';
-              if (k === 'idOrOfficerType') {
-                const showType = (reportType === 'hospitalPlus' || reportType === 'state' || reportType === 'hospital' || reportType === 'hospitalPartTime' || reportType === 'hospitalOver60' || reportType === 'retiredThenContract' || reportType === 'worker');
-                return showType ? (hr.officerType || hr.civilServantId || hr.officerId || '') : (hr.civilServantId || hr.officerId || hr.officerType || hr.staffId || '');
-              }
-              if (k === 'skill') return hr.skill || hr.technicalRole || '';
-              if (k === 'position') return hr.position || '';
-              if (k === 'department') return hr.Department_Kh || hr.department || hr.unit || '';
-              if (k === 'phone') return hr.phone || hr.mobile || hr.tel || hr.contact || '';
-              if (k === 'joinDate') return fmtDateSlash(hr.joinDate || hr.dateJoinedMinistry || hr.nominationStartDate || hr.startDate || '');
-              if (k === 'birthplace') return hr.placeOfBirth || hr.birthPlace || hr.currentAddress || hr.address || '';
-              if (k === 'actions') return hr.status || '';
-              if (k === 'nid') return hr.nid || hr.nationalId || hr.identityNumber || hr.identity || '';
-              if (k === 'bankAccount') return hr.bankAccount || hr.bank_account || hr.bank || '';
-              return '';
-            });
-            rows.push(row);
-          });
-        });
+        sheet.addRow([]);
       }
-      // after all groups, add totals and signature blocks similar to printed report
-      rows.push(visibleOrder.map(() => ''));
+
+      // 4. Main Header
+      const headerRow = sheet.addRow(visibleOrder.map(c => c.label));
+      headerRow.eachCell((cell, i) => {
+        cell.font = { name: 'Khmer OS Siemreap', size: 11, bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+        cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+
+      // 5. Data Rows
+      let overallIdx = 0;
+      (grouped || []).forEach((g, gi) => {
+        // Dept Header (Image B)
+        const deptLabel = `${toKhmerRoman(gi + 1)} ${g.dept || ''}`.trim();
+        const dRow = sheet.addRow([deptLabel]);
+        sheet.mergeCells(dRow.number, 1, dRow.number, visibleOrder.length);
+        dRow.getCell(1).font = { name: 'Khmer OS Muol Light', size: 9, bold: false };
+        dRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
+        dRow.getCell(1).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+
+        let deptIdx = 0;
+        (g.items || []).forEach(hr => {
+          overallIdx += 1;
+          deptIdx += 1;
+          const rowValues = visibleOrder.map(c => {
+            const k = c.key;
+            if (k === 'serialOverall') return overallIdx;
+            if (k === 'serialDept') return deptIdx;
+            if (k === 'name') return hr.khmerName || hr.name || '';
+            if (k === 'latinName') return hr.nameLatin || hr.nameEn || hr.englishName || hr.name || '';
+            if (k === 'staffId') return hr.staffId || hr.cardNumber || hr.staffCode || '';
+            if (k === 'gender') {
+              const gval = (hr.gender || '').toString().toLowerCase();
+              if (gval === 'female' || gval === 'ស' || gval.startsWith('f')) return 'ស';
+              return 'ប';
+            }
+            if (k === 'dob') return fmtDateSlash(hr.dob || hr.birthDate || '');
+            if (k === 'salaryLevel') return hr.salaryLevel || hr.kamPrak || '';
+            if (k === 'idOrOfficerType') {
+              const isContract = ['state', 'hospital', 'worker', 'hospitalPlus', 'hospitalPartTime', 'retiredThenContract'].includes(reportType);
+              return isContract ? (hr.officerType || '') : (hr.civilServantId || hr.officerId || hr.staffId || hr.idCardNumber || hr.officerCardNumber || hr.cardNumber || '');
+            }
+            if (k === 'skill') return hr.skill || hr.technicalRole || '';
+            if (k === 'position') return hr.position || '';
+            if (k === 'department') return hr.Department_Kh || hr.department || hr.unit || '';
+            if (k === 'bankAccount') return hr.bankAccount || '';
+            if (k === 'grant') {
+              const grantVal = hr.grantAmount || hr.bonus || hr.allowance || '';
+              return grantVal ? (formatCurrencyKhmer(grantVal) + ' រៀល') : '';
+            }
+            return '';
+          });
+          const newRow = sheet.addRow(rowValues);
+          newRow.eachCell((cell, i) => {
+            cell.font = { name: 'Khmer OS Siemreap', size: 11 };
+            cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+            const key = visibleOrder[i - 1].key;
+            if (['serialOverall', 'serialDept', 'gender', 'dob', 'salaryLevel', 'idOrOfficerType'].includes(key)) {
+              cell.alignment = { horizontal: 'center' };
+            }
+          });
+        });
+      });
+
+      // 6. Totals & Signatures
+      sheet.addRow([]);
       const totalsStr = `បញ្ចប់បញ្ជីត្រឹមចំនួន: ${toKhmerDigits((selectedTotals && selectedTotals.total) || 0)} នាក់  (ប្រុស: ${toKhmerDigits((selectedTotals && selectedTotals.male) || 0)} នាក់  ស្រី: ${toKhmerDigits((selectedTotals && selectedTotals.female) || 0)} នាក់)`;
-      rows.push(visibleOrder.map((c, i) => (i === 0 ? totalsStr : '')));
-      // signature rows: left, center, right (place text approximately in columns)
-      rows.push(visibleOrder.map((c, i) => (i === 0 ? 'បានឃើញ\nនាយកមន្ទីរពេទ្យ' : '')));
-      rows.push(visibleOrder.map((c, i) => (i === Math.floor(visibleOrder.length/2) ? 'បានពិនិត្យត្រឹមត្រូវ\nប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក' : '')));
-      rows.push(visibleOrder.map((c, i) => (i === (visibleOrder.length - 1) ? `រាជធានីភ្នំពេញ ${fmtKhmerLongDate(footerDate)}` : '')));
-      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
-      const content = '\uFEFF' + csv;
-      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+      const totalRow = sheet.addRow([totalsStr]);
+      totalRow.getCell(1).font = { name: 'Khmer OS Siemreap', bold: true };
+      sheet.mergeCells(totalRow.number, 1, totalRow.number, visibleOrder.length);
+
+      sheet.addRow([]);
+      sheet.addRow([]);
+      const midStart = Math.floor(visibleOrder.length / 3) + 1;
+      const rightStart = Math.floor((visibleOrder.length * 2) / 3) + 1;
+      const last = visibleOrder.length;
+
+      // Row 1: Dates and First lines
+      const sigRow1 = sheet.addRow([]);
+      sigRow1.getCell(1).value = 'បានឃើញ';
+      sigRow1.getCell(midStart).value = 'បានពិនិត្យត្រឹមត្រូវ';
+      sigRow1.getCell(rightStart).value = (lunarText && lunarText.trim()) ? lunarText : ('ថ្ងៃ' + khWeekday(new Date()) + '  ព.ស. ' + toKhmerDigits(buddhistEraYear(new Date())));
+      
+      sheet.mergeCells(sigRow1.number, 1, sigRow1.number, midStart - 1);
+      sheet.mergeCells(sigRow1.number, midStart, sigRow1.number, rightStart - 1);
+      sheet.mergeCells(sigRow1.number, rightStart, sigRow1.number, last);
+
+      sigRow1.eachCell(c => {
+        c.font = { name: 'Khmer OS Siemreap', size: 11 };
+        c.alignment = { horizontal: 'center' };
+      });
+
+      // Row 2: Roles and Full Date
+      const sigRow2 = sheet.addRow([]);
+      sigRow2.getCell(1).value = 'នាយកមន្ទីរពេទ្យ';
+      sigRow2.getCell(midStart).value = 'ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក';
+      sigRow2.getCell(rightStart).value = `រាជធានីភ្នំពេញ ${fmtKhmerLongDate(footerDateStr)}`;
+
+      sheet.mergeCells(sigRow2.number, 1, sigRow2.number, midStart - 1);
+      sheet.mergeCells(sigRow2.number, midStart, sigRow2.number, rightStart - 1);
+      sheet.mergeCells(sigRow2.number, rightStart, sigRow2.number, last);
+
+      sigRow2.getCell(1).font = { name: 'Khmer OS Muol Light', size: 11 };
+      sigRow2.getCell(midStart).font = { name: 'Khmer OS Muol Light', size: 11 };
+      sigRow2.getCell(rightStart).font = { name: 'Khmer OS Siemreap', size: 11 };
+      
+      sigRow2.eachCell(c => {
+        c.alignment = { horizontal: 'center' };
+      });
+
+      // Row 3: Final title for report maker
+      const sigRow3 = sheet.addRow([]);
+      sigRow3.getCell(rightStart).value = 'អ្នកធ្វើរបាយការណ៍';
+      sheet.mergeCells(sigRow3.number, rightStart, sigRow3.number, last);
+      sigRow3.getCell(rightStart).font = { name: 'Khmer OS Muol Light', size: 11 };
+      sigRow3.getCell(rightStart).alignment = { horizontal: 'center' };
+
+      // 7. Write & Download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const name = `employee_report_${reportType}_${asOfDate || ''}.csv`;
-      a.download = name;
+      const filename = `employee_report_${reportType}_${footerDateStr}.xlsx`;
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
+
     } catch (err) {
       console.error('Export failed', err);
       alert('Export failed: ' + (err?.message || err));
@@ -1815,124 +2244,194 @@ export default function EmployeeReportPage() {
   };
 
   // Ensure footer and helper values exist (used in JSX below)
-  const footerDate = asOfDate || new Date().toISOString().slice(0,10);
+  const footerDate = asOfDate || new Date().toISOString().slice(0, 10);
   function khWeekday(d) {
-    const days = ['អាទិត្យ','ចន្ទ','អង្គារ៍','ពុធ','ព្រហស្បតិ៍','សុក្រ','សៅរ៍'];
+    const days = ['អាទិត្យ', 'ចន្ទ', 'អង្គារ៍', 'ពុធ', 'ព្រហស្បតិ៍', 'សុក្រ', 'សៅរ៍'];
     try { return days[new Date(d).getDay()] || ''; } catch { return ''; }
   }
   function buddhistEraYear(d) { try { return new Date(d).getFullYear() + 543; } catch { return new Date().getFullYear() + 543; } }
-  function fmtKhmerLongDate(d) { if (!d) return ''; const dt = new Date(d); if (isNaN(dt.getTime())) return ''; const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ']; return `ថ្ងៃទី ${toKhmerDigits(String(dt.getDate()).padStart(2,'0'))} ខែ ${khMonths[dt.getMonth()]} ឆ្នាំ ${toKhmerDigits(String(dt.getFullYear()))}`; }
+  function fmtKhmerLongDate(d) { if (!d) return ''; const dt = new Date(d); if (isNaN(dt.getTime())) return ''; const khMonths = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ']; return `ថ្ងៃទី ${toKhmerDigits(String(dt.getDate()).padStart(2, '0'))} ខែ ${khMonths[dt.getMonth()]} ឆ្នាំ ${toKhmerDigits(String(dt.getFullYear()))}`; }
 
   if (!(perms.canViewHR || perms.canViewEmployees)) {
     return (
       <div className="p-6">
         <h2 className="text-xl font-semibold mb-2">របាយការណ៍បុគ្គលិក</h2>
-  <div className="p-3 border rounded bg-yellow-50 text-yellow-800">ត្រូវការ សិទ្ធិ: view:hr ឬ view:employees</div>
+        <div className="p-3 border rounded bg-yellow-50 text-yellow-800">ត្រូវការ សិទ្ធិ: view:hr ឬ view:employees</div>
       </div>
     );
   }
 
   return (
     <div className="p-6">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-           
+      {/* Modern Filter Card */}
+      <div 
+        ref={filterCardRef}
+        style={{
+          position: 'sticky',
+          top: '-24px', 
+          zIndex: 40,
+          background: '#fff',
+          padding: '24px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          border: '1px solid #edf2f7',
+          marginBottom: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}
+      >
+        {/* Row 1: Search and Main Actions */}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>🔍</span>
+            <input
+              type="text"
+              placeholder="ស្វែងរកឈ្មោះ, អត្តលេខ, ផ្នែក, តួនាទី..."
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px 8px 36px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '13px', background: '#f8fafc' }}
+            />
           </div>
-          <div className="flex items-center gap-1">
-            <label className="text-sm text-gray-700">ផ្នែក:</label>
-            <div style={{ position: 'relative', width: 280, marginRight: 8 }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setShowGroupModal(true)}
+              style={{ padding: '8px 16px', background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
+            >បង្កើតក្រុមជំនាញ</button>
+            <button
+              type="button"
+              onClick={() => exportToExcel(filteredList, computedTitle)}
+              style={{ padding: '8px 16px', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
+            >នាំចេញ Excel</button>
+            <button
+              type="button"
+              onClick={handlePrint}
+              style={{ padding: '8px 16px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
+            >បោះពុម្ព</button>
+          </div>
+        </div>
+
+        {/* Row 2: All Filters and Controls */}
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>ផ្នែក:</label>
+            <div style={{ position: 'relative', width: '180px' }}>
               <input
                 type="text"
                 placeholder="ស្វែងរកផ្នែក..."
-                value={deptQuery || (departments.find(d => ((d.Department_Kh||d.Department||d.Department_En||'').toString()) === (selectedDept || '')) ? selectedDept : deptQuery)}
+                value={deptQuery || selectedDept}
                 onChange={(e) => { setDeptQuery(e.target.value); setShowDeptList(true); }}
                 onFocus={() => setShowDeptList(true)}
-                onBlur={() => setTimeout(()=>setShowDeptList(false), 150)}
-                className="border rounded px-3 py-1 text-gray-900 bg-white w-full"
+                onBlur={() => setTimeout(() => setShowDeptList(false), 150)}
+                style={{ width: '100%', padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '12px', background: '#fff' }}
               />
               {showDeptList && (
-                <div style={{ position: 'absolute', top: '38px', left: 0, right: 0, maxHeight: 260, overflowY: 'auto', background: '#fff', border: '1px solid #ddd', zIndex: 60 }}>
-                  <div onMouseDown={() => { setSelectedDept(''); setDeptQuery(''); setShowDeptList(false); }} style={{ padding: '6px 8px', cursor: 'pointer', borderBottom: '1px solid #f3f3f3' }}>-- ទាំងអស់ --</div>
-                  {(departments || []).filter(d => {
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: '200px', overflowY: 'auto', background: '#fff', border: '1px solid #e2e8f0', zIndex: 100, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', borderRadius: '4px', marginTop: '2px' }}>
+                  <div onMouseDown={() => { setSelectedDept(''); setDeptQuery(''); setShowDeptList(false); }} style={{ padding: '6px 10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', fontSize: '12px' }}>-- ទាំងអស់ --</div>
+                  {departments.filter(d => {
                     const label = (d.Department_Kh || d.Department || d.Department_En || '').toString();
-                    if (!deptQuery) return true;
-                    return label.toLowerCase().includes(deptQuery.toLowerCase());
+                    return !deptQuery || label.toLowerCase().includes(deptQuery.toLowerCase());
                   }).map(d => {
                     const label = (d.Department_Kh || d.Department || d.Department_En || '').toString();
-                    const val = (d.Department_Kh || d.Department || d.Department_En || d.Department_Id || '').toString();
+                    const val = (d.Department_Kh || d.Department || d.Department_En).toString();
                     return (
-                      <div key={val + label} onMouseDown={() => { setSelectedDept(val); setDeptQuery(label); setShowDeptList(false); }} style={{ padding: '6px 8px', cursor: 'pointer', borderBottom: '1px solid #fafafa' }}>{label}</div>
+                      <div key={val + label} onMouseDown={() => { setSelectedDept(val); setDeptQuery(label); setShowDeptList(false); }} style={{ padding: '6px 10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', fontSize: '12px' }} onMouseEnter={(e) => e.target.style.background = '#f8fafc'} onMouseLeave={(e) => e.target.style.background = 'transparent'}>{label}</div>
                     );
                   })}
                 </div>
               )}
             </div>
-            <label className="text-sm text-gray-700">ជ្រើសរើស:</label>
-            <select
-              className="border rounded px-3 py-1 text-gray-900 bg-white w-72"
-              value={reportType}
-              onChange={(e) => setReportType(e.target.value)}
-            >
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>ប្រភេទ:</label>
+            <select value={reportType} onChange={(e) => setReportType(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '12px', background: '#fff', minWidth: '150px' }}>
               <option value="total">សរុបបុគ្គលិក</option>
               <option value="technical">ជំនាញបច្ចេកទេស</option>
               <option value="civil">មន្ត្រីរាជការ</option>
               <option value="state">កិច្ចសន្យារដ្ឋ</option>
               <option value="hospital">កិច្ចសន្យាមន្ទីរពេទ្យ</option>
               <option value="worker">កម្មករកិច្ចសន្យា</option>
-              <option value="hospitalPlus">កិច្ចសន្យា (មន្ទីរពេទ្យ + ក្រៅម៉ោង + កម្មករ)</option>
-              <option value="hospitalPartTime">កិច្ចសន្យាមន្ទីរពេទ្យ (ក្រៅម៉ោង)</option>
-              <option value="retiredThenContract">ចូលនិវត្តន៍ (បន្តជា​កិច្ចសន្យា)</option>
-              <option value="hospitalOver60">កិច្ចសន្យាមន្ទីរពេទ្យ (អាយុ ៦០ ឆ្នាំឡើង)</option>
+              <option value="hospitalPlus">កិច្ចសន្យាសរុប</option>
+              <option value="hospitalPartTime">កិច្ចសន្យា (ក្រៅម៉ោង)</option>
+              <option value="retiredThenContract">ចូលនិវត្តន៍បន្តកិច្ចសន្យា</option>
+              <option value="hospitalOver60">កិច្ចសន្យា (≥៦០ឆ្នាំ)</option>
               <option value="allhr">ទិន្នន័យបុគ្គលិក</option>
               <option value="evaluation">ការវាយតម្លៃ</option>
               <option value="femaleCount">ចំនួនស្រ្តី</option>
             </select>
-
-            <label className="text-sm" style={{marginLeft:8, marginRight:6}}>គម្រៀប:</label>
-            <select className="border rounded px-2 py-1 text-gray-900 bg-white" value={orientation} onChange={e => setOrientation(e.target.value)}>
-              <option value="portrait">Portrait (ឌីហ្វូល)</option>
-              <option value="landscape">Landscape</option>
-            </select>
-
-            {/* Quick roster buttons removed as requested */}
-
-            <button type="button" className="ml-2 px-2 py-1 rounded text-sm bg-gray-100" onClick={() => setShowGroupModal(true)} title="ចាប់បញ្ចូលជំនាញ">បញ្ចូលជំនាញ</button>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-sm">គិតត្រឹម:</label>
-          <input type="date" value={asOfDate} onChange={e=>setAsOfDate(e.target.value)} className="border px-2 py-1 rounded text-sm" />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 6 }}>
-            <input type="text" className="border rounded px-2 py-1" style={{ width: 340 }} placeholder="ចន្ទគតិ (ឧ. ថ្ងៃសុក្រ ១៣កើត...)" value={lunarText} onChange={(e)=> setLunarText(e.target.value)} />
-            {(!lunarText.trim()) && <span className="text-red-600 text-xs">សូមបំពេញចន្ទគតិ</span>}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 6, position: 'relative' }}>
-            <label className="text-sm">Row height</label>
-            <input type="range" min={20} max={60} step={1} value={rowHeight} onChange={(e) => setRowHeight(Number(e.target.value))} style={{width: 160}} />
-            <div style={{minWidth:40, textAlign:'right', fontWeight:600}}>{rowFontSize}px</div>
-            <div style={{marginLeft:8, position:'relative'}}>
-              <button type="button" onClick={() => setShowColsMenu(v => !v)} className="border px-2 py-1 rounded text-sm">Columns</button>
-              {showColsMenu && (
-                <div style={{position:'absolute', right:0, top:36, background:'#fff', border:'1px solid #ddd', padding:8, boxShadow:'0 2px 6px rgba(0,0,0,0.12)', zIndex:50}}>
-                  {Object.keys(defaultColumns).map(k => (
-                    <label key={k} style={{display:'block', fontSize:12, whiteSpace:'nowrap'}}>
-                      <input type="checkbox" checked={!!visibleCols[k]} onChange={() => toggleCol(k)} style={{marginRight:6}} /> {({serialOverall:'ស.រ',serialDept:'ល.រ',name:'គោត្តនាម និងនាម',latinName:'ឈ្មោះឡាតាំង',staffId:'អត្តលេខកាត់',gender:'ភេទ',dob:'ថ្ងៃកំណើត',salaryLevel:'កាំប្រាក់',idOrOfficerType:'អត្តលេខ/ប្រភេទ',skill:'ជំនាញ',position:'តួនាទី',femaleCount:'ចំនួនស្រ្តី'}[k] || k)}
-                    </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>ក្រុម:</label>
+            <div style={{ position: 'relative', width: '150px' }}>
+              <input
+                type="text"
+                placeholder="ស្វែងរកក្រុម..."
+                value={groupQuery || selectedGroup}
+                onChange={(e) => { setGroupQuery(e.target.value); setShowGroupList(true); }}
+                onFocus={() => setShowGroupList(true)}
+                onBlur={() => setTimeout(() => setShowGroupList(false), 150)}
+                style={{ width: '100%', padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '12px', background: '#fff' }}
+              />
+              {showGroupList && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: '200px', overflowY: 'auto', background: '#fff', border: '1px solid #e2e8f0', zIndex: 100, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', borderRadius: '4px', marginTop: '2px' }}>
+                  <div onMouseDown={() => { setSelectedGroup(''); setGroupQuery(''); setShowGroupList(false); }} style={{ padding: '6px 10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', fontSize: '12px' }}>-- ទាំងអស់ --</div>
+                  {[
+                    'ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក', 'ប្រធានការិយាល័យហិរញ្ញវត្ថុ', 'ប្រធានការិយាល័យបច្ចេកទេស',
+                    'ការិយាល័យរដ្ឋបាល និងបុគ្គលិក បុគ្គលិកអនាម័យ', 'ការិយាល័យបច្ចេកទេស ចំហុយសម្ភារៈ និង ផ្នែកបោកអ៊ុត',
+                    ...Array.from(new Set(list.map(hr => (hr.Department_Kh || hr.department || '').toString().trim()))).filter(Boolean)
+                  ].filter((g, index, self) => self.indexOf(g) === index).filter(g => !groupQuery || g.toLowerCase().includes(groupQuery.toLowerCase())).map(g => (
+                    <div key={g} onMouseDown={() => { setSelectedGroup(g); setGroupQuery(g); setShowGroupList(false); }} style={{ padding: '6px 10px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', fontSize: '12px' }} onMouseEnter={(e) => e.target.style.background = '#f8fafc'} onMouseLeave={(e) => e.target.style.background = 'transparent'}>{g}</div>
                   ))}
-                  <div style={{textAlign:'right', marginTop:6}}>
-                    <button type="button" onClick={() => setShowColsMenu(false)} className="px-2 py-1 border rounded text-sm">Close</button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>គម្រៀប:</label>
+            <select value={orientation} onChange={e => setOrientation(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '12px', background: '#fff' }}>
+              <option value="portrait">បញ្ឈរ (A4)</option>
+              <option value="landscape">ទទឹង (A4)</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>គិតត្រឹម:</label>
+            <input type="date" value={asOfDate} onChange={e => setAsOfDate(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '12px', background: '#fff' }} />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '200px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>ចន្ទគតិ:</label>
+            <input type="text" placeholder="ចន្ទគតិ..." value={lunarText} onChange={(e) => setLunarText(e.target.value)} style={{ width: '100%', padding: '6px 10px', border: '1px solid', borderColor: lunarText.trim() ? '#cbd5e1' : '#fca5a5', borderRadius: '4px', fontSize: '12px', background: '#fff' }} />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '4px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <label style={{ fontSize: '10px', color: '#94a3b8', textAlign: 'center' }}>Row Height</label>
+              <input type="range" min={20} max={60} value={rowHeight} onChange={(e) => setRowHeight(Number(e.target.value))} style={{ width: '80px' }} />
+            </div>
+            <div style={{ position: 'relative' }}>
+              <button type="button" onClick={() => setShowColsMenu(v => !v)} style={{ padding: '6px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Columns</button>
+              {showColsMenu && (
+                <div style={{ position: 'absolute', right: 0, bottom: '100%', marginBottom: '8px', background: '#fff', border: '1px solid #ddd', padding: '12px', minWidth: '200px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 100, borderRadius: '8px' }}>
+                  <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                    {Object.keys(defaultColumns).map(k => (
+                      <label key={k} style={{ display: 'flex', alignItems: 'center', fontSize: '11px', marginBottom: '6px', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={!!visibleCols[k]} onChange={() => toggleCol(k)} style={{ marginRight: '8px' }} />
+                        {({ serialOverall: 'ស.រ', serialDept: 'ល.រ', name: 'ឈ្មោះ', staffId: 'អត្តលេខ', gender: 'ភេទ', dob: 'ថ្ងៃកំណើត', salaryLevel: 'កាំប្រាក់', skill: 'ជំនាញ', position: 'តួនាទី', department: 'ផ្នែក', phone: 'ទូរស័ព្ទ' }[k] || k)}
+                      </label>
+                    ))}
                   </div>
                 </div>
               )}
             </div>
           </div>
-          <button onClick={handleExportExcel} className="bg-green-600 text-white px-2 py-1 rounded">Export</button>
-          <button className={`border px-2 py-1 rounded ml-2 ${(!lunarText.trim() || loading) ? 'bg-gray-100 text-gray-300' : 'bg-blue-600 text-white border-blue-600'}`} onClick={handlePrint} disabled={!lunarText.trim() || loading}>បោះពុម្ព</button>
         </div>
       </div>
-      
+
 
       {error && <div className="mb-2 text-red-600 text-sm">{error}</div>}
 
@@ -1943,59 +2442,74 @@ export default function EmployeeReportPage() {
           {/* Screen-only style to match print layout */}
           <style dangerouslySetInnerHTML={{ __html: SCREEN_CSS }} />
           <style>{`.print-scope tbody tr { min-height: ${rowHeight}px; }
-            .print-scope tbody tr > td, .print-scope tbody tr > th { vertical-align: middle !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-            .print-scope th, .print-scope td { padding: ${Math.max(6, Math.round(rowHeight/4))}px ${Math.max(4, Math.round(rowHeight/8))}px !important; line-height: ${Math.max(12, Math.round(rowHeight*0.6))}px !important; }
+            .print-scope thead tr > th {
+              position: sticky;
+              top: ${filterHeight - 24}px;
+              z-index: 30;
+              background: #f7f7f7 !important;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .print-scope thead tr > th, .print-scope tbody tr > td, .print-scope tbody tr > th { 
+              vertical-align: middle !important; 
+              white-space: nowrap !important; 
+              overflow: visible !important;
+            }
+            /* Scaling container for long text */
+            .scale-container {
+              display: inline-block;
+              width: 100%;
+              transform-origin: left center;
+            }
+            .print-scope th, .print-scope td { padding: ${Math.max(6, Math.round(rowHeight / 4))}px ${Math.max(4, Math.round(rowHeight / 8))}px !important; line-height: ${Math.max(12, Math.round(rowHeight * 0.6))}px !important; }
             `}</style>
           <div className="title">
-            <h2>{computedTitle}</h2>
-            {reportType === 'evaluation' && selectedDept && (
-              <div style={{textAlign:'center', fontSize:'14px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', marginTop:'4px', }}>
-                {selectedDept}
-              </div>
-            )}
+            <h2 style={{ marginBottom: 0 }}>
+              {computedTitle}
+              {reportType === 'evaluation' && selectedDept && (
+                <span style={{ marginLeft: '10px' }}>{selectedDept}</span>
+              )}
+            </h2>
           </div>
           {reportType === 'evaluation' ? (
-            <div style={{textAlign:'center', marginTop:6, fontSize:14, fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontWeight:'bold'}}>
+            <div style={{ textAlign: 'center', marginTop: 2, fontSize: 14, fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontWeight: 'bold' }}>
               {asOfDate ? (
-                <>
-                  <div style={{marginTop:'4px', fontSize:'13px'}}>
-                    ប្រចាំ ខែ{(() => {
-                      const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
-                      const dt = new Date(asOfDate);
-                      return `${khMonths[dt.getMonth()]} ឆ្នាំ${toKhmerDigits(String(dt.getFullYear()))}`;
-                    })()}
-                  </div>
-                </>
+                <div style={{ fontSize: '13px' }}>
+                  ប្រចាំ ខែ{(() => {
+                    const khMonths = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
+                    const dt = new Date(asOfDate);
+                    return `${khMonths[dt.getMonth()]} ឆ្នាំ${toKhmerDigits(String(dt.getFullYear()))}`;
+                  })()}
+                </div>
               ) : ''}
             </div>
           ) : (
-            <div style={{textAlign:'center', marginTop:6, fontSize:14}}>{asOfDate ? fmtDateLong(asOfDate) : ''}</div>
+            <div style={{ textAlign: 'center', marginTop: 2, fontSize: 14 }}>{asOfDate ? fmtDateLong(asOfDate) : ''}</div>
           )}
 
           {reportContent}
 
           {showGroupModal && (
-            <div style={{position:'fixed', left:0, top:0, right:0, bottom:0, background:'rgba(0,0,0,0.4)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center'}}>
-              <div style={{width:740, maxHeight:'80vh', overflow:'auto', background:'#fff', padding:16, borderRadius:6}}>
-                <h3 style={{marginTop:0}}>បង្កើតក្រុមជំនាញ</h3>
-                <div style={{display:'flex', gap:12}}>
-                  <div style={{flex:1}}>
-                    <div style={{marginBottom:8}}>ជ្រើសជំនាញ (ចុចដាក់សញ្ញាក្រោម):</div>
-                    <div style={{maxHeight:860, overflowY:'auto', border:'1px solid #eee', padding:8}}>
+            <div style={{ position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 740, maxHeight: '80vh', overflow: 'auto', background: '#fff', padding: 16, borderRadius: 6 }}>
+                <h3 style={{ marginTop: 0 }}>បង្កើតក្រុមជំនាញ</h3>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ marginBottom: 8 }}>ជ្រើសជំនាញ (ចុចដាក់សញ្ញាក្រោម):</div>
+                    <div style={{ maxHeight: 860, overflowY: 'auto', border: '1px solid #eee', padding: 8 }}>
                       {/* hide names already present in existing groups to avoid duplicate selection */}
                       {availableSkills.length === 0 && <div className="text-gray-600">គ្មានជំនាញសម្រាប់ជ្រើស (ទាំងអស់បានបញ្ចូលក្នុងក្រុមរួចហើយ)</div>}
                       {availableSkills.map((sk, i) => (
-                        <label key={sk+i} style={{display:'block', padding:'4px 0'}}>
-                          <input type="checkbox" checked={groupSelection.has(sk)} onChange={() => toggleSelectSkillForGroup(sk)} style={{marginRight:8}} /> {sk}
+                        <label key={sk + i} style={{ display: 'block', padding: '4px 0' }}>
+                          <input type="checkbox" checked={groupSelection.has(sk)} onChange={() => toggleSelectSkillForGroup(sk)} style={{ marginRight: 8 }} /> {sk}
                         </label>
                       ))}
-                      {existingGroupMembers.size > 0 && <div style={{marginTop:8, fontSize:12, color:'#666'}}>ចំណាំ៖ ជំនាញដែលបានបញ្ចូលក្នុងក្រុមរួចហើយមិនបង្ហាញនៅទីនេះ ដើម្បីទប់ស្កាត់ការជ្រើសពីរដង</div>}
+                      {existingGroupMembers.size > 0 && <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>ចំណាំ៖ ជំនាញដែលបានបញ្ចូលក្នុងក្រុមរួចហើយមិនបង្ហាញនៅទីនេះ ដើម្បីទប់ស្កាត់ការជ្រើសពីរដង</div>}
                     </div>
                   </div>
-                  <div style={{width:380}}>
-                    <div style={{marginBottom:8}}>ឈ្មោះក្រុម:</div>
-                    <input value={groupNameInput} onChange={e=>setGroupNameInput(e.target.value)} placeholder="ឧ. សាស្រ្តាចារ្យ" style={{width:'100%', padding:8, boxSizing:'border-box'}} />
-                    <div style={{marginTop:12}}>
+                  <div style={{ width: 380 }}>
+                    <div style={{ marginBottom: 8 }}>ឈ្មោះក្រុម:</div>
+                    <input value={groupNameInput} onChange={e => setGroupNameInput(e.target.value)} placeholder="ឧ. សាស្រ្តាចារ្យ" style={{ width: '100%', padding: 8, boxSizing: 'border-box' }} />
+                    <div style={{ marginTop: 12 }}>
                       {selectedEditGroupIndex == null ? (
                         <button type="button" onClick={createSkillGroup} className="px-3 py-1 bg-blue-600 text-white rounded">បង្កើត</button>
                       ) : (
@@ -2006,20 +2520,20 @@ export default function EmployeeReportPage() {
                       )}
                       <button type="button" onClick={() => { setShowGroupModal(false); setGroupSelection(new Set()); setGroupNameInput(''); setSelectedEditGroupIndex(null); }} className="ml-2 px-3 py-1 border rounded">បោះបង់</button>
                     </div>
-                    <div style={{marginTop:16}}>
-                      <div style={{fontWeight:700}}>ក្រុមដែលមាន:</div>
-                      <div style={{maxHeight:220, overflowY:'auto', border:'1px solid #eee', padding:8}}>
+                    <div style={{ marginTop: 16 }}>
+                      <div style={{ fontWeight: 700 }}>ក្រុមដែលមាន:</div>
+                      <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid #eee', padding: 8 }}>
                         {skillGroups.length === 0 && <div className="text-gray-600">មិនមាន</div>}
                         {skillGroups.map((g, idx) => (
-                          <div key={g.name+idx} style={{padding:'6px 0', borderBottom:'1px solid #fafafa', cursor:'pointer'}} onClick={() => editSkillGroup(idx)}>
-                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                          <div key={g.name + idx} style={{ padding: '6px 0', borderBottom: '1px solid #fafafa', cursor: 'pointer' }} onClick={() => editSkillGroup(idx)}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div>{g.name}</div>
-                              <div style={{display:'flex', gap:8}}>
-                                <button type="button" onClick={(e)=>{ e.stopPropagation(); editSkillGroup(idx); }} className="px-2 py-1 border rounded text-sm">កែ</button>
-                                <button type="button" onClick={(e)=>{ e.stopPropagation(); removeSkillGroup(idx); }} className="text-red-600">លុប</button>
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <button type="button" onClick={(e) => { e.stopPropagation(); editSkillGroup(idx); }} className="px-2 py-1 border rounded text-sm">កែ</button>
+                                <button type="button" onClick={(e) => { e.stopPropagation(); removeSkillGroup(idx); }} className="text-red-600">លុប</button>
                               </div>
                             </div>
-                            <div style={{fontSize:12, color:'#444'}}>{g.members.join(', ')}</div>
+                            <div style={{ fontSize: 12, color: '#444' }}>{g.members.join(', ')}</div>
                           </div>
                         ))}
                       </div>
@@ -2029,12 +2543,17 @@ export default function EmployeeReportPage() {
               </div>
             </div>
           )}
-          
+
           {/* Evaluation marking "A" label below data */}
           {reportType === 'evaluation' && (
-            <div style={{marginTop:'10px', display:'flex', alignItems:'flex-start', gap:'8px'}}>
-            
-              <div style={{fontSize:'12px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontWeight: 'bold'}}>សំគាល់៖  ល្អ ទទួលបានប្រាក់លាភការ 100%  ,ល្អបង្គួរ ទទួលបាន 75%  ,មធ្យម ទទួលបាន 50%  ,ខ្សោយ ទទួលបាន 0%</div>
+            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ fontSize: '13px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontWeight: 'bold' }}>
+                សំគាល់៖
+              </div>
+              <div style={{ fontSize: '12px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', paddingLeft: '10px', lineHeight: '1.6' }}>
+                ១. វឌ្ឍនការងារ៖ ល្អ (≥៨៥%-១០០%), ល្អបង្គួរ (≥៦៥%-{"<"}៨៥%), មធ្យម (≥៤៥%-{"<"}៦៥%), ខ្សោយ ({"<"}៤៥%)<br />
+                ២. ការផ្តល់ប្រាក់លើកទឹកចិត្ត៖ ល្អ (១០០%), ល្អបង្គួរ (៧៥%), មធ្យម (៥០%), ខ្សោយ (០%)
+              </div>
             </div>
           )}
           {reportType !== 'evaluation' && (
@@ -2045,81 +2564,82 @@ export default function EmployeeReportPage() {
 
           {/* footer/signature area for evaluation report */}
           {reportType === 'evaluation' && (
-            <div style={{display:'flex', justifyContent:'space-between', marginTop:'20px', fontSize:'12px'}}>
-              <div style={{width:'50%', paddingLeft: '20px'}}>
-                <div style={{marginTop:'10px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>បានឃើញ និងឯកភាព</div>
-                <div style={{height:'0px'}}></div>
-                <select 
-                  value={footerLeftTitle} 
-                  onChange={(e) => setFooterLeftTitle(e.target.value)}
-                  style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center', width:'100%',
-                     padding:'6px', boxSizing:'border-box', borderRadius:'3px', border:'none', background:'transparent', appearance:'none', WebkitAppearance:'none', MozAppearance:'none', cursor:'pointer'}}
-                >
-                  <option value="នាយករងទទួលបន្ទុក">នាយករងទទួលបន្ទុក</option>
-                  <option value="នាយកមន្ទីរពេទ្យ">នាយកមន្ទីរពេទ្យ</option>
-                </select>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '12px' }}>
+              <div style={{ width: '45%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px' }}>បានឃើញ និងឯកភាព</div>
+                <div style={{ marginTop: '2px' }}>
+                  <select
+                    value={footerLeftTitle}
+                    onChange={(e) => setFooterLeftTitle(e.target.value)}
+                    style={{
+                      fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '13px', textAlign: 'center', border: 'none', background: 'transparent', cursor: 'pointer', outline: 'none'
+                    }}
+                  >
+                    <option value="នាយករងទទួលបន្ទុក">នាយករងទទួលបន្ទុក</option>
+                    <option value="នាយកមន្ទីរពេទ្យ">នាយកមន្ទីរពេទ្យ</option>
+                  </select>
+                </div>
               </div>
-              <div style={{width:'30%', textAlign:'center'}}>
-                <div style={{marginTop:'10px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}></div>
-                <div style={{marginTop:'5px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}></div>
-                <div style={{height:'0px'}}></div>
-              </div>
-              <div style={{width:'50%', textAlign:'right', paddingRight: '20px'}}>
-                 <div style={{marginTop:'0px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center'}}>
+
+              <div style={{ width: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px' }}>
                   បានវាយតម្លៃ និងគោរពជូន លោកនាយក
                 </div>
-                <div style={{marginTop:'0px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center'}}>
+                <div style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px' }}>
                   ដើម្បីពិនិត្យនិងសម្រេច
                 </div>
-                <div style={{marginTop:'0px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center'}}>
-                   រាជធានីភ្នំពេញ ថ្ងៃទី..........ខែ..............ឆ្នាំ២០....
+                <div style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px' }}>
+                  រាជធានីភ្នំពេញ ថ្ងៃទី..........ខែ..............ឆ្នាំ២០....
                 </div>
-                <div style={{marginTop:'5px', height:'0px'}}></div>
-                <select 
-                  value={footerRightTitle} 
-                  onChange={(e) => setFooterRightTitle(e.target.value)}
-                  style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center', width:'100%', padding:'6px', boxSizing:'border-box', borderRadius:'3px', border:'none', background:'transparent', appearance:'none', WebkitAppearance:'none', MozAppearance:'none', cursor:'pointer'}}
-                >
-                  <option value="នាយករងទទួលបន្ទុក">នាយករងទទួលបន្ទុក</option>
-                  <option value="ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក">ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក</option>
-                  <option value="ប្រធានការិយាល័យហិរញ្ញវត្ថុ">ប្រធានការិយាល័យហិរញ្ញវត្ថុ</option>
-                  <option value="ប្រធានការិយាល័យបច្ចេកទេស">ប្រធានការិយាល័យបច្ចេកទេស</option>
-                  <option value="នាយផ្នែក">នាយផ្នែក</option>
-                  <option value="នាយមណ្ឌល">នាយមណ្ឌល</option>
-                  <option value="នាយផ្នែករងក្ដាប់រូប">នាយផ្នែករងក្ដាប់រូប</option>
-                  <option value="មន្រ្តីទទួលបន្ទុក">មន្រ្តីទទួលបន្ទុក</option>
-                </select>
+                <div style={{ marginTop: '5px' }}>
+                  <select
+                    value={footerRightTitle}
+                    onChange={(e) => setFooterRightTitle(e.target.value)}
+                    style={{
+                      fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '13px', textAlign: 'center', border: 'none', background: 'transparent', cursor: 'pointer', outline: 'none', width: '100%'
+                    }}
+                  >
+                    <option value="នាយករងទទួលបន្ទុក">នាយករងទទួលបន្ទុក</option>
+                    <option value="ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក">ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក</option>
+                    <option value="ប្រធានការិយាល័យហិរញ្ញវត្ថុ">ប្រធានការិយាល័យហិរញ្ញវត្ថុ</option>
+                    <option value="ប្រធានការិយាល័យបច្ចេកទេស">ប្រធានការិយាល័យបច្ចេកទេស</option>
+                    <option value="នាយផ្នែក">នាយផ្នែក</option>
+                    <option value="នាយមណ្ឌល">នាយមណ្ឌល</option>
+                    <option value="នាយផ្នែករងក្ដាប់រូប">នាយផ្នែករងក្ដាប់រូប</option>
+                    <option value="មន្រ្តីទទួលបន្ទុក">មន្រ្តីទទួលបន្ទុក</option>
+                  </select>
+                </div>
               </div>
             </div>
           )}
 
           {/* footer/signature area for other reports */}
           {reportType !== 'evaluation' && (
-            <div style={{display:'flex', justifyContent:'space-between', marginTop:'1px', fontSize:'12px'}}>
-            <div style={{width:'30%', paddingLeft: '40px'}}>
-              <div style={{marginTop:'27px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>បានឃើញ</div>
-              <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>នាយកមន្ទីរពេទ្យ</div>
-              <div style={{height:'64px'}}></div>
-              <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
-            </div>
-            <div style={{width:'50%', textAlign:'center', paddingLeft: '50px'}}>
-              <div style={{marginTop:'25px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>បានពិនិត្យត្រឹមត្រូវ</div>
-              <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក</div>
-              <div style={{height:'82px'}}></div>
-              <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
-            </div>
-            <div style={{width:'45%', textAlign:'right', paddingRight: '0px'}}>
-              <div style={{marginTop:'0px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center'}}>
-                {(lunarText && lunarText.trim()) ? lunarText : ('ថ្ងៃ' + khWeekday(new Date()) + '  ព.ស. ' + toKhmerDigits(buddhistEraYear(new Date())))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1px', fontSize: '12px' }}>
+              <div style={{ width: '30%', paddingLeft: '40px' }}>
+                <div style={{ marginTop: '27px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>បានឃើញ</div>
+                <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>នាយកមន្ទីរពេទ្យ</div>
+                <div style={{ height: '64px' }}></div>
+                <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
               </div>
-              <div style={{marginTop:'2px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center'}}>
-                រាជធានីភ្នំពេញ {fmtKhmerLongDate(footerDate)}
+              <div style={{ width: '50%', textAlign: 'center', paddingLeft: '50px' }}>
+                <div style={{ marginTop: '25px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>បានពិនិត្យត្រឹមត្រូវ</div>
+                <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក</div>
+                <div style={{ height: '82px' }}></div>
+                <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
               </div>
-              <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}> អ្នកធ្វើរបាយការណ៍</div>
-              <div style={{height:'82px'}}></div>
-              <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
+              <div style={{ width: '45%', textAlign: 'right', paddingRight: '0px' }}>
+                <div style={{ marginTop: '0px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>
+                  {(lunarText && lunarText.trim()) ? lunarText : ('ថ្ងៃ' + khWeekday(new Date()) + '  ព.ស. ' + toKhmerDigits(buddhistEraYear(new Date())))}
+                </div>
+                <div style={{ marginTop: '2px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>
+                  រាជធានីភ្នំពេញ {fmtKhmerLongDate(footerDate)}
+                </div>
+                <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}> អ្នកធ្វើរបាយការណ៍</div>
+                <div style={{ height: '82px' }}></div>
+                <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
+              </div>
             </div>
-          </div>
           )}
         </div>
       )}

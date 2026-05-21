@@ -15,20 +15,20 @@ export default function LetterPage() {
     _localId: '',
     letterNo: '',
     dateText: '',
-  ministry: 'មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត',
-  department: 'អគ្គនាយកដ្ឋាន',
-  subject: 'សំណើ/សេចក្តីស្នើ',
-  recipient: 'លោកនាយកមន្ទីរពេទ្យ',
-  body: 'ដោយយោងដល់បទបញ្ជា និងការស្នើររបស់ផ្នែក សូមអញ្ជើញពិនិត្យ និងអនុម័ត​ការស្នើរនេះ​ដោយមានការ​ពិចារណា។',
-  signPlace: 'ភ្នំពេញ',
-  signTitle: 'នាយក',
-  signName: 'ហេង ស៊ីណាត',
-  requesterSection: '',
-  requesterName: '',
-  createdBy: 'Admin',
-  createdAt: '',
-  reference: '',
-  attachments: [],
+    ministry: 'មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត',
+    department: 'អគ្គនាយកដ្ឋាន',
+    subject: 'សំណើ/សេចក្តីស្នើ',
+    recipient: 'លោកនាយកមន្ទីរពេទ្យ',
+    body: 'ដោយយោងដល់បទបញ្ជា និងការស្នើររបស់ផ្នែក សូមអញ្ជើញពិនិត្យ និងអនុម័ត​ការស្នើរនេះ​ដោយមានការ​ពិចារណា។',
+    signPlace: 'ភ្នំពេញ',
+    signTitle: 'នាយក',
+    signName: 'ហេង ស៊ីណាត',
+    requesterSection: '',
+    requesterName: '',
+    createdBy: 'Admin',
+    createdAt: '',
+    reference: '',
+    attachments: [],
   });
 
   const [letters, setLetters] = useState([]);
@@ -111,7 +111,7 @@ export default function LetterPage() {
       // also remove from local storage in case it existed there
       removeLocalLetter(l);
       // update UI
-      setLetters((s) => s.filter((x) => !( (l._id && x._id === l._id) || (l._localId && x._localId === l._localId) || (l.createdAt && x.createdAt === l.createdAt && x.letterNo === l.letterNo) )));
+      setLetters((s) => s.filter((x) => !((l._id && x._id === l._id) || (l._localId && x._localId === l._localId) || (l.createdAt && x.createdAt === l.createdAt && x.letterNo === l.letterNo))));
       alert('បានលុប');
     } catch (err) {
       console.error('delete error', err);
@@ -164,11 +164,11 @@ export default function LetterPage() {
       const w = JSON.parse(localStorage.getItem('lettersTableColWidths') || 'null');
       const rh = JSON.parse(localStorage.getItem('lettersTableRowHeight') || 'null');
       const lw = JSON.parse(localStorage.getItem('lettersTableLabelWidth') || 'null');
-  const ar = JSON.parse(localStorage.getItem('lettersTableAutoRow') || 'null');
+      const ar = JSON.parse(localStorage.getItem('lettersTableAutoRow') || 'null');
       if (Array.isArray(w) && w.length === defaultColWidths.length) setColWidths(w);
-        if (typeof rh === 'number') setRowHeight(rh);
+      if (typeof rh === 'number') setRowHeight(rh);
       if (typeof lw === 'number') setLabelColWidth(lw);
-  if (typeof ar === 'boolean') setAutoRowHeight(ar);
+      if (typeof ar === 'boolean') setAutoRowHeight(ar);
     } catch (e) { /* ignore */ }
   }, []);
 
@@ -178,8 +178,8 @@ export default function LetterPage() {
       localStorage.setItem('lettersTableColWidths', JSON.stringify(colWidths));
       localStorage.setItem('lettersTableRowHeight', JSON.stringify(rowHeight));
       localStorage.setItem('lettersTableLabelWidth', JSON.stringify(labelColWidth));
-  localStorage.setItem('lettersTableAutoRow', JSON.stringify(autoRowHeight));
-    } catch (e) {}
+      localStorage.setItem('lettersTableAutoRow', JSON.stringify(autoRowHeight));
+    } catch (e) { }
   }, [colWidths, rowHeight, labelColWidth, autoRowHeight]);
 
   // column resize mouse handlers
@@ -249,7 +249,7 @@ export default function LetterPage() {
       });
 
       document.body.removeChild(measure);
-  const final = Math.max(20, Math.min(1200, Math.ceil(maxW) + 8));
+      const final = Math.max(20, Math.min(1200, Math.ceil(maxW) + 8));
       setColWidths((prev) => { const c = prev.slice(); c[index] = final; return c; });
     } catch (e) {
       console.warn('autoSize failed', e);
@@ -257,14 +257,14 @@ export default function LetterPage() {
   };
 
   // helper: format Date -> Khmer (e.g. "១៤ សីហា ២០២៥")
-  const _khDigits = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+  const _khDigits = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
   const toKhmerNumber = (num) => String(num).split('').map(ch => (_khDigits[+ch] ?? ch)).join('');
   const formatDateKhmer = (isoOrDate) => {
     try {
       const d = isoOrDate ? new Date(isoOrDate) : new Date();
       if (isNaN(d)) return '';
       const day = toKhmerNumber(d.getDate());
-      const months = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
+      const months = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
       const month = months[d.getMonth()] || '';
       const year = toKhmerNumber(d.getFullYear());
       return `ថ្ងៃទី${day} ខែ${month} ឆ្នាំ${year}`;
@@ -335,8 +335,8 @@ export default function LetterPage() {
   const saveLetter = async () => {
     setSaving(true);
     try {
-  const createdAtIso = form.createdAt && form.createdAt.length === 10 ? new Date(form.createdAt ).toISOString() : (form.createdAt || new Date().toISOString());
-  const payload = { ...form, createdAt: createdAtIso };
+      const createdAtIso = form.createdAt && form.createdAt.length === 10 ? new Date(form.createdAt).toISOString() : (form.createdAt || new Date().toISOString());
+      const payload = { ...form, createdAt: createdAtIso };
 
       // If editing an existing backend letter, use PUT to update
       if (form._id) {
@@ -403,8 +403,8 @@ export default function LetterPage() {
       console.error('Save error', err);
       // attempt local persist on unexpected error
       try {
-  const createdAtIso = form.createdAt && form.createdAt.length === 10 ? new Date(form.createdAt + 'T00:00:00').toISOString() : (form.createdAt || new Date().toISOString());
-  const payload = { ...form, createdAt: createdAtIso };
+        const createdAtIso = form.createdAt && form.createdAt.length === 10 ? new Date(form.createdAt + 'T00:00:00').toISOString() : (form.createdAt || new Date().toISOString());
+        const payload = { ...form, createdAt: createdAtIso };
         // when error, update local copy if editing, else persist
         if (payload._localId) {
           updateLocalLetter(payload);
@@ -444,12 +444,12 @@ export default function LetterPage() {
         // allow render then print
         setTimeout(() => {
           try { win.print(); } catch (e) { console.error('print error', e); }
-          try { win.close(); } catch (_) {}
+          try { win.close(); } catch (_) { }
         }, 300);
         return;
       } catch (e) {
         console.error('Popup print failed', e);
-        try { win.close(); } catch (_) {}
+        try { win.close(); } catch (_) { }
       }
     }
 
@@ -476,7 +476,7 @@ export default function LetterPage() {
           console.error('Iframe print failed', err);
           alert('Print failed — please allow popups or try Export Word.');
         }
-        setTimeout(() => { try { iframe.remove(); } catch(_){} }, 700);
+        setTimeout(() => { try { iframe.remove(); } catch (_) { } }, 700);
       }, 400);
     } catch (err) {
       console.error('Print fallback failed', err);
@@ -558,6 +558,18 @@ export default function LetterPage() {
       signTitle: 'នាយក',
       signName: 'ស៊ិន សុផល',
     },
+    {
+      id: 5,
+      name: 'លិខិតបង្គាប់ការ (មាតុភាព)',
+      ministry: 'ក្រសួងសុខាភិបាល',
+      department: 'មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត',
+      subject: 'លិខិតបង្គាប់ការ',
+      recipient: '- លិខិតអនុញ្ញាតលេខ ...... ចុះថ្ងៃទី... ខែ... ឆ្នាំ... \n- តាមការចាំបាច់របស់មន្ទីរពេទ្យ',
+      body: 'លោកស្រី ...... ជា...... បន្ទាប់ពីសម្រាកលំហែមាតុភាព ត្រូវបានចាត់ឱ្យចូលបម្រើការនៅ ផ្នែក...... វិញចាប់ពីថ្ងៃទី...... ខែ...... ឆ្នាំ...... នេះតទៅ។\n\nការិយាល័យរដ្ឋបាលនិងបុគ្គលិក - ការិយាល័យបច្ចេកទេស - ការិយាល័យហិរញ្ញវត្ថុ - ផ្នែកពាក់ព័ន្ធនានា - សាមីខ្លួន ត្រូវអនុវត្តតាមលិខិតបង្គាប់ការនេះ ចាប់ពីថ្ងៃទី...... ខែ...... ឆ្នាំ...... នេះតទៅ។',
+      signPlace: 'រាជធានីភ្នំពេញ',
+      signTitle: 'នាយកមន្ទីរពេទ្យ',
+      signName: 'សាស្ត្រាចារ្យ ងី ម៉េង',
+    },
   ];
 
   const applyTemplate = (t) => {
@@ -585,8 +597,8 @@ export default function LetterPage() {
       requesterSection: l.requesterSection || (l.createdBy && (l.createdBy.department || '')) || '',
       requesterName: l.requesterName || (l.createdBy && (l.createdBy.fullName || l.createdBy.name)) || '',
       reference: l.reference || '',
-  createdBy: l.createdBy || '',
-  createdAt: l.createdAt ? (new Date(l.createdAt)).toISOString().slice(0,10) : ''
+      createdBy: l.createdBy || '',
+      createdAt: l.createdAt ? (new Date(l.createdAt)).toISOString().slice(0, 10) : ''
     };
     setForm(mapped);
     setCreating(true);
@@ -626,7 +638,7 @@ export default function LetterPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-  a.download = (toKhmerDigitsString(form.letterNo) || 'letter') + '.doc';
+      a.download = (toKhmerDigitsString(form.letterNo) || 'letter') + '.doc';
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -641,8 +653,8 @@ export default function LetterPage() {
 
   return (
     <div className="p-2 bg-gray-400 min-h-screen">
-        {!creating ? (
-    <div className="bg-white w-full border border-gray-100 mx-0 px-2 py-3 shadow-md" style={{ borderRadius: 4 }}>
+      {!creating ? (
+        <div className="bg-white w-full border border-gray-100 mx-0 px-2 py-3 shadow-md" style={{ borderRadius: 4 }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold">តារាងឯកសារ</h2>
             <button
@@ -670,7 +682,7 @@ export default function LetterPage() {
             ))}
           </div>
 
-            <div className="mb-3 flex items-center gap-4">
+          <div className="mb-3 flex items-center gap-4">
             <label className="text-sm">Row height:</label>
             <input type="range" min={28} max={120} value={rowHeight} disabled={autoRowHeight} onChange={(e) => setRowHeight(Number(e.target.value))} />
             <span className="text-xs">{rowHeight}px</span>
@@ -686,33 +698,33 @@ export default function LetterPage() {
             }}>Reset layout</button>
           </div>
 
-      <div className="overflow-x-auto w-full px-2">
+          <div className="overflow-x-auto w-full px-2">
             <table className="w-full border table-fixed text-sm bg-white" style={{ tableLayout: 'fixed' }}>
-            <thead>
-              <tr className="bg-gray-50 text-sm">
-                {['ល.រ','ផ្នែក','លេខលិខិត','កម្មវត្ថុ','យោង','ខ្លឹមសារ','ទីតាំងចុះឈ្មោះ','ភ្ជាប់ឯកសារ','ហត្ថលេខា','កាលបរិច្ឆេទបង្កើត','ស្ថានភាព','សកម្មភាព'].map((h, i) => (
-                  <th
-        key={i}
-        className="border px-4 py-3 text-center text-sm font-semibold text-gray-700 relative"
-                    style={{ width: colWidths[i] }}
-                    title={`Double-click to auto-size column to content`}
-                    onDoubleClick={() => autoSizeColumn(i)}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <div>{h}</div>
-                    </div>
-                    {/* resizer handle */}
-                      <div
-                      onMouseDown={(e) => startColResize(i, e)}
-                      style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 8, cursor: 'col-resize', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              <thead>
+                <tr className="bg-gray-50 text-sm">
+                  {['ល.រ', 'ផ្នែក', 'លេខលិខិត', 'កម្មវត្ថុ', 'យោង', 'ខ្លឹមសារ', 'ទីតាំងចុះឈ្មោះ', 'ភ្ជាប់ឯកសារ', 'ហត្ថលេខា', 'កាលបរិច្ឆេទបង្កើត', 'ស្ថានភាព', 'សកម្មភាព'].map((h, i) => (
+                    <th
+                      key={i}
+                      className="border px-4 py-3 text-center text-sm font-semibold text-gray-700 relative"
+                      style={{ width: colWidths[i] }}
+                      title={`Double-click to auto-size column to content`}
+                      onDoubleClick={() => autoSizeColumn(i)}
                     >
-                      <div style={{ width: 2, height: '60%', background: 'rgba(0,0,0,0.12)', borderRadius: 1 }} />
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div>{h}</div>
+                      </div>
+                      {/* resizer handle */}
+                      <div
+                        onMouseDown={(e) => startColResize(i, e)}
+                        style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 8, cursor: 'col-resize', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <div style={{ width: 2, height: '60%', background: 'rgba(0,0,0,0.12)', borderRadius: 1 }} />
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
                 {loading ? (
                   <tr>
                     <td colSpan={12} className="border px-4 py-6 text-center">Loading...</td>
@@ -723,7 +735,7 @@ export default function LetterPage() {
                   </tr>
                 ) : (
                   letters.map((l, idx) => (
-                    <tr key={l._id || idx} className="hover:bg-gray-50" style={ autoRowHeight ? {} : { height: rowHeight } }>
+                    <tr key={l._id || idx} className="hover:bg-gray-50" style={autoRowHeight ? {} : { height: rowHeight }}>
                       <td className="border px-4 py-3 align-middle text-sm text-center" style={{ width: colWidths[0] }}>{idx + 1}</td>
                       <td className="border px-4 py-3 align-middle text-sm" style={{ width: colWidths[1] }}>{l.department || '-'}</td>
                       <td className="border px-4 py-3 align-middle text-sm" style={{ width: colWidths[2] }}>{l.letterNo ? toKhmerDigitsString(l.letterNo) : '-'}</td>
@@ -742,9 +754,9 @@ export default function LetterPage() {
                       <td className="border px-4 py-3 text-center" style={{ width: colWidths[11] }}>
                         <div className="flex gap-2 justify-center items-center">
                           <button onClick={(ev) => { ev.stopPropagation(); onRowClick(l); }} title="កែ" className="w-8 h-6 flex items-center justify-center bg-green-600 hover:bg-green-700 text-white text-xs rounded-full">កែ</button>
-                          { (perms.canViewDocuments || perms.canViewFiles) ? (
+                          {(perms.canViewDocuments || perms.canViewFiles) ? (
                             <div style={{ position: 'relative', display: 'inline-block' }}>
-                              <button onClick={(ev) => { ev.stopPropagation(); try { const id = l && (l._id || l._localId || l.id); if (id) { const ts = (l && (l.updatedAt || l.createdAt)) ? new Date(l.updatedAt || l.createdAt).getTime() : Date.now(); localStorage.setItem(`lastSeenLetter_${id}`, String(ts)); } } catch(e){}; navigate('/documents/' + (l._id || l._localId)); }} title="មើល" className="w-8 h-6 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-full">មើល</button>
+                              <button onClick={(ev) => { ev.stopPropagation(); try { const id = l && (l._id || l._localId || l.id); if (id) { const ts = (l && (l.updatedAt || l.createdAt)) ? new Date(l.updatedAt || l.createdAt).getTime() : Date.now(); localStorage.setItem(`lastSeenLetter_${id}`, String(ts)); } } catch (e) { }; navigate('/documents/' + (l._id || l._localId)); }} title="មើល" className="w-8 h-6 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-full">មើល</button>
                               {/* New badge: shown when this letter's timestamp is newer than last seen */}
                               {(() => {
                                 try {
@@ -777,84 +789,84 @@ export default function LetterPage() {
                     </tr>
                   ))
                 )}
-            </tbody>
+              </tbody>
             </table>
           </div>
         </div>
       ) : (
-    <div className="p-6 bg-gray-400 min-h-screen">
-  <div className={`mx-auto flex gap-8 w-full ${fullView ? '' : 'max-wl'} items-start`}>
-          {!fullView && (
-            <div className="bg-white w-full border border-gray-100 mx-2 px-4 py-4 shadow-md" style={{ width: '390px', minWidth: '660px', minHeight: '11.69in', overflowY: 'auto' }}>
-              <h4 className="text-sm block mb-3 text-blue-900 font-bold text-center" style={{ fontSize: '22px' }}>បំពេញព័ត៍មាន</h4>
+        <div className="p-6 bg-gray-400 min-h-screen">
+          <div className={`mx-auto flex gap-8 w-full ${fullView ? '' : 'max-wl'} items-start`}>
+            {!fullView && (
+              <div className="bg-white w-full border border-gray-100 mx-2 px-4 py-4 shadow-md" style={{ width: '390px', minWidth: '660px', minHeight: '11.69in', overflowY: 'auto' }}>
+                <h4 className="text-sm block mb-3 text-blue-900 font-bold text-center" style={{ fontSize: '22px' }}>បំពេញព័ត៍មាន</h4>
 
-              <label className="text-sm block mb- text-blue-900 font-bold " style={{ fontSize: '18px' }}>លេខលិខិត</label>
-              <input value={form.letterNo} onChange={handleChange('letterNo')} className="w-full border p-3 mb-3" />
+                <label className="text-sm block mb- text-blue-900 font-bold " style={{ fontSize: '18px' }}>លេខលិខិត</label>
+                <input value={form.letterNo} onChange={handleChange('letterNo')} className="w-full border p-3 mb-3" />
 
-              <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>ផ្នែក</label>
-              <input value={form.department} onChange={handleChange('department')} className="w-full border p-3 mb-3" />
+                <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>ផ្នែក</label>
+                <input value={form.department} onChange={handleChange('department')} className="w-full border p-3 mb-3" />
 
-              <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>កម្មវត្ថុ</label>
-              <input value={form.subject} onChange={handleChange('subject')} className="w-full border p-3 mb-3" />
+                <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>កម្មវត្ថុ</label>
+                <input value={form.subject} onChange={handleChange('subject')} className="w-full border p-3 mb-3" />
 
-              <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>យោង</label>
-              <input value={form.recipient} onChange={handleChange('recipient')} className="w-full border p-3 mb-3" />
+                <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>យោង</label>
+                <input value={form.recipient} onChange={handleChange('recipient')} className="w-full border p-3 mb-3" />
 
-              <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>ខ្លឹមសារ</label>
-              <textarea value={form.body} onChange={handleChange('body')} className="w-full border p-3 mb-3 h-32" />
-              <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>ទីតាំងចុះឈ្មោះ</label>
-              <input value={form.signPlace} onChange={handleChange('signPlace')} className="w-full border p-3 mb-3" />
-<label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>កាលបរិច្ឆេទបង្កើត</label>
-              <input type="date" value={form.createdAt || ''} onChange={handleChange('createdAt')} className="w-full border p-3 mb-3" />
-              <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>តំណែងអ្នកចុះឈ្មោះ (sign title)</label>
-              <input value={form.signTitle} onChange={handleChange('signTitle')} className="w-full border p-3 mb-3" />
+                <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>ខ្លឹមសារ</label>
+                <textarea value={form.body} onChange={handleChange('body')} className="w-full border p-3 mb-3 h-32" />
+                <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>ទីតាំងចុះឈ្មោះ</label>
+                <input value={form.signPlace} onChange={handleChange('signPlace')} className="w-full border p-3 mb-3" />
+                <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>កាលបរិច្ឆេទបង្កើត</label>
+                <input type="date" value={form.createdAt || ''} onChange={handleChange('createdAt')} className="w-full border p-3 mb-3" />
+                <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>តំណែងអ្នកចុះឈ្មោះ (sign title)</label>
+                <input value={form.signTitle} onChange={handleChange('signTitle')} className="w-full border p-3 mb-3" />
 
-              <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>ឈ្មោះអ្នកចុះឈ្មោះ (sign name)</label>
-              <input value={form.signName} onChange={handleChange('signName')} className="w-full border p-3 mb-3" />
+                <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>ឈ្មោះអ្នកចុះឈ្មោះ (sign name)</label>
+                <input value={form.signName} onChange={handleChange('signName')} className="w-full border p-3 mb-3" />
 
-              <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>ភ្ជាប់ឯកសារ</label>
-              <input type="file" multiple onChange={handleFilesChange} className="w-full mb-3" />
+                <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>ភ្ជាប់ឯកសារ</label>
+                <input type="file" multiple onChange={handleFilesChange} className="w-full mb-3" />
 
-              <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>អ្នកបង្កើត</label>
-              <input value={form.createdBy} onChange={handleChange('createdBy')} className="w-full border p-3 mb-3" />
+                <label className="text-sm block mb-1 text-blue-900 font-bold" style={{ fontSize: '18px' }}>អ្នកបង្កើត</label>
+                <input value={form.createdBy} onChange={handleChange('createdBy')} className="w-full border p-3 mb-3" />
 
-              
 
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => setCreating(false)} className="px-4 py-2 bg-blue-600 text-white">បោះបង់</button>
-                
-              </div>
-            </div>
-          )}
 
-          <div className="self-start" style={{ flex: 1, paddingRight: '10px' }}>
-            {showPreview ? (
-              <div>
-                <div className="mb-2 flex gap-2 justify-end no-print">
-                  <button onClick={handlePrint} className="px-3 py-1 bg-gray-600 text-white rounded">Print</button>
-                  <button onClick={saveLetter} disabled={saving} className="px-3 py-1 bg-green-600 text-white rounded">{saving ? 'Saving...' : 'រក្សាទុក'}</button>
-                  <button onClick={handleExportWord} className="px-3 py-1 bg-indigo-600 text-white rounded">Export Word (.doc)</button>
+                <div className="flex gap-2 mt-4">
+                  <button onClick={() => setCreating(false)} className="px-4 py-2 bg-blue-600 text-white">បោះបង់</button>
+
                 </div>
+              </div>
+            )}
 
-                <div className="w-full flex justify-center">
-                  <div
-                    key={previewKey}
-                    ref={contentRef}
-                    style={{
-                      width: '8.27in',
-                      minHeight: '11.69in',
-                      background: '#fcfbfbff',
-                      padding: '10mm',
-                      boxSizing: 'border-box',
-                      margin: '0',
-                      boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
-                      fontFamily: 'Khmer OS, Arial, serif',
-                      color: '#000',
-                    }}
-                  >
-                  {/* Inline styles included so export/print keep layout */}
-                  <style>{`
-                    .doc-header { text-align: center; font-weight: 700; padding: 0px 0px; }
+            <div className="self-start" style={{ flex: 1, paddingRight: '10px' }}>
+              {showPreview ? (
+                <div>
+                  <div className="mb-2 flex gap-2 justify-end no-print">
+                    <button onClick={handlePrint} className="px-3 py-1 bg-gray-600 text-white rounded">Print</button>
+                    <button onClick={saveLetter} disabled={saving} className="px-3 py-1 bg-green-600 text-white rounded">{saving ? 'Saving...' : 'រក្សាទុក'}</button>
+                    <button onClick={handleExportWord} className="px-3 py-1 bg-indigo-600 text-white rounded">Export Word (.doc)</button>
+                  </div>
+
+                  <div className="w-full flex justify-center">
+                    <div
+                      key={previewKey}
+                      ref={contentRef}
+                      style={{
+                        width: '8.27in',
+                        minHeight: '11.69in',
+                        background: '#fcfbfbff',
+                        padding: '10mm',
+                        boxSizing: 'border-box',
+                        margin: '0',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
+                        fontFamily: 'Khmer OS, Arial, serif',
+                        color: '#000',
+                      }}
+                    >
+                      {/* Inline styles included so export/print keep layout */}
+                      <style>{`
+                    .doc-header { text-align: center; font-weight: normal; padding: 0px 0px; }
                     .doc-top { font-family: 'Khmer OS Muol Light', 'Khmer OS', Arial, serif; font-size: 17px; }
                     .doc-top1 { font-family: 'Khmer OS Muol Light', 'Khmer OS', Arial, serif; font-size: 16px; padding: 4px 6px; }
                     .doc-top2 {text-align: left;padding: 0;font-family: 'Khmer OS Muol Light', 'Khmer OS', Arial, serif;align-self: start;font-size: 15px; text-align: left;padding: 0px 0px;}
@@ -898,71 +910,71 @@ export default function LetterPage() {
                     }
                     .doc-sign .place-date {font-family: "Khmer OS Siemreap"; text-indent: ${labelColWidth * 4}px; margin-bottom: 8px; text-align: center !important; display:block; width:100%; }
                     .doc-sign .sign-title {font-family: 'Khmer OS Muol Light', 'Khmer OS', Arial, serif;
-                      font-size: 16px; text-indent: ${labelColWidth * 4}px; margin-top: 0px; font-weight: 700; text-align: center !important; display:block; width:100%; }
+                      font-size: 16px; text-indent: ${labelColWidth * 4}px; margin-top: 0px; font-weight: normal; text-align: center !important; display:block; width:100%; }
                     .doc-sign .sign-name {font-family: 'Khmer OS Muol Light', 'Khmer OS', Arial, serif;
                       font-size: 16px; text-indent: ${labelColWidth * 4}px; margin-top: 110px; text-align: center !important; display:block; width:100%; }
                     .doc-strong { font-weight: 800; }
                   `}</style>
 
-                  <div className="doc-header">
-                    <div className="doc-top">ព្រះរាជាណាចក្រកម្ពុជា</div>
-                    <div className="doc-top1">ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
-                    <div className="doc-top2">មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</div>
-					<div className="doc-top3" style={{fontSize:15}}>{form.department}</div>
-          <div className="doc-top3">លេខ <span className="doc-value3">{form.letterNo ? toKhmerDigitsString(form.letterNo) : '...........'}</span></div>
-					<div className="doc-top5" style={{fontSize:15}}>{form.department}</div>
-					<div className="doc-top5">សូមគោរពជូន</div>
-					<div className="doc-top5">លោកនាយកមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</div>
-                                      </div>
+                      <div className="doc-header">
+                        <div className="doc-top">ព្រះរាជាណាចក្រកម្ពុជា</div>
+                        <div className="doc-top1">ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
+                        <div className="doc-top2">មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</div>
+                        <div className="doc-top3" style={{ fontSize: 15 }}>{form.department}</div>
+                        <div className="doc-top3">លេខ <span className="doc-value3">{form.letterNo ? toKhmerDigitsString(form.letterNo) : '...........'}</span></div>
+                        <div className="doc-top5" style={{ fontSize: 15 }}>{form.department}</div>
+                        <div className="doc-top5">សូមគោរពជូន</div>
+                        <div className="doc-top5">លោកនាយកមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</div>
+                      </div>
 
-                  <div className="doc-row">
-                    <div className="doc-label">កម្មវត្ថុ៖</div>
-                    <div className="doc-value1">{form.subject}</div>
-                  </div>
+                      <div className="doc-row">
+                        <div className="doc-label">កម្មវត្ថុ៖</div>
+                        <div className="doc-value1">{form.subject}</div>
+                      </div>
 
-                  <div className="doc-row">
-                    <div className="doc-label">យោង៖</div>
-                    <div className="doc-value1">{form.recipient}</div>
-                  </div>
+                      <div className="doc-row">
+                        <div className="doc-label">យោង៖</div>
+                        <div className="doc-value1">{form.recipient}</div>
+                      </div>
 
-                  <div className="doc-body">
-                    {/* Use pre-line so line breaks in body are preserved */}
-                    <div style={{whiteSpace: 'pre-line'}}>សេចក្ដីដូចមានចែងក្នុងកម្មវត្ថុ និងយោងខាងលើ ខ្ញុំបាទសូមគោរពជម្រាបជូន លោកនាយក មេត្តាជ្រាបថា ៖ {form.body}</div>
-               </div>
-                  <div className="doc-body1">
-                  <p>
-                     អាស្រ័យដូចបានគោរពជម្រាបជូនខាងលើសូម លោកនាយក មេត្តាពិនិត្យនិងសម្រេចដោយក្តីអនុគ្រោះ។
-                  </p>
-                  <p style={{padding: '15px 0px'}}>
-                    សូម លោកនាយក មេត្តាទទួលនូវការគោរពដ៏ខ្ពង់ខ្ពស់ពីខ្ញុំបាទ ។
-                  </p>
-                </div>
-                  <div className="doc-sign">
-                    <div className="place-date">{form.signPlace}, {formatDateKhmer(form.createdAt)}</div>
-                    <div className="sign-title">{form.signTitle}</div>
-                    <div className="sign-name">{form.signName}</div>
-                  </div>
+                      <div className="doc-body">
+                        {/* Use pre-line so line breaks in body are preserved */}
+                        <div style={{ whiteSpace: 'pre-line' }}>សេចក្ដីដូចមានចែងក្នុងកម្មវត្ថុ និងយោងខាងលើ ខ្ញុំបាទសូមគោរពជម្រាបជូន លោកនាយក មេត្តាជ្រាបថា ៖ {form.body}</div>
+                      </div>
+                      <div className="doc-body1">
+                        <p>
+                          អាស្រ័យដូចបានគោរពជម្រាបជូនខាងលើសូម លោកនាយក មេត្តាពិនិត្យនិងសម្រេចដោយក្តីអនុគ្រោះ។
+                        </p>
+                        <p style={{ padding: '15px 0px' }}>
+                          សូម លោកនាយក មេត្តាទទួលនូវការគោរពដ៏ខ្ពង់ខ្ពស់ពីខ្ញុំបាទ ។
+                        </p>
+                      </div>
+                      <div className="doc-sign">
+                        <div className="place-date">{form.signPlace}, {formatDateKhmer(form.createdAt)}</div>
+                        <div className="sign-title">{form.signTitle}</div>
+                        <div className="sign-name">{form.signName}</div>
+                      </div>
 
-                  {form.attachments && form.attachments.length > 0 && (
-                    <div style={{ marginTop: 20 }}>
-                      <strong>ភ្ជាប់ឯកសារ:</strong>
-                      <ul>
-                        {form.attachments.map((a, i) => (
-                          <li key={i}>{a}</li>
-                        ))}
-                      </ul>
+                      {form.attachments && form.attachments.length > 0 && (
+                        <div style={{ marginTop: 20 }}>
+                          <strong>ភ្ជាប់ឯកសារ:</strong>
+                          <ul>
+                            {form.attachments.map((a, i) => (
+                              <li key={i}>{a}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
-                  )}
                   </div>
-                </div>
 
-                {/* buttons moved above preview for easier access */}
-              </div>
-            ) : (
-              <div className="p-8 text-center">ចុច "បង្ហាញទិន្នន័យ" ដើម្បីមើល</div>
-            )}
+                  {/* buttons moved above preview for easier access */}
+                </div>
+              ) : (
+                <div className="p-8 text-center">ចុច "បង្ហាញទិន្នន័យ" ដើម្បីមើល</div>
+              )}
+            </div>
           </div>
-      </div>
         </div>
       )}
     </div>

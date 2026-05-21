@@ -5,7 +5,7 @@ import usePermission from '../hooks/usePermission';
 import headerBg from '../assets/3.JPG';
 
 function toKhmerDigits(n) {
-  const map = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+  const map = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
   return String(n).replace(/[0-9]/g, d => map[d]);
 }
 
@@ -13,8 +13,8 @@ function fmtDateSlash(d) {
   if (!d) return '';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '';
-  const dd = String(dt.getDate()).padStart(2,'0');
-  const mm = String(dt.getMonth()+1).padStart(2,'0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
   const yyyy = dt.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
 }
@@ -23,15 +23,15 @@ function fmtKhmerLongDate(d) {
   if (!d) return '';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '';
-  const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
-  const dd = toKhmerDigits(String(dt.getDate()).padStart(1,'0'));
+  const khMonths = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
+  const dd = toKhmerDigits(String(dt.getDate()).padStart(1, '0'));
   const mmName = khMonths[dt.getMonth()];
   const yyyy = toKhmerDigits(dt.getFullYear());
   return `ថ្ងៃទី ${dd} ខែ ${mmName} ឆ្នាំ ${yyyy}`;
 }
 
 function khWeekday(d) {
-  const names = ['អាទិត្យ','ចន្ទ','អង្គារ','ពុធ','ព្រហស្បតិ៍','សុក្រ','សៅរ៍'];
+  const names = ['អាទិត្យ', 'ចន្ទ', 'អង្គារ', 'ពុធ', 'ព្រហស្បតិ៍', 'សុក្រ', 'សៅរ៍'];
   const dt = new Date(d);
   return names[dt.getDay()];
 }
@@ -57,7 +57,7 @@ export default function RetirementReportPage() {
   const [retireYear, setRetireYear] = useState(new Date().getFullYear());
   const printRef = useRef();
   const [lunarText, setLunarText] = useState('');
-  const [footerDate, setFooterDate] = useState(() => new Date().toISOString().slice(0,10));
+  const [footerDate, setFooterDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     let mounted = true;
@@ -83,13 +83,13 @@ export default function RetirementReportPage() {
     const rows = list
       .map(hr => ({ hr, rDate: computeRetirementDate(hr.dob) }))
       .filter(x => x.rDate && x.rDate.getFullYear() === Number(retireYear))
-      .sort((a,b) => (a.hr.no||0)-(b.hr.no||0));
+      .sort((a, b) => (a.hr.no || 0) - (b.hr.no || 0));
     const male = rows.filter(r => r.hr.gender === 'Male').length;
     const female = rows.filter(r => r.hr.gender === 'Female').length;
     // Category breakdowns (civil vs contract)
     const catMap = {
-      civil: ['មន្ត្រីរាជការ','Civil','civil'],
-      contract: ['កិច្ចសន្យា','contract','កម្មករកិច្ចសន្យា','WORKER']
+      civil: ['មន្ត្រីរាជការ', 'Civil', 'civil'],
+      contract: ['កិច្ចសន្យា', 'contract', 'កម្មករកិច្ចសន្យា', 'WORKER']
     };
     const catCounts = { civil: { total: 0, female: 0 }, contract: { total: 0, female: 0 } };
     rows.forEach(r => {
@@ -175,7 +175,7 @@ export default function RetirementReportPage() {
       'ថ្ងៃខែឆ្នាំចូលនិវត្តន៍'
     ];
     const data = rows.map((row, idx) => ([
-      idx+1,
+      idx + 1,
       row.hr.staffId || row.hr.no || '',
       row.hr.khmerName || row.hr.name || '',
       row.hr.gender === 'Male' ? 'ប' : row.hr.gender === 'Female' ? 'ស' : '',
@@ -220,23 +220,23 @@ export default function RetirementReportPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <label className="text-sm">ឆ្នាំ:</label>
-          <input type="number" className="border rounded px-2 py-1 w-24" value={retireYear} onChange={(e)=> setRetireYear(Number(e.target.value)||new Date().getFullYear())} />
+          <input type="number" className="border rounded px-2 py-1 w-24" value={retireYear} onChange={(e) => setRetireYear(Number(e.target.value) || new Date().getFullYear())} />
           <label className="text-sm">ចន្ទគតិ*:</label>
           <input
             type="text"
             className="border rounded px-2 py-1 w-72"
             placeholder="ឧ. ថ្ងៃសុក្រ ១៣កើត ខែភទ្របទ ឆ្នាំម្សាញ់ សប្តស័ក ព.ស. ២៥៦៩"
             value={lunarText}
-            onChange={(e)=> setLunarText(e.target.value)}
+            onChange={(e) => setLunarText(e.target.value)}
           />
           <label className="text-sm">ថ្ងៃខែឆ្នាំ:</label>
           <input
             type="date"
             className="border rounded px-2 py-1"
             value={footerDate}
-            onChange={(e)=> setFooterDate(e.target.value)}
+            onChange={(e) => setFooterDate(e.target.value)}
           />
-          
+
           {/* inline warnings */}
           {(!lunarText.trim()) && <span className="text-red-600 text-xs">សូមបំពេញចន្ទគតិ</span>}
           <button className={`border px-2 py-1 rounded ${loading ? 'bg-gray-100 text-gray-300' : 'bg-green-600 text-white border-green-600'}`} onClick={handleExportExcel} disabled={loading}>Export Excel</button>
@@ -248,31 +248,31 @@ export default function RetirementReportPage() {
 
       <div ref={printRef} className="bg-white p-4 border rounded print-scope">
         <style dangerouslySetInnerHTML={{ __html: SCREEN_CSS }} />
-        <div style={{textAlign:'center', marginBottom: '8px'}}>
-            <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'16px'}}>ព្រះរាជាណាចក្រកម្ពុជា</div>
-          <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'14px'}}>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
-            <div style={{position:'relative', textAlign:'left', padding:'6px 0'}}>
-              {/* background image behind the text */}
-              <img src={headerBg} alt="" aria-hidden="true"
-                   style={{position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)', width:'150px', height:'auto', opacity:88, pointerEvents:'none'}} />
-              <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12.5px', position:'relative', zIndex:1}}>ក្រសួងសុខាភិបាល</div>
-            </div>
-            <div style={{fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'left'}}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</div>
-          <div style={{fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'13px',marginTop:'4px', fontWeight:600}}>បញ្ជីឈ្មោះមន្រ្តីរាជការចូលនិវត្តន៍របស់ មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត ឆ្នាំ {toKhmerDigits(retireYear)}</div>
+        <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+          <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '16px' }}>ព្រះរាជាណាចក្រកម្ពុជា</div>
+          <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '14px' }}>ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
+          <div style={{ position: 'relative', textAlign: 'left', padding: '6px 0' }}>
+            {/* background image behind the text */}
+            <img src={headerBg} alt="" aria-hidden="true"
+              style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '150px', height: 'auto', opacity: 88, pointerEvents: 'none' }} />
+            <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12.5px', position: 'relative', zIndex: 1 }}>ក្រសួងសុខាភិបាល</div>
+          </div>
+          <div style={{ fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'left' }}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</div>
+          <div style={{ fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '13px', marginTop: '4px', fontWeight: 600 }}>បញ្ជីឈ្មោះមន្រ្តីរាជការចូលនិវត្តន៍របស់ មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត ឆ្នាំ {toKhmerDigits(retireYear)}</div>
         </div>
         <table>
           <thead>
             <tr>
-              <th style={{width:'35px'}}>ល.រ</th>
-              <th style={{width:'110px'}}>អត្តលេខមន្រ្តីរាជការ</th>
+              <th style={{ width: '35px' }}>ល.រ</th>
+              <th style={{ width: '110px' }}>អត្តលេខមន្រ្តីរាជការ</th>
               <th>គោត្តនាម-នាម</th>
-              <th style={{width:'40px'}}>ភេទ</th>
-              <th style={{width:'110px'}}>ថ្ងៃខែឆ្នាំកំណើត</th>
-              <th style={{width:'110px'}}>ថ្ងៃចូលធ្វើការ</th>
-              <th style={{width:'90px'}}>អតីតភាព</th>
+              <th style={{ width: '40px' }}>ភេទ</th>
+              <th style={{ width: '110px' }}>ថ្ងៃខែឆ្នាំកំណើត</th>
+              <th style={{ width: '110px' }}>ថ្ងៃចូលធ្វើការ</th>
+              <th style={{ width: '90px' }}>អតីតភាព</th>
               <th>មុខងារ</th>
-              <th style={{width:'70px'}}>កាំប្រាក់</th>
-              <th style={{width:'115px'}}>ថ្ងៃខែឆ្នាំចូលនិវត្តន៍</th>
+              <th style={{ width: '70px' }}>កាំប្រាក់</th>
+              <th style={{ width: '115px' }}>ថ្ងៃខែឆ្នាំចូលនិវត្តន៍</th>
             </tr>
           </thead>
           <tbody>
@@ -287,7 +287,7 @@ export default function RetirementReportPage() {
               }
               return rows.map((row, idx) => (
                 <tr key={row.hr._id || idx}>
-                  <td className="center">{toKhmerDigits(idx+1)}</td>
+                  <td className="center">{toKhmerDigits(idx + 1)}</td>
                   <td className="center">{row.hr.staffId || row.hr.no || ''}</td>
                   <td>{row.hr.khmerName || row.hr.name || ''}</td>
                   <td className="center">{row.hr.gender === 'Male' ? 'ប' : row.hr.gender === 'Female' ? 'ស' : ''}</td>
@@ -303,34 +303,34 @@ export default function RetirementReportPage() {
           </tbody>
         </table>
         {/* footer/signature area */}
-        <div style={{display:'flex', justifyContent:'space-between', marginTop:'16px', fontSize:'12px'}}>
-          <div style={{width:'33%'}}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', fontSize: '12px' }}>
+          <div style={{ width: '33%' }}>
             <div>
               សរុប: {toKhmerDigits(derived.total)} នាក់ ( ប្រុស: {toKhmerDigits(derived.male)} នាក់ — ស្រី: {toKhmerDigits(derived.female)} នាក់ )
             </div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>បានឃើញ</div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>នាយកមន្ទីរពេទ្យ</div>
-            <div style={{height:'64px'}}></div>
-            <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>បានឃើញ</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>នាយកមន្ទីរពេទ្យ</div>
+            <div style={{ height: '64px' }}></div>
+            <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
-          <div style={{width:'33%', textAlign:'center'}}>
-            <div style={{marginTop:'16px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>បានពិនិត្យត្រឹមត្រូវ</div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}>ប្រធានការិយាល័យរដ្ឋបាលនិងបុគ្គលិក</div>
-            <div style={{height:'82px'}}></div>
-            <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
+          <div style={{ width: '33%', textAlign: 'center' }}>
+            <div style={{ marginTop: '16px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>បានពិនិត្យត្រឹមត្រូវ</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក</div>
+            <div style={{ height: '82px' }}></div>
+            <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
-          <div style={{width:'33%', textAlign:'right'}}>
-            <div style={{marginTop:'12px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center'}}>
+          <div style={{ width: '33%', textAlign: 'right' }}>
+            <div style={{ marginTop: '12px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>
               {lunarText && lunarText.trim()
                 ? lunarText
                 : `ថ្ងៃ${khWeekday(new Date())}  ព.ស. ${toKhmerDigits(buddhistEraYear(new Date()))}`}
             </div>
-            <div style={{marginTop:'2px', fontFamily:'"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize:'12px', textAlign:'center'}}>
+            <div style={{ marginTop: '2px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>
               រាជធានីភ្នំពេញ {fmtKhmerLongDate(footerDate)}
             </div>
-            <div style={{marginTop:'1px', fontFamily:'"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize:'12px',textAlign:'center'}}> អ្នកធ្វើតារាង</div>
-            <div style={{height:'82px'}}></div>
-            <div style={{textDecoration:'underline', visibility:'hidden'}}>............................</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}> អ្នកធ្វើតារាង</div>
+            <div style={{ height: '82px' }}></div>
+            <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
         </div>
       </div>

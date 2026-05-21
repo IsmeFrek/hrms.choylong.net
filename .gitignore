@@ -12,6 +12,15 @@ dist
 dist-ssr
 *.local
 
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+backend/!.env.example
+
+
 # Ignore Uploads folders in build and public assets
 /dist/Uploads/
 /public/Uploads/

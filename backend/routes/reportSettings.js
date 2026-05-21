@@ -1,8 +1,174 @@
 import express from 'express';
 import ReportSetting from '../models/ReportSetting.js';
 import { authRequired, requirePermission } from '../middleware/auth.js';
+import { recordLog } from '../services/auditService.js';
+import { scheduleAttendanceSync, scheduleLeaveSync, scheduleGoogleSheetsSync } from '../services/cronService.js';
 
 const router = express.Router();
+
+// GET /api/report-settings/group/ui-settings
+router.get('/group/ui-settings', async (req, res, next) => {
+  try {
+    const docs = await ReportSetting.find({ groupName: 'ui_settings' }).lean();
+    const settings = {};
+    docs.forEach(d => { settings[d.key] = d.value; });
+    return res.json({ ok: true, settings });
+  } catch (err) { next(err); }
+});
+
+// POST /api/report-settings/group/ui-settings
+router.post('/group/ui-settings', authRequired, async (req, res, next) => {
+  try {
+    const { settings } = req.body || {};
+    if (!settings) return res.status(400).json({ ok: false, message: 'Missing settings object' });
+    
+    // Improved Admin Check
+    const roles = (req.auth.user.roles || []).map(r => r.name);
+    const isAdmin = roles.includes('Admin') || roles.includes('Administrator') || req.auth.user.email === 'admin@hospital.com';
+    
+    if (!isAdmin) {
+      console.warn('UI Settings Update Denied: User is not admin', { email: req.auth.user.email, roles });
+      return res.status(403).json({ ok: false, message: 'Only admins can change UI settings' });
+    }
+
+    const updates = [];
+    for (const key in settings) {
+      updates.push(
+        ReportSetting.findOneAndUpdate(
+          { key, groupName: 'ui_settings' },
+          { $set: { value: settings[key] } },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        )
+      );
+    }
+    
+    await Promise.all(updates);
+
+    // Record Audit Log
+    const footerText = settings.footer_text || '';
+    const truncatedText = footerText.length > 60 ? footerText.substring(0, 60) + '...' : footerText;
+
+    try {
+      await recordLog({
+        userId: req.auth.user._id,
+        userName: req.auth.user.fullName || req.auth.user.username || req.auth.user.email || 'Administrator',
+        action: 'UPDATE',
+        resource: 'SystemSettings',
+        details: `កែសម្រួល Footer ទៅជា: "${truncatedText}"`,
+        metadata: { settings }
+      });
+    } catch (auditErr) {
+      console.error('Audit Log recording failed:', auditErr);
+    }
+
+    return res.json({ ok: true });
+  } catch (err) { 
+    console.error('Failed to save UI settings:', err);
+    next(err); 
+  }
+});
+
+// GET /api/report-settings/group/attendance-sync
+router.get('/group/attendance-sync', async (req, res, next) => {
+  try {
+    const docs = await ReportSetting.find({ groupName: 'attendance_sync' }).lean();
+    const settings = {};
+    docs.forEach(d => { settings[d.key] = d.value; });
+    // Default values if not set
+    if (!settings.sync_time) settings.sync_time = '09:35';
+    if (typeof settings.auto_sync_enabled === 'undefined') settings.auto_sync_enabled = true;
+
+    return res.json({ ok: true, settings });
+  } catch (err) { next(err); }
+});
+
+// POST /api/report-settings/group/attendance-sync
+router.post('/group/attendance-sync', authRequired, async (req, res, next) => {
+  try {
+    const { settings } = req.body || {};
+    if (!settings) return res.status(400).json({ ok: false, message: 'Missing settings object' });
+    
+    const updates = [];
+    for (const key in settings) {
+      updates.push(
+        ReportSetting.findOneAndUpdate(
+          { key, groupName: 'attendance_sync' },
+          { $set: { value: settings[key] } },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        )
+      );
+    }
+    await Promise.all(updates);
+
+    // Re-schedule the cron job
+    scheduleAttendanceSync();
+
+    // Record Audit Log
+    try {
+      await recordLog({
+        userId: req.auth.user._id,
+        userName: req.auth.user.fullName || req.auth.user.username || 'Administrator',
+        action: 'UPDATE',
+        resource: 'AttendanceSyncSettings',
+        details: `Updated attendance sync settings: ${JSON.stringify(settings)}`,
+        metadata: { settings }
+      });
+    } catch (e) { console.error('Audit Log failed', e); }
+
+    return res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// GET /api/report-settings/group/leave-sync
+router.get('/group/leave-sync', async (req, res, next) => {
+  try {
+    const docs = await ReportSetting.find({ groupName: 'leave_sync' }).lean();
+    const settings = {};
+    docs.forEach(d => { settings[d.key] = d.value; });
+    // Default values if not set
+    if (!settings.sync_times) settings.sync_times = [settings.sync_time || '09:40'];
+    if (typeof settings.auto_sync_enabled === 'undefined') settings.auto_sync_enabled = true;
+
+    return res.json({ ok: true, settings });
+  } catch (err) { next(err); }
+});
+
+// POST /api/report-settings/group/leave-sync
+router.post('/group/leave-sync', authRequired, async (req, res, next) => {
+  try {
+    const { settings } = req.body || {};
+    if (!settings) return res.status(400).json({ ok: false, message: 'Missing settings object' });
+    
+    const updates = [];
+    for (const key in settings) {
+      updates.push(
+        ReportSetting.findOneAndUpdate(
+          { key, groupName: 'leave_sync' },
+          { $set: { value: settings[key] } },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        )
+      );
+    }
+    await Promise.all(updates);
+
+    // Re-schedule the cron job
+    scheduleLeaveSync();
+
+    // Record Audit Log
+    try {
+      await recordLog({
+        userId: req.auth.user._id,
+        userName: req.auth.user.fullName || req.auth.user.username || 'Administrator',
+        action: 'UPDATE',
+        resource: 'LeaveSyncSettings',
+        details: `Updated leave sync settings: ${JSON.stringify(settings)}`,
+        metadata: { settings }
+      });
+    } catch (e) { console.error('Audit Log failed', e); }
+
+    return res.json({ ok: true });
+  } catch (err) { next(err); }
+});
 
 // GET /api/report-settings/hr-skill-groups?groupName=... - returns { prefs: { groups, tableOrder } }
 router.get('/hr-skill-groups', async (req, res, next) => {
@@ -77,6 +243,49 @@ router.post('/:groupName', async (req, res, next) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     ).lean();
     return res.json({ ok: true, hotline: updated ? updated.value : hotline });
+  } catch (err) { next(err); }
+});
+
+// GET /api/report-settings/group/attendance-day-sync
+router.get('/group/attendance-day-sync', async (req, res, next) => {
+  try {
+    const docs = await ReportSetting.find({ groupName: 'attendance_day_sync' }).lean();
+    const settings = {};
+    docs.forEach(d => { settings[d.key] = d.value; });
+    
+    // Default values if not set
+    if (!settings.sync_times) settings.sync_times = ['09:35'];
+    if (typeof settings.auto_sync_enabled === 'undefined') settings.auto_sync_enabled = true;
+    
+    if (!settings.google_sheets_sync_times) settings.google_sheets_sync_times = ['10:00'];
+    if (typeof settings.google_sheets_sync_enabled === 'undefined') settings.google_sheets_sync_enabled = false;
+
+    return res.json({ ok: true, settings });
+  } catch (err) { next(err); }
+});
+
+// POST /api/report-settings/group/attendance-day-sync
+router.post('/group/attendance-day-sync', authRequired, async (req, res, next) => {
+  try {
+    const { settings } = req.body || {};
+    if (!settings) return res.status(400).json({ ok: false, message: 'Missing settings object' });
+    
+    const updates = [];
+    for (const key in settings) {
+      updates.push(
+        ReportSetting.findOneAndUpdate(
+          { key, groupName: 'attendance_day_sync' },
+          { $set: { value: settings[key] } },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        )
+      );
+    }
+    await Promise.all(updates);
+
+    // Re-schedule the cron jobs
+    scheduleGoogleSheetsSync();
+
+    return res.json({ ok: true });
   } catch (err) { next(err); }
 });
 

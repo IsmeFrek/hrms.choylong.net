@@ -3,7 +3,6 @@
 
   const els = {
     video: $('video'),
-    start: $('start'),
     scan: $('scan'),
     save: $('save'),
     stop: $('stop'),
@@ -82,7 +81,6 @@
 
     els.video.srcObject = stream;
 
-    els.start.disabled = true;
     els.stop.disabled = false;
     els.scan.disabled = !modelsReady;
 
@@ -98,7 +96,6 @@
     }
     stream = null;
 
-    els.start.disabled = false;
     els.stop.disabled = true;
     els.scan.disabled = true;
   }
@@ -245,9 +242,25 @@
   }
 
   // events
-  els.start.addEventListener('click', () => startCamera().catch((e) => setResult(`កើតបញ្ហា៖ ${e.message || e}`)));
+  // Single green button: open camera if needed, then auto scan + match.
+  els.scan.addEventListener('click', async () => {
+    try {
+      if (!stream) {
+        await startCamera();
+        // Small delay so video has a frame, then auto-scan
+        setTimeout(() => {
+          if (stream && modelsReady) {
+            doMatch().catch((e) => setResult(`កើតបញ្ហា៖ ${e.message || e}`));
+          }
+        }, 400);
+      } else {
+        await doMatch();
+      }
+    } catch (e) {
+      setResult(`កើតបញ្ហា៖ ${e.message || e}`);
+    }
+  });
   els.stop.addEventListener('click', () => stopCamera());
-  els.scan.addEventListener('click', () => doMatch().catch((e) => setResult(`កើតបញ្ហា៖ ${e.message || e}`)));
   els.save.addEventListener('click', () => saveAttendance().catch((e) => setResult(`កើតបញ្ហា៖ ${e.message || e}`)));
 
   // defaults

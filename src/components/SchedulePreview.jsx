@@ -58,9 +58,13 @@ export default function SchedulePreview({
   // optional master lists (so preview can resolve colors from templates/global shifts)
   shiftTemplates = [],
   shifts = [],
+  // Pass through manual overrides from parent for persistence
+  manualOverrides = {},
+  setManualOverrides = null,
 }) {
   // Local editable phone map: { employeeKey: phone }
   const [phoneEdits, setPhoneEdits] = React.useState({});
+  const [reportHtml, setReportHtml] = React.useState('');
 
   // helper to normalize phone: keep digits, collapse leading zeros to single 0, ensure single leading zero
   const normalizePhone = React.useCallback((raw) => {
@@ -138,22 +142,10 @@ export default function SchedulePreview({
   // when showing example layout, force 31 days (to match the attached visual)
   const displayTotalDays = exampleLayout ? 31 : totalDays;
   // state for inline report preview (avoid opening new tab)
-  const [reportHtml, setReportHtml] = React.useState('');
-  const [showReport, setShowReport] = React.useState(false);
+  // state for inline report preview (avoid opening new tab)
   const reportFrameRef = React.useRef(null);
 
-  React.useEffect(() => {
-    if (showReport && reportHtml && reportFrameRef.current) {
-      try {
-        const doc = reportFrameRef.current.contentWindow.document;
-        doc.open();
-        doc.write(reportHtml);
-        doc.close();
-      } catch (e) {
-        // ignore write errors
-      }
-    }
-  }, [showReport, reportHtml]);
+
   // Printable/header HTML used for print views and group preview header
   const printableHeaderHtml = React.useMemo(() => {
     // Compact Khmer-style centered header similar to the provided screenshot.
@@ -168,8 +160,7 @@ export default function SchedulePreview({
   // Open a visible print tab with an instruction banner and attempt to trigger print.
   const openPrintWindow = (htmlString) => {
     try {
-  const instructBanner = `<div style="text-align:center;padding:8px 52px;background:#fff3cd;border:1px solid #f89aceff;margin-bottom:8px;border-radius:4px;font-size:13px;color:#856404;font-family: 'Khmer OS Muol Light', 'Khmer OS System', 'Noto Sans Khmer', Arial, sans-serif">ប្រសិនបើប្រអប់បោះពុម្ពមិនបង្ហាញ សូមចុច <strong>Ctrl+P</strong> ឬប្រើម៉ឺនុយ Print ដើម្បីបោះពុម្ព។</div>`;
-      let finalHtml = htmlString.replace(/<body([^>]*)>/i, (m) => `${m}\n${instructBanner}`);
+      let finalHtml = htmlString;
       // Open a visible tab (so the user can manually print if automatic print is blocked)
       const w = window.open('', '_blank');
       if (w) {
@@ -375,7 +366,9 @@ export default function SchedulePreview({
     color: '#c92a2a',
   }), []);
   // per-cell overrides applied by bulk/column replace operations
-  const [scheduleOverrides, setScheduleOverrides] = React.useState({});
+  const scheduleOverrides = manualOverrides || {};
+  const setScheduleOverrides = setManualOverrides || (() => {});
+
   const [replaceSrcInput, setReplaceSrcInput] = React.useState('');
   const [replaceTgtInput, setReplaceTgtInput] = React.useState('');
   const [onlyFirstSat, setOnlyFirstSat] = React.useState(false);
@@ -485,19 +478,52 @@ export default function SchedulePreview({
   // try to find a color for a shift object by searching pickedShiftsByCategory
   const findShiftColor = React.useCallback((shift) => utilFindShiftColor(shift, { pickedShiftsByCategory, shifts, shiftTemplates }), [pickedShiftsByCategory, shifts, shiftTemplates]);
   const resolveShiftForDay = React.useCallback((row, dayIndex) => {
-    // check per-cell override first
-    try {
-      const empKey = String(row.employeeRef || (row.employee && (row.employee.staffId || row.employee.id)) || '').trim();
-      const overrideKey = `${empKey}-${dayIndex}`;
-      if (scheduleOverrides && scheduleOverrides[overrideKey]) return scheduleOverrides[overrideKey];
-    } catch (e) {}
+    const empKey = String(row.employeeRef || (row.employee && (row.employee.staffId || row.employee.id)) || '').trim();
+    const overrideKey = `${empKey}-${dayIndex}`;
+    if (scheduleOverrides && scheduleOverrides[overrideKey]) return scheduleOverrides[overrideKey];
+
+    const date = new Date(monthMeta.year, monthMeta.month - 1, dayIndex + 1);
+    if (Number.isNaN(date.getTime())) return null;
+    const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const dow = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const currentDayKey = dayNames[dow];
+    const isHoliday = normalizedHolidaySet.has(iso);
+
+    // 1. Check for Custom Pattern (Standard/Flexible) from SubgroupEditModal
+    if (row.group && row.group.customPattern) {
+      const { mode, standard, flexible } = row.group.customPattern;
+      
+      if (mode === 'flexible' && flexible && flexible[currentDayKey]) {
+        const config = flexible[currentDayKey];
+        if (!config.work) return dayOffShift;
+        return {
+          title: `${config.start}-${config.end}`,
+          start: config.start,
+          end: config.end,
+          color: getColorForShift(config.start, config.end),
+          halfDay: config.halfDay
+        };
+      } 
+      
+      if (mode === 'standard' && standard) {
+        const isWorkDay = standard.days && standard.days[currentDayKey];
+        if (!isWorkDay) return dayOffShift;
+        return {
+          title: `${standard.start}-${standard.end}`,
+          start: standard.start,
+          end: standard.end,
+          color: getColorForShift(standard.start, standard.end),
+          halfDay: standard.halfDay
+        };
+      }
+    }
+
+    // 2. Default Rotation Logic
     const shifts = Array.isArray(row.groupShifts) && row.groupShifts.length ? row.groupShifts : [];
     const shiftsLen = Math.max(1, shifts.length);
-
-    // Determine the group's start day index (0-based). By default it's the group's index.
     const startDayIndex = Math.max(0, Number((row.group && row.group.startDayIndex) ?? row.groupIndex ?? 0));
 
-    // Determine desired start shift index (0-based) from group metadata if provided.
     let desiredStartIndex = null;
     try {
       if (row.group) {
@@ -516,42 +542,26 @@ export default function SchedulePreview({
 
     let baseIndex;
     if (desiredStartIndex !== null && Number.isFinite(desiredStartIndex)) {
-      // compute baseIndex so that on startDayIndex the shiftIndex equals desiredStartIndex
       baseIndex = ((desiredStartIndex - startDayIndex) % shiftsLen + shiftsLen) % shiftsLen;
     } else {
-      // fallback to previous behaviour (groupIndex as base offset)
       baseIndex = Math.max(0, row.groupIndex || 0) % shiftsLen;
     }
 
     const shiftIndex = (baseIndex + dayIndex) % shiftsLen;
     const baseShift = shifts[shiftIndex] || null;
-    const date = new Date(monthMeta.year, monthMeta.month - 1, dayIndex + 1);
-    if (Number.isNaN(date.getTime())) return baseShift;
-    const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    const dow = date.getDay();
-  const isWeekend = dow === 0 || dow === 6;
-  const isSunday = dow === 0;
-  const isSaturday = dow === 6;
-    const isHoliday = normalizedHolidaySet.has(iso);
 
-    // Weekend/Holiday handling
-    // - If it's a holiday: keep existing behaviour (use Day Off unless the base shift object itself is Day Off)
-    // - If it's a weekend: keep the base shift only when the corresponding flag is enabled
+    const isWeekend = dow === 0 || dow === 6;
+    const isSunday = dow === 0;
+    const isSaturday = dow === 6;
+
     if (isHoliday) {
-      // If the base shift itself is Day Off (title/empty times), keep it as-is
       if (baseShift && ((baseShift.title || '').toLowerCase().includes('day off') || (!baseShift.start && !baseShift.end))) return baseShift;
-      // Respect holidayWork flag: keep base shift on holidays when enabled, otherwise Day Off
       if (baseShift && baseShift.holidayWork) return baseShift;
       return dayOffShift;
     }
+
     if (isWeekend) {
       try {
-        // Special weekend rotation rule for groups like "G" where the shift short-code is 'G'.
-        // Two supported modes:
-        //  - 'alternateDays': within the same weekend one employee works Saturday, the other works Sunday
-        //  - 'alternateWeeks': the same employee works both weekend days for a week, then they swap the following week
-        // This only applies when the group's key is 'G' (e.g. Group G / category G) and the base shift short code is 'G'.
-        // local group key extraction (avoid referencing helpers declared later)
         const groupKey = (() => {
           try {
             const nm = String(row.groupName || row.category || '').trim();
@@ -561,7 +571,6 @@ export default function SchedulePreview({
           } catch (e) {}
           return '';
         })();
-        // simple detection of 'G' short-code for the base shift without depending on shortCodeForShift helper
         const baseCode = (() => {
           try {
             if (!baseShift) return '';
@@ -573,7 +582,6 @@ export default function SchedulePreview({
           } catch (e) { return ''; }
         })();
         if (groupKey === 'G' && String(baseCode) === 'G' && weekendRotationMode && weekendRotationMode !== 'none') {
-          // find employee position within the group if available (stable ordering)
           let empPos = -1;
           try {
             const members = Array.isArray(row.group && row.group.employees) ? row.group.employees : null;
@@ -581,7 +589,6 @@ export default function SchedulePreview({
               empPos = members.findIndex(x => String(x) === String(row.employeeRef));
             }
           } catch (e) { empPos = -1; }
-          // fallback: stable hash from employeeRef
           if (empPos < 0) {
             const s = String(row.employeeRef || '');
             let sum = 0;
@@ -589,27 +596,17 @@ export default function SchedulePreview({
             empPos = sum % 2;
           }
           if (weekendRotationMode === 'alternateDays') {
-            if (isSaturday) {
-              return (empPos % 2 === 0) ? baseShift : dayOffShift;
-            }
-            if (isSunday) {
-              return (empPos % 2 === 1) ? baseShift : dayOffShift;
-            }
+            if (isSaturday) return (empPos % 2 === 0) ? baseShift : dayOffShift;
+            if (isSunday) return (empPos % 2 === 1) ? baseShift : dayOffShift;
           } else if (weekendRotationMode === 'alternateWeeks') {
-            // compute week index (0-based) within the month; both weekend days in same week use same assignment
             const weekIndex = Math.floor((date.getDate() - 1) / 7);
             return ((weekIndex % 2) === (empPos % 2)) ? baseShift : dayOffShift;
           }
         }
-      } catch (e) {
-        // if anything fails here, fall through to default weekend handling below
-      }
-      // If the base shift is an explicit Day Off, keep it
+      } catch (e) {}
       if (baseShift && ((baseShift.title || '').toLowerCase().includes('day off') || (!baseShift.start && !baseShift.end))) return baseShift;
-      // Respect per-day weekend flags
       if (isSaturday && baseShift && baseShift.weekendWorkSaturday) return baseShift;
       if (isSunday && baseShift && baseShift.weekendWorkSunday) return baseShift;
-      // default for weekend: Day Off
       return dayOffShift;
     }
     return baseShift;
@@ -1297,274 +1294,52 @@ export default function SchedulePreview({
     }
   }, [displayRows, displayTotalDays, dayHeader, exampleLayout, exampleVariant, exampleRows, isoMonthTag, lookupEmployeeById, monthMeta, resolveShiftForDay, lookupEmployeeById, displayMonthLabel, groupKeyFromName]);
 
-  // Build an on-screen preview for a single group (image 1 style), with print support
+  // Build an on-screen preview for a single group using the exact HTML that will be printed
   const GroupReportPreview = React.useMemo(() => {
-    // Modal overlay removed: group report is rendered in a separate tab via buildGroupReportHtml.
-    try {
-      const groupName = selectedGroupForReport; // category id
-  const selectedCategory = String(groupName).trim();
-  const groupRows = (displayRows || []).filter(r => groupKeyFromName(r.category) === groupKeyFromName(selectedCategory));
-      // use shared shortCodeForShift helper defined above
-      // Format subgroup to only ordinal label e.g., "ទី១" extracted from name
-      const toKhmerDigits = (numStr) => {
-        const kh = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
-        return String(numStr).split('').map(ch => (ch >= '0' && ch <= '9') ? kh[parseInt(ch,10)] : ch).join('');
-      };
-      const formatSubgroupLabel = (name) => {
-        if (!name) return '';
-        const s = String(name);
-        // Prefer first number sequence (Arabic or Khmer digits)
-        const m = s.match(/[0-9០-៩]+/);
-        if (m && m[0]) {
-          const token = m[0];
-          const hasKhmer = /[០-៩]/.test(token);
-          return `ទី${hasKhmer ? token : toKhmerDigits(token)}`;
-        }
-        // Fallback: if "ទី" already present without digits, keep as-is
-        if (s.includes('ទី')) return s;
-        // Last resort: return original
-        return s;
-      };
-      const rowsData = groupRows.map((r, idx) => {
-        const emp = r.employee || lookupEmployeeById(r.employeeRef) || null;
-        const subgroup = r.groupName || (r.group && r.group.name) || '';
-        const subgroupDisplay = formatSubgroupLabel(subgroup);
-        const name = emp ? (emp.khmerName || emp.fullName || emp.name || '') : String(r.employeeRef || '');
-        const phone = emp ? (emp.phone || emp.phoneNumber || emp.tel || emp.mobile || emp.contact || '') : '';
-        // Always render full month in group report preview/print
-        const codes = Array.from({ length: monthDays }).map((_, di) => {
-          const sh = (exampleLayout ? (r.groupShifts && r.groupShifts[di % (r.groupShifts.length || 1)]) : resolveShiftForDay(r, di));
-          return shortCodeForShift(sh) || '';
-        });
-        return { idx: idx + 1, subgroup, subgroupDisplay, name, phone, codes };
-      });
-
-      // Group rows by subgroupDisplay (or subgroup)
-      // Then within each subgroup, combine rows that have identical day codes across the month
-      const grouped = (() => {
-        const map = new Map();
-        rowsData.forEach(r => {
-          const key = (r.subgroupDisplay || r.subgroup || '').trim() || '-';
-          if (!map.has(key)) map.set(key, []);
-          map.get(key).push(r);
-        });
-        // For each subgroup, combine by codes signature
-        return Array.from(map.entries()).map(([key, rows]) => {
-          const bySig = new Map();
-          rows.forEach(r => {
-            const sig = (r.codes || []).join('|');
-            if (!bySig.has(sig)) bySig.set(sig, { nameList: [], phoneList: [], codes: r.codes });
-            bySig.get(sig).nameList.push(r.name || '');
-            const phoneVal = (r.phone || '').toString().trim();
-            if (phoneVal) bySig.get(sig).phoneList.push(phoneVal);
-          });
-          const combined = Array.from(bySig.values()).map(x => ({
-            names: x.nameList,
-            phone: Array.from(new Set(x.phoneList)).join(', '),
-            codes: x.codes,
-          }));
-          // stable sort by first name for consistency
-          combined.sort((a, b) => String(a.names[0] || '').localeCompare(String(b.names[0] || ''), 'km-KH'));
-          return { key, combined };
-        });
-      })();
-
-      // Build two-tier day header (weekday + date) and tint weekends/holidays
-      const weekdayShort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-      const dayMeta = Array.from({ length: monthDays }).map((_, i) => {
-        const d = new Date(monthMeta.year, monthMeta.month - 1, i + 1);
-        const dow = d.getDay();
-        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const isHoliday = normalizedHolidaySet.has(iso);
-        const isWeekend = dow === 0 || dow === 6;
-        const bg = dow === 0 ? '#fde2e2' : (dow === 6 ? '#e2f0ff' : (isHoliday ? '#fee2e2' : '#ffffff'));
-        return { label: dayHeader(i), dowLabel: weekdayShort[dow], isWeekend, isHoliday, bg };
-      });
-
-    // A4 landscape approximate pixels at 96 DPI: 297mm x 210mm -> 1123 x 794 px
-  const A4W = 1123; const A4H = 794;
-  const cardW = 112, nameW = 200, phoneW = 120, dayW = 24; // adjusted widths after removing serial column
-
-      return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded shadow-lg overflow-hidden p-3" style={{ width: A4W, height: A4H }}>
-            <div className="flex items-center justify-between mb-3">
-              <div style={{ flex: 1 }}>
-                {/* Render printable header visually at top of modal */}
-                <div dangerouslySetInnerHTML={{ __html: printableHeaderHtml }} />
-                <div className="text-center text-xl font-semibold">{labelMap[selectedGroupForReport] || `Group ${selectedGroupForReport}`}</div>
-                <div className="text-center text-sm text-gray-600">{displayMonthLabel}</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button className="px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded" onClick={() => exportGroupReport(selectedGroupForReport)}>Download Excel</button>
-                <button className="px-3 py-1.5 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded" onClick={() => {
-                  // Open print window optimized for A4 landscape with two-tier header and colored codes
-                  // Build rows with rowspan for the group column; within each subgroup
-                  // identical code patterns are combined and names are joined with line breaks
-                  const buildRowsWithRowspan = () => {
-                    const rows = [];
-                    grouped.forEach(g => {
-                      const span = g.combined.length;
-                      g.combined.forEach((r, i) => {
-                        const leftCells = [];
-                        if (i === 0) {
-                          leftCells.push(`<td class=\"col-card\" rowspan=\"${span}\" style=\"text-align:center\">${String(g.key || '')}</td>`);
-                        }
-                        const nameHtml = r.names.map(n => `<div>${String(n || '')}</div>`).join('');
-                        leftCells.push(`<td class=\"col-name\" style=\"text-align:left\">${nameHtml}</td>`);
-                        leftCells.push(`<td class=\"col-phone\" style=\"text-align:center\">${String(r.phone || '')}</td>`);
-                        const dayCells = r.codes.map(c => {
-                          const legendItem = (legendItems || []).find(li => String(li.code) === String(c));
-                          const bg = legendItem ? (legendItem.color || '#9ca3af') : (c === 'R' ? '#ef4444' : (c === 'DG' ? '#1d4ed8' : (c === 'G' ? '#3b82f6' : (c === 'D' ? '#1e40af' : '#9ca3af'))));
-                          const textColor = (function(hex) {
-                            try {
-                              const cc = String(hex || '').replace('#','');
-                              const rr = parseInt(cc.substring(0,2),16);
-                              const gg = parseInt(cc.substring(2,4),16);
-                              const bb = parseInt(cc.substring(4,6),16);
-                              const lum = (0.299*rr + 0.587*gg + 0.114*bb)/255;
-                              return lum > 0.6 ? '#111827' : '#ffffff';
-                            } catch (e) { return '#ffffff'; }
-                          })(bg);
-                          return `<td class=\"col-day\" style=\"text-align:center\"><span style=\"display:inline-block;min-width:6mm;padding:1px 4px;border-radius:3px;background:${bg};color:${textColor};font-weight:600\">${String(c||'')}</span></td>`;
-                        }).join('');
-                        rows.push(`<tr>${leftCells.join('')}${dayCells}</tr>`);
-                      });
-                    });
-                    return rows.join('');
-                  };
-                  const rowsHtml = buildRowsWithRowspan();
-                  // Build two-tier header
-                  const leftHeaders = ['ក្រុម','គោត្តនាម និងនាម','លេខទូរស័ព្ទ'];
-                  const leftHeadHtml = leftHeaders.map((h, i) => {
-                    const cls = i === 0 ? 'col-card' : i === 1 ? 'col-name' : 'col-phone';
-                    return `<th class=\"${cls}\" rowspan=\"2\">${h}</th>`;
-                  }).join('');
-                  const dowHtml = dayMeta.map(d => `<th class=\"col-day\" style=\"background:${d.bg}\">${d.dowLabel}</th>`).join('');
-                  const dayNumHtml = dayMeta.map(d => `<th class=\"col-day\">${d.label}</th>`).join('');
-                  const theadHtml = `<tr>${leftHeadHtml}${dowHtml}</tr><tr>${dayNumHtml}</tr>`;
-
-                  const title = `${labelMap[selectedGroupForReport] || `Group ${selectedGroupForReport}`} - ${displayMonthLabel}`;
-                  const html = `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <title>Group Report</title>
-  <style>
-    @page { size: A4 landscape; margin: 8mm; }
-    body { margin: 0; font-family: Arial, Helvetica, "Khmer OS System", "Noto Sans Khmer", sans-serif; font-size: 11px; color: #111; }
-    .page { width: calc(297mm - 16mm); margin: 0 auto; }
-    h2.title { text-align: center; margin: 0 0 6mm 0; font-size: 16px; }
-    table { border-collapse: collapse; width: 100%; table-layout: fixed; }
-    thead { display: table-header-group; }
-    tfoot { display: table-footer-group; }
-    tr { page-break-inside: avoid; }
-    th, td { border: 1px solid #bbb; padding: 3px; font-size: 11px; word-wrap: break-word; }
-    thead th { background: #f3f4f6; }
-    .col-card { width: 24mm; }
-    .col-name { width: 48mm; }
-    .col-phone { width: 28mm; }
-    .col-day { width: 6mm; }
-    .legend { font-size: 10px; margin-top: 4mm; }
-  </style>
-  <script>window.addEventListener('afterprint', () => window.close && window.close());</script>
-  </head>
-<body>
-  <div class="page">
-    ${printableHeaderHtml}
-    <h2 class="title">${title}</h2>
-    <table>
-      <thead>${theadHtml}</thead>
-      <tbody>${rowsHtml}</tbody>
-    </table>
-    <div class="legend">
-      ${ (legendItems || []).map(li => {
-        const bg = li.color || '#9ca3af';
-        const cc = String(bg||'').replace('#','');
-        let text = '#fff';
-        try {
-          const rr = parseInt(cc.substring(0,2),16);
-          const gg = parseInt(cc.substring(2,4),16);
-          const bb = parseInt(cc.substring(4,6),16);
-          const lum = (0.299*rr + 0.587*gg + 0.114*bb)/255;
-          text = lum > 0.6 ? '#111827' : '#ffffff';
-        } catch(e) {}
-        return `<span style="display:inline-block;width:7mm;text-align:center;border-radius:3px;background:${bg};color:${text};font-weight:700;">${li.code}</span>${li.code === 'R' ? '&nbsp;= Day Off' : ''}&nbsp;&nbsp;`;
-      }).join('') }
-    </div>
-    <div style="margin-top: 2mm; font-size: 10px; color: #444;">Generated: ${new Date().toLocaleString()}</div>
-  </div>
-</body>
-</html>`;
-                  openPrintWindow(html);
-                }}>Print</button>
-                <button className="px-3 py-1.5 text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 rounded" onClick={() => setShowGroupReport(false)}>Close</button>
-              </div>
+    if (!showGroupReport || !reportHtml) return null;
+    return (
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 transition-all">
+        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200" style={{ maxWidth: '98vw', maxHeight: '96vh', width: 1140, height: 820 }}>
+          {/* Modal Header Actions */}
+          <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-8 bg-indigo-600 rounded-full" />
+              <h3 className="font-bold text-slate-800 text-lg">របាយការណ៍តាមក្រុម (Preview)</h3>
             </div>
-            <div className="overflow-auto" style={{ width: '100%', height: `calc(${A4H}px - 64px)` }}>
-              <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed', width: '100%' }}>
-                <thead>
-                  <tr>
-                    <th className="border px-2 py-1 bg-gray-100 text-gray-700 text-center" style={{ width: cardW }} rowSpan={2}>ក្រុម</th>
-                    <th className="border px-2 py-1 bg-gray-100 text-gray-700 text-center" style={{ width: nameW }} rowSpan={2}>គោត្តនាម និងនាម</th>
-                    <th className="border px-2 py-1 bg-gray-100 text-gray-700 text-center" style={{ width: phoneW }} rowSpan={2}>លេខទូរស័ព្ទ</th>
-                    {dayMeta.map((d, i) => (
-                      <th key={`dow-${i}`} className="border px-1 py-1 text-center" style={{ width: dayW, background: d.bg }}>{d.dowLabel}</th>
-                    ))}
-                  </tr>
-                  <tr>
-                    {dayMeta.map((d, i) => (
-                      <th key={`day-${i}`} className="border px-1 py-1 text-center" style={{ width: dayW }}>{d.label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {grouped.map((g) => (
-                    g.combined.map((r, i) => (
-                      <tr key={`${g.key}-${i}`}>
-                        {i === 0 && (
-                          <td className="border px-2 py-1 text-center" style={{ width: cardW }} rowSpan={g.combined.length}>{g.key}</td>
-                        )}
-                        <td className="border px-2 py-1" style={{ width: nameW }}>
-                          {r.names.map((n, idx) => (<div key={idx}>{n}</div>))}
-                        </td>
-                        <td className="border px-2 py-1 text-center" style={{ width: phoneW }}>{r.phone}</td>
-                        {r.codes.map((c, i2) => {
-                          const legendItem = (legendItems || []).find(li => String(li.code) === String(c));
-                          const bg = legendItem ? (legendItem.color || '#9ca3af') : (c ? (c === 'R' ? '#ef4444' : (c === 'DG' ? '#1d4ed8' : (c === 'G' ? '#3b82f6' : (c === 'D' ? '#1e40af' : '#9ca3af')))) : '#9ca3af');
-                          const textColor = (function(hex) { try { const cc = String(hex||'').replace('#',''); const rr = parseInt(cc.substring(0,2),16); const gg = parseInt(cc.substring(2,4),16); const bb = parseInt(cc.substring(4,6),16); const lum = (0.299*rr + 0.587*gg + 0.114*bb)/255; return lum > 0.6 ? '#111827' : '#ffffff'; } catch(e){ return '#ffffff'; } })(bg);
-                          return (
-                            <td key={i2} className="border px-1 py-1 text-center" style={{ width: dayW }}>
-                              <span style={{ display: 'inline-block', minWidth: 24, padding: '2px 6px', borderRadius: 3, background: bg, color: textColor, fontWeight: 600 }}>{c}</span>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))
-                  ))}
-                </tbody>
-              </table>
-              {/* Legend */}
-              <div className="mt-3 text-xs text-gray-700">
-                <div className="flex items-center gap-3">
-                  {(legendItems || []).map((li, idx) => {
-                    const bg = li.color || '#9ca3af';
-                    const cc = String(bg||'').replace('#','');
-                    let text = '#fff';
-                    try { const rr = parseInt(cc.substring(0,2),16); const gg = parseInt(cc.substring(2,4),16); const bb = parseInt(cc.substring(4,6),16); const lum = (0.299*rr + 0.587*gg + 0.114*bb)/255; text = lum > 0.6 ? '#111827' : '#ffffff'; } catch(e) {}
-                    return (<span key={idx}><span style={{ display: 'inline-block', width: 24, textAlign: 'center', borderRadius: 3, background: bg, color: text, fontWeight: 700 }}>{li.code}</span>{li.code === 'R' ? ' = Day Off' : ''}</span>);
-                  })}
-                </div>
-              </div>
+            <div className="flex items-center gap-2">
+              <button 
+                className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all shadow-sm flex items-center gap-2" 
+                onClick={() => exportGroupReport(selectedGroupForReport)}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Download Excel
+              </button>
+              <button 
+                className="px-4 py-2 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-all shadow-sm flex items-center gap-2" 
+                onClick={() => openPrintWindow(reportHtml)}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                Print
+              </button>
+              <button className="px-4 py-2 text-sm bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-medium transition-all flex items-center gap-2" onClick={() => setShowGroupReport(false)}>
+                Close
+              </button>
             </div>
           </div>
+
+          {/* Iframe content - 100% identical to print */}
+          <div className="flex-1 overflow-hidden bg-slate-100 p-4">
+            <iframe 
+              srcDoc={reportHtml} 
+              title="Group Report Preview"
+              className="w-full h-full border-none shadow-inner bg-white rounded-lg"
+              style={{ minHeight: '600px' }}
+            />
+          </div>
         </div>
-      );
-    } catch (e) {
-      return null;
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showGroupReport, selectedGroupForReport, displayRows, displayTotalDays, exampleLayout, resolveShiftForDay, lookupEmployeeById, displayMonthLabel, groupKeyFromName]);
+      </div>
+    );
+  }, [showGroupReport, reportHtml, selectedGroupForReport, exportGroupReport]);
 
   // Print current preview as A4 landscape. Builds HTML snapshot and opens print dialog.
   const printA4Landscape = React.useCallback(() => {
@@ -1578,40 +1353,70 @@ export default function SchedulePreview({
         const card = emp ? (emp.staffId || emp.staff_id || emp.cardNumber || emp.card_no || emp.id || emp._id || '') : String(r.employeeRef || '');
         const name = emp ? (emp.khmerName || emp.fullName || emp.name || '') : String(r.employeeRef || '');
         const cells = [idx + 1, card, name].concat(Array.from({ length: cols }).map((_, di) => {
-          const date = new Date(monthMeta.year, monthMeta.month - 1, di + 1);
-          const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-          const list = scheduleByDay[iso] || [];
-          const found = list.find(x => String(x.employeeRef) === String(r.employeeRef) || String(x.employeeId) === String(getEmployeeId(r.employee || {}) || '')) || null;
-          const title = found && found.shift ? (found.shift.title || `${found.shift.start || ''}-${found.shift.end || ''}`) : '';
-          return title || '';
+          const sh = resolveShiftForDay(r, di);
+          const title = sh ? (sh.title || `${sh.start || ''}-${sh.end || ''}`) : '';
+          const bg = (sh ? (sh.color || findShiftColor(sh)) : null) || '#f3f4f6';
+          const textColor = (function(hex) {
+            try {
+              const c = hex.replace('#', '');
+              const r = parseInt(c.substring(0,2),16);
+              const g = parseInt(c.substring(2,4),16);
+              const b = parseInt(c.substring(4,6),16);
+              const lum = (0.299*r + 0.587*g + 0.114*b) / 255;
+              return lum > 0.6 ? '#111827' : '#ffffff';
+            } catch (e) { return '#111827'; }
+          })(bg);
+          return { title, bg, textColor };
         }));
-        return `<tr>${cells.map(c => `<td style="border:1px solid #ccc;padding:4px;font-size:12px;">${String(c || '')}</td>`).join('')}</tr>`;
+
+        const cellHtml = cells.map((c, i) => {
+          if (i < 3) return `<td style="border:1px solid #ccc;padding:4px;font-size:11px;text-align:center;">${String(c || '')}</td>`;
+          const isWeekend = dayMeta[i-3]?.isWeekend;
+          return `<td style="border:1px solid #ccc;padding:2px;font-size:10px;text-align:center;background:${isWeekend ? '#fee2e2' : 'white'}">
+            ${c.title ? `<span style="background:${c.bg};color:${c.textColor};padding:2px 4px;border-radius:4px;font-weight:600;display:inline-block;min-width:18px;">${c.title}</span>` : '—'}
+          </td>`;
+        }).join('');
+        return `<tr>${cellHtml}</tr>`;
       }).join('');
 
-      const theadHtml = `<tr>${headerCells.map(h => `<th style="border:1px solid #bbb;padding:6px;background:#f3f4f6;font-size:12px;">${h}</th>`).join('')}</tr>`;
+      const theadHtml = `<tr>${headerCells.map((h, i) => {
+        const isWeekend = i >= 3 && dayMeta[i-3]?.isWeekend;
+        return `<th style="border:1px solid #bbb;padding:6px;background:${isWeekend ? '#fecaca' : '#f3f4f6'};font-size:11px;">${h}</th>`;
+      }).join('')}</tr>`;
 
       const html = `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8" />
-<title>Schedule Print</title>
+<title>Schedule Print - ${displayMonthLabel}</title>
 <style>
-  @page { size: A4 landscape; margin: 10mm; }
-  body { font-family: Arial, Helvetica, "Khmer OS System", serif; font-size: 12px; }
+  @font-face { font-family: 'Khmer OS System'; src: local('Khmer OS System'); }
+  @page { size: A4 landscape; margin: 8mm; }
+  body { 
+    margin: 0; 
+    font-family: "Khmer OS System", Arial, sans-serif; 
+    font-size: 11px; 
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   table { border-collapse: collapse; width: 100%; table-layout: fixed; }
-  th, td { word-wrap: break-word; }
-  .small { font-size: 11px; }
+  th, td { word-wrap: break-word; border: 1px solid #ccc; }
+  .header { text-align: center; margin-bottom: 15px; }
+  .title { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
 </style>
 </head>
 <body>
-  ${printableHeaderHtml}
-  <h2 style="text-align:center;margin:0 0 8px 0;">${displayMonthLabel}</h2>
-  <div style="margin-bottom:8px;">Range: ${previewRange.start} → ${previewRange.end}</div>
+  <div class="header">
+    <div class="title">${labelMap[selectedGroupForReport] || 'Schedule Report'}</div>
+    <div>${displayMonthLabel}</div>
+  </div>
   <table>
     <thead>${theadHtml}</thead>
     <tbody>${rowsHtml}</tbody>
   </table>
-  <div style="margin-top:12px;font-size:11px;color:#333;">Generated: ${new Date().toLocaleString()}</div>
+  <div style="margin-top: 15px; font-size: 9px; color: #666; text-align: right;">
+    Generated on ${new Date().toLocaleString('km-KH')}
+  </div>
 </body>
 </html>`;
 
@@ -1762,36 +1567,36 @@ export default function SchedulePreview({
                 end: formatDateForRange(new Date(monthMeta.year, monthMeta.month - 1, fullMonthTotalDays)),
               };
 
-              const html = buildGroupReportHtml({
-                groupName: grp,
-                labelMap,
-                displayRows,
-                monthMeta,
-                monthDays,
-                // force report to include full month days
-                displayTotalDays: fullMonthTotalDays,
-                // provide full-month range for title
-                previewRange: fullPreviewRange,
-                // pass a snapshot of the preview schedule for the entire month so the builder uses exact per-date values (including overrides)
-                scheduleByDay: extractScheduleByDay({ rows: displayRows, monthMeta, totalDays: fullMonthTotalDays, resolveShiftForDay, getEmployeeId }),
-                printableHeaderHtml,
-                displayMonthLabel,
-                exampleLayout,
-                // show short code labels (សំគាល់) from Shift Group when available
-                displayShiftLabel: 'short',
-                resolveShiftForDay,
-                shortCodeForShift,
-                normalizedHolidaySet,
-                legendItems,
-                // pass computed per-code rgba map (may be empty)
-                customColorMap: computedCustomColorMap,
-                debug: false,
-                // include current department so the report header shows the exact department name
-                department: department,
-              });
-              // Render inside an in-page modal iframe to avoid opening a new browser tab
-              setReportHtml(String(html || ''));
-              setShowReport(true);
+                const html = buildGroupReportHtml({
+                  groupName: grp,
+                  labelMap,
+                  displayRows,
+                  monthMeta,
+                  monthDays,
+                  // force report to include full month days
+                  displayTotalDays: fullMonthTotalDays,
+                  // provide full-month range for title
+                  previewRange: fullPreviewRange,
+                  // pass a snapshot of the preview schedule for the entire month so the builder uses exact per-date values (including overrides)
+                  scheduleByDay: extractScheduleByDay({ rows: displayRows, monthMeta, totalDays: fullMonthTotalDays, resolveShiftForDay, getEmployeeId }),
+                  printableHeaderHtml,
+                  displayMonthLabel,
+                  exampleLayout,
+                  // show short code labels (សំគាល់) from Shift Group when available
+                  displayShiftLabel: 'short',
+                  resolveShiftForDay,
+                  shortCodeForShift,
+                  normalizedHolidaySet,
+                  legendItems,
+                  // pass computed per-code rgba map (may be empty)
+                  customColorMap: computedCustomColorMap,
+                  debug: false,
+                  // include current department so the report header shows the exact department name
+                  department: department,
+                });
+                // Store HTML and show modal
+                setReportHtml(html);
+                setShowGroupReport(true);
             }}>Preview Group</button>
               <button className="px-3 py-1.5 text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 rounded" onClick={() => setShowColorEditor(s => !s)}>{showColorEditor ? 'Close color editor' : 'Customize colors'}</button>
             </div>
@@ -1832,24 +1637,7 @@ export default function SchedulePreview({
         </div>
       </div>
       {/* Inline modal for group report preview (replaces opening a new tab) */}
-      {showReport && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: '95%', height: '95%', background: '#fff', borderRadius: 6, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: 8, background: '#f8fafc', borderBottom: '1px solid #e6edf3', display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontWeight: 600 }}>Group Report Preview</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => {
-                  try { reportFrameRef.current && reportFrameRef.current.contentWindow.print(); } catch (e) { alert('Unable to print preview.'); }
-                }} style={{ padding: '6px 10px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4 }}>Print</button>
-                <button onClick={() => { setShowReport(false); setReportHtml(''); }} style={{ padding: '6px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4 }}>Close</button>
-              </div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <iframe title="Group Report" ref={reportFrameRef} style={{ width: '100%', height: '100%', border: 0, background: '#fff' }} />
-            </div>
-          </div>
-        </div>
-      )}
+
       {/* Example variant B header: group cards + shift list */}
       {exampleLayout && exampleVariant === 'B' && (
         <div className="mb-4 flex gap-4">

@@ -72,7 +72,7 @@ export default function DepartmentNewPage() {
 
   const handleExport = () => {
     const csvRows = [
-      ['Department_Id','Department_Kh','Department_En','Other'],
+      ['Department_Id', 'Department_Kh', 'Department_En', 'Other'],
       ...departments.map(d => [d.Department_Id || '', d.Department_Kh || '', d.Department_En || '', d.Other || ''])
     ];
     const csvContent = '\uFEFF' + csvRows.map(row => row.map(val => `"${val || ''}"`).join(',')).join('\n');
@@ -102,7 +102,7 @@ export default function DepartmentNewPage() {
     reader.readAsText(file);
   };
 
-  const sortedDepartments = [...departments].sort((a,b) => {
+  const sortedDepartments = [...departments].sort((a, b) => {
     if (sortField === 'Department_Id') {
       const va = Number(a.Department_Id) || 0; const vb = Number(b.Department_Id) || 0;
       return sortOrder === 'asc' ? va - vb : vb - va;
@@ -120,7 +120,7 @@ export default function DepartmentNewPage() {
     (d.Other || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const pagedDepartments = filteredDepartments.slice((page-1)*limit, page*limit);
+  const pagedDepartments = filteredDepartments.slice((page - 1) * limit, page * limit);
   const totalPages = Math.ceil(filteredDepartments.length / limit) || 1;
 
   return (
@@ -148,10 +148,10 @@ export default function DepartmentNewPage() {
           <table className="min-w-full border">
             <thead>
               <tr className="bg-indigo-50">
-                <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Department_Id')}>លេខសម្គាល់ផ្នែក {sortField==='Department_Id' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-                <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Department_Kh')}>ឈ្មោះផ្នែក (ខ្មែរ) {sortField==='Department_Kh' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-                <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Department_En')}>ឈ្មោះផ្នែក (អង់គ្លេស) {sortField==='Department_En' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
-                <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Other')}>ព័ត៌មានផ្សេងៗ {sortField==='Other' ? (sortOrder==='asc'?'▲':'▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Department_Id')}>លេខសម្គាល់ផ្នែក {sortField === 'Department_Id' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Department_Kh')}>ឈ្មោះផ្នែក (ខ្មែរ) {sortField === 'Department_Kh' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Department_En')}>ឈ្មោះផ្នែក (អង់គ្លេស) {sortField === 'Department_En' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
+                <th className="border px-4 py-2 cursor-pointer text-indigo-800" onClick={() => handleSort('Other')}>ព័ត៌មានផ្សេងៗ {sortField === 'Other' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}</th>
                 <th className="border px-4 py-2">សកម្មភាព</th>
               </tr>
             </thead>
@@ -173,9 +173,9 @@ export default function DepartmentNewPage() {
           </table>
 
           <div className="flex justify-center items-center mt-4 gap-2">
-            <button onClick={() => setPage(page-1)} disabled={page===1} className={`px-3 py-1 border rounded ${page===1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}>Prev</button>
+            <button onClick={() => setPage(page - 1)} disabled={page === 1} className={`px-3 py-1 border rounded ${page === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}>Prev</button>
             <span className="px-4 py-1 rounded bg-blue-600 text-white font-bold">ទំព័រ {page} / {totalPages}</span>
-            <button onClick={() => setPage(page+1)} disabled={page===totalPages} className={`px-3 py-1 border rounded ${page===totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}>Next</button>
+            <button onClick={() => setPage(page + 1)} disabled={page === totalPages} className={`px-3 py-1 border rounded ${page === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-700 text-white'}`}>Next</button>
           </div>
         </>
       )}

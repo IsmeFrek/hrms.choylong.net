@@ -1,5 +1,6 @@
 import express from 'express';
 import Department from '../models/Department.js';
+import HR from '../models/HR.js';
 import { authRequired, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -11,6 +12,32 @@ router.get('/public', async (req, res) => {
     const departments = await Department.find();
     res.json(departments);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get unique departments from HR records (fallback if Department collection is empty)
+router.get('/active', authRequired, async (req, res) => {
+  try {
+    console.log('API: GET /api/departments/active -> starting distinct query');
+    const items = await HR.distinct('Department_Kh', { 
+      Department_Kh: { $ne: null, $ne: '', $exists: true } 
+    });
+    
+    console.log(`API: Found ${items?.length || 0} unique departments in HR`);
+
+    // Map to objects and sort
+    const formatted = (items || [])
+      .filter(name => !!name)
+      .sort((a, b) => String(a).localeCompare(String(b), 'km'))
+      .map((name, index) => ({
+        _id: `active-${index}`,
+        Department_Kh: String(name).trim()
+      }));
+    
+    res.json(formatted);
+  } catch (err) {
+    console.error('API Error in /api/departments/active:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -42,10 +69,14 @@ router.post('/', requirePermission('edit:departments'), async (req, res) => {
 // Update department
 router.put('/:id', requirePermission('edit:departments'), async (req, res) => {
   try {
-    const { Department_Id, Department_En, Department_Kh, Other } = req.body;
+    const { Department_Id, Department_En, Department_Kh, Other, customPattern } = req.body;
+    const updatePayload = { Department_Id, Department_En, Department_Kh, Other };
+    if (customPattern !== undefined) {
+      updatePayload.customPattern = customPattern;
+    }
     const department = await Department.findByIdAndUpdate(
       req.params.id,
-      { Department_Id, Department_En, Department_Kh, Other },
+      updatePayload,
       { new: true, runValidators: true }
     );
     if (!department) {

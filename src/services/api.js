@@ -197,4 +197,12 @@ export const holidaysAPI = {
   getPublicHolidays: (year) => api.get(`/holidays`, { params: { year } }),
 };
 
+// Department Unit (អង្គភាព) API
+export const departmentUnitAPI = {
+  getUnits: () => api.get('/department-units'),
+  getUnit: (id) => api.get(`/department-units/${id}`),
+  updateUnit: (id, data) => api.put(`/department-units/${id}`, data),
+  deleteUnit: (id) => api.delete(`/department-units/${id}`),
+};
+
 export default api;

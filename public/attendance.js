@@ -149,41 +149,285 @@ try {
   // ignore
 }
 
-// Auto-fill `staffId` from app auth (localStorage 'auth') when available
-try {
-  const authRaw = localStorage.getItem('auth');
-  if (authRaw) {
-    try {
-      const auth = JSON.parse(authRaw);
-      const user = auth && auth.user;
-      if (user) {
-        // Prefer phone for staffId and fullName for name
-        const phone = user.phone || user.phoneNumber || user.mobile || user.cell || user.phone_number || user.tel;
-        const fullname = user.fullName || user.fullname || user.name || user.displayName || user.full_name;
-        // Only auto-fill staffId for non-approver users; approvers/Admin should see full list by default
-        const isApprover = (typeof isAdmin === 'function' && isAdmin()) || (typeof hasPermission === 'function' && hasPermission('addattendance:approve'));
-        if (phone && !isApprover) {
-          const el = document.querySelector('input[name="staffId"]');
-          if (el) {
-            el.value = String(phone);
-            // leave editable so user can change staffId if needed
-            el.style.backgroundColor = '#f8fafc';
-          }
-        }
-        if (fullname) {
-          const fEl = document.querySelector('input[name="fullName"]');
-          if (fEl) {
-            fEl.value = String(fullname);
-            fEl.style.backgroundColor = '#f8fafc';
-          }
-        }
-      }
-    } catch (e) {
-      // ignore JSON parse errors
+// មិនបំពេញលេខកាត់បុគ្គលិក និងឈ្មោះពី auth ទៀតទេ។
+// វាលទាំងពីរនេះត្រូវបានបំពេញតែនៅពេលស្កេនមុខ match ជាមួយ Face Profile។
+
+// --- Face recognition (for auto-fill from Scan Face) ---
+const FACE_MODELS_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+let faceModelsReady = false;
+let faceModelsLoading = false;
+
+function getAuthToken(){
+  try{
+    const raw = localStorage.getItem('auth');
+    if (!raw) return null;
+    const a = JSON.parse(raw);
+    return a && a.token ? String(a.token) : null;
+  }catch{ return null; }
+}
+
+function authHeaders(){
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function ensureFaceModels(){
+  if (faceModelsReady || faceModelsLoading) {
+    // wait briefly if another call is loading
+    while(faceModelsLoading && !faceModelsReady){
+      await new Promise(r => setTimeout(r, 100));
     }
+    return;
+  }
+  if (typeof faceapi === 'undefined' || !faceapi.nets) return;
+  faceModelsLoading = true;
+  try {
+    await faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODELS_URL);
+    await faceapi.nets.faceLandmark68Net.loadFromUri(FACE_MODELS_URL);
+    await faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODELS_URL);
+    faceModelsReady = true;
+  } catch (e) {
+    console.error('Failed to load face models', e);
+  } finally {
+    faceModelsLoading = false;
+  }
+}
+
+// --- Camera capture for scanIn (face photo) ---
+let capturedScanInData = null;
+let cameraStream = null;
+let faceMatchedForForm = false;
+let autoCaptureTimer = null;
+let autoCloseTimer = null;
+const AUTO_CAPTURE_DELAY_MS = 3000; // 3 វិនាទី
+const AUTO_CLOSE_DELAY_MS = 20000; // បើមិនថតរូបរួច ក្នុង 20 វិនាទី បិទម៉ូដាល់
+
+function clearAutoCaptureTimer(){
+  if (autoCaptureTimer) {
+    clearTimeout(autoCaptureTimer);
+    autoCaptureTimer = null;
+  }
+  if (autoCloseTimer) {
+    clearTimeout(autoCloseTimer);
+    autoCloseTimer = null;
+  }
+}
+
+async function openCameraForCheckIn() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return false;
+  const modal = document.getElementById('cameraModal');
+  const video = document.getElementById('cameraPreview');
+  const canvas = document.getElementById('cameraCanvas');
+  const captureBtn = document.getElementById('cameraCaptureBtn');
+  const cancelBtn = document.getElementById('cameraCancelBtn');
+  if (!modal || !video || !canvas || !captureBtn || !cancelBtn) return false;
+
+  return new Promise(async (resolve) => {
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = cameraStream;
+    } catch (err) {
+      console.error('Unable to open camera', err);
+      resolve(false);
+      return;
+    }
+
+    modal.style.display = 'flex';
+
+    const cleanup = (ok) => {
+      try {
+        if (cameraStream) {
+          cameraStream.getTracks().forEach((t) => t.stop());
+        }
+      } catch (e) {}
+      cameraStream = null;
+      modal.style.display = 'none';
+      captureBtn.onclick = null;
+      cancelBtn.onclick = null;
+      clearAutoCaptureTimer();
+      resolve({ ok, canvas: ok ? canvas : null });
+    };
+
+    const doCapture = () => {
+      try {
+        const w = video.videoWidth || 320;
+        const h = video.videoHeight || 240;
+        // Crop center square (focus roughly on face area)
+        const size = Math.min(w, h) * 0.8;
+        const sx = (w - size) / 2;
+        const sy = (h - size) / 2;
+        canvas.width = size;
+        canvas.height = size;
+        // Hint to browser that we'll read pixels frequently (face-api getImageData)
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
+        capturedScanInData = canvas.toDataURL('image/jpeg', 0.85);
+      } catch (e) {
+        console.error('Capture failed', e);
+        capturedScanInData = null;
+      }
+      cleanup(true);
+    };
+
+    captureBtn.onclick = () => {
+      clearAutoCaptureTimer();
+      doCapture();
+    };
+
+    cancelBtn.onclick = () => {
+      clearAutoCaptureTimer();
+      capturedScanInData = null;
+      cleanup(false);
+    };
+
+    // Auto-capture after delay, and auto-close if still open for too long
+    try {
+      clearAutoCaptureTimer();
+      autoCaptureTimer = setTimeout(() => {
+        autoCaptureTimer = null;
+        // Only auto-capture if modal still open
+        if (modal.style.display === 'flex') {
+          doCapture();
+        }
+      }, AUTO_CAPTURE_DELAY_MS);
+      autoCloseTimer = setTimeout(() => {
+        autoCloseTimer = null;
+        if (modal.style.display === 'flex') {
+          capturedScanInData = null;
+          cleanup(false);
+        }
+      }, AUTO_CLOSE_DELAY_MS);
+    } catch (e) {}
+  });
+}
+
+// Quick face-scan button on the attendance form
+try {
+  const quickFaceScanBtn = document.getElementById('quickFaceScan');
+  if (quickFaceScanBtn) {
+    quickFaceScanBtn.addEventListener('click', async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        document.getElementById('result').textContent = 'Browser មិនគាំទ្រ camera';
+        return;
+      }
+      const captureRes = await openCameraForCheckIn();
+      if (!captureRes || !captureRes.ok) {
+        document.getElementById('result').textContent = 'បានបោះបង់ថតមុខ';
+        faceMatchedForForm = false;
+        return;
+      }
+      const f = document.getElementById('attendanceForm');
+      // After successful capture, default check-in time to 07:35 (morning)
+      if (f && !f.checkIn.value) {
+        f.checkIn.value = '07:35';
+      }
+
+      // After capturing the face photo, try to auto-fill staffId + fullName via face match
+      try {
+        await ensureFaceModels();
+        if (!faceModelsReady || typeof faceapi === 'undefined') {
+          document.getElementById('result').textContent = 'មិនអាចទាញ face models បាន';
+          return;
+        }
+        const token = getAuthToken();
+        if (!token) {
+          document.getElementById('result').textContent = 'សូម Login ជាមុន (token មិនមាន)';
+          return;
+        }
+        const canvas = captureRes.canvas;
+        if (!canvas) {
+          document.getElementById('result').textContent = 'មិនរកទំហំរូបមុខ';
+          return;
+        }
+
+        document.getElementById('result').textContent = 'កំពុងស្វែងរកមុខ...';
+
+        const detection = await faceapi
+          .detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }))
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+
+        if (!detection) {
+          document.getElementById('result').textContent = 'រកមុខមិនឃើញ (សូមពន្លឺល្អ និងមុខត្រង់)';
+          faceMatchedForForm = false;
+          return;
+        }
+
+        const descriptor = Array.from(detection.descriptor, (x) => Number(x));
+
+        const r = await fetch('/api/face/match', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          // Use a more forgiving threshold for attendance matching
+          // (different from enroll duplicate check).
+          body: JSON.stringify({ descriptor, threshold: 0.7 })
+        });
+
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          document.getElementById('result').textContent = data && data.message ? data.message : 'Match failed';
+          faceMatchedForForm = false;
+          return;
+        }
+
+        if (!data.matched) {
+          const dist = typeof data.distance === 'number' ? data.distance.toFixed(3) : '';
+          const thr = typeof data.threshold === 'number' ? data.threshold.toFixed(3) : '';
+          document.getElementById('result').textContent = dist
+            ? `មិន match ជាមួយ Face Profile ទេ (distance=${dist}, threshold=${thr})`
+            : 'មិន match ជាមួយ Face Profile ទេ';
+          faceMatchedForForm = false;
+          return;
+        }
+
+        if (f) {
+          if (data.staffId) f.staffId.value = data.staffId;
+          if (data.fullName) f.fullName.value = data.fullName;
+        }
+        faceMatchedForForm = true;
+        document.getElementById('result').textContent = `Match ✅ Staff: ${data.staffId || ''} Name: ${data.fullName || ''}`;
+
+        // After a successful match, reveal the form fields and main buttons
+        try {
+          document.querySelectorAll('.hidden-until-match').forEach(el => el.classList.remove('hidden-until-match'));
+          const intro = document.getElementById('preScanIntro');
+          if (intro) intro.style.display = 'none';
+        } catch (e) {}
+
+        // Automatically show/refresh the recent records table under the form
+        try {
+          const listEl = document.getElementById('recordsList');
+          const btn = document.getElementById('showRecords');
+          if (btn && listEl) {
+            // If already visible, hide then show again to refresh
+            if (listEl.dataset.visible === '1' && listEl.innerHTML.trim()) {
+              btn.click();
+            }
+            btn.click();
+          }
+        } catch (e) {}
+      } catch (err) {
+        console.error(err);
+        faceMatchedForForm = false;
+        document.getElementById('result').textContent = 'កើតបញ្ហា​ពេល match មុខ';
+      }
+    });
   }
 } catch (e) {
-  // ignore storage errors
+  // ignore
+}
+
+// Button on the form to go back to the initial scan card
+try {
+  const backToScan = document.getElementById('backToScan');
+  if (backToScan) {
+    backToScan.addEventListener('click', () => {
+      // Simple reload to restore the first scan card view
+      window.location.reload();
+    });
+  }
+} catch (e) {
+  // ignore
 }
 
 // Toggle hidden file inputs for scans and show filename
@@ -236,6 +480,7 @@ try{
 document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
+  const resultEl = document.getElementById('result');
   const staffId = f.staffId.value.trim();
   const fullName = f.fullName.value.trim();
   const dateRaw = (f.date.value || '').trim();
@@ -255,6 +500,12 @@ document.getElementById('attendanceForm').addEventListener('submit', async (e) =
     return null;
   };
   const date = parseDMY(dateRaw);
+  // Require that user has successfully scanned face before saving
+  if (!faceMatchedForForm) {
+    resultEl.textContent = 'សូមស្កេនមុខ (ប៊ូតុង ស្កេនមុខ) ជាមុន មិនទាន់អនុញ្ញាតបញ្ចូលវត្តមានទេ';
+    return;
+  }
+
   const checkIn = f.checkIn.value || undefined;
   const checkOut = f.checkOut.value || undefined;
   const checkInDateRaw = (f.checkInDate && f.checkInDate.value) ? f.checkInDate.value.trim() : '';
@@ -273,7 +524,7 @@ document.getElementById('attendanceForm').addEventListener('submit', async (e) =
 
   const scanInFile = f.scanIn.files[0];
   const scanOutFile = f.scanOut.files[0];
-  const scanInData = await fileToDataURL(scanInFile);
+  const scanInData = capturedScanInData || (await fileToDataURL(scanInFile));
   const scanOutData = await fileToDataURL(scanOutFile);
 
   // Build notes payload carrying extra fields (server model will persist `notes` string)
@@ -305,14 +556,6 @@ document.getElementById('attendanceForm').addEventListener('submit', async (e) =
     document.getElementById('result').textContent = 'សូមបញ្ចូលម៉ោងចូល (HH:MM)';
     return;
   }
-  if (!checkOut) {
-      const scanInFile = f.scanIn.files[0];
-      const scanOutFile = f.scanOut.files[0];
-      const scanInData = await fileToDataURL(scanInFile);
-      const scanOutData = await fileToDataURL(scanOutFile);
-    document.getElementById('result').textContent = 'សូមបញ្ចូល ការកំណត់សម្គាល់';
-    return;
-  }
 
   // parse checkIn/checkOut dates to ISO (if provided)
   const checkInDate = (function(s){
@@ -335,7 +578,6 @@ document.getElementById('attendanceForm').addEventListener('submit', async (e) =
     notes: JSON.stringify(meta)
   };
 
-  const resultEl = document.getElementById('result');
   resultEl.textContent = 'កំពុងដាក់ស្នើ...';
 
   try {
@@ -364,37 +606,60 @@ document.getElementById('attendanceForm').addEventListener('submit', async (e) =
       return;
     }
     if (!resp.ok) throw new Error(data && data.message ? data.message : JSON.stringify(data));
-    // Safely display saved record details under the form
-    const id = data._id || data.id || '';
-    let notesObj = data.notes;
-    try { notesObj = data.notes ? JSON.parse(data.notes) : undefined; } catch (err) { notesObj = data.notes; }
-    const details = {
-      staffId: data.staffId,
-      fullName: data.fullName || (notesObj && notesObj.fullName) || undefined,
-      date: data.date || undefined,
-      checkIn: data.checkIn || undefined,
-      checkOut: data.checkOut || undefined,
-      approved: data.approved || undefined,
-      notes: notesObj || undefined
-    };
-    resultEl.innerHTML = '<div>បានរក្សាទុក៖ ID = ' + escapeHtml(id) + '។</div>' +
-      '<pre style="white-space:pre-wrap;margin-top:6px;background:#f8fafc;padding:8px;border-radius:4px;border:1px solid #eee">' +
-      escapeHtml(JSON.stringify(details, null, 2)) + '</pre>';
+    // Show a short success message (no long JSON block)
+    resultEl.textContent = 'បានរក្សាទុកវត្តមានរួចរាល់';
     if (truncated && truncated.length) {
       const list = truncated.join(', ');
-      resultEl.innerHTML += '<div style="color:#b45309;margin-top:8px">សម្គាល់៖ ខ្លះៗត្រូវបានកាត់ខ្លី (' + escapeHtml(list) + ')</div>';
+      resultEl.textContent += ' (បានកាត់ខ្លី: ' + list + ')';
     }
     f.reset();
+
+    // Auto-refresh the records table if the button exists
+    try {
+      const listEl = document.getElementById('recordsList');
+      const btn = document.getElementById('showRecords');
+      if (btn && listEl) {
+        if (listEl.dataset.visible === '1') {
+          btn.click(); // hide old list
+        }
+        btn.click();   // reload list
+      }
+    } catch (e) {}
   } catch (err) {
     resultEl.textContent = 'កើតបញ្ហា៖ ' + (err.message || err);
   }
 });
+
+// Require a simple daily PIN (123) before allowing edit/delete/approval actions
+function ensureDailyAdminPin(){
+  try{
+    const today = new Date().toISOString().slice(0,10);
+    const stored = localStorage.getItem('attendanceAdminPinDate');
+    if (stored === today) return true; // already unlocked today
+    const input = window.prompt('សូមបញ្ចូលលេខកូដ (123) ម្តងក្នុងមួយថ្ងៃ ដើម្បីកែ/លុប ឬផ្តល់មតិរដ្ឋបាល');
+    if (input === null) return false;
+    if (input === '123'){
+      localStorage.setItem('attendanceAdminPinDate', today);
+      return true;
+    }
+    alert('លេខកូដមិនត្រឹមត្រូវ');
+    return false;
+  }catch(e){
+    return false;
+  }
+}
 
 // Fetch and display recent records (optionally filtered by staffId)
 document.getElementById('showRecords')?.addEventListener('click', async () => {
   const out = document.getElementById('recordsList');
   const btn = document.getElementById('showRecords');
   if (!out) return;
+  // Base permission checks (PIN will be required later only when user
+  // actually clicks approve/edit/delete, not when just opening the list)
+  // For this simple view, hide the Actions column (no edit/delete)
+  const canEdit = false;
+  const canDelete = false;
+  const canEditDelete = false;
   // If currently visible, hide and update button text
   if (out.dataset.visible === '1' && out.innerHTML.trim()) {
     out.dataset.visible = '0';
@@ -423,19 +688,28 @@ document.getElementById('showRecords')?.addEventListener('click', async () => {
     const data = await resp.json();
     if (!Array.isArray(data)) return out.textContent = 'ទិន្នន័យមិនត្រឹមត្រូវ';
     if (data.length === 0) return out.textContent = 'គ្មានកំណត់ត្រាទេ';
-    // Render table with requested columns (Serial, Staff ID, FullName, Date, In, Out, Notes, Approved)
-    let html = '<div class="table-wrap"><table class="records-table">';
+    // Render table with requested columns (Serial, Staff ID, FullName, Date, CreatedAt, In, Out, Notes, Approved)
+    // Also show a small link to open the full report page (with CSV/Excel export)
+    let html = '';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+      + '<div style="font-weight:600;color:#111">បញ្ជីវត្តមាន (ចុងក្រោយ)</div>'
+      + '<a href="/attendance_list.html" target="_blank" style="font-size:0.9rem;padding:4px 10px;border-radius:9999px;border:1px solid #0ea5e9;background:#e0f2fe;color:#0369a1;text-decoration:none;white-space:nowrap">Export CSV / Excel</a>'
+      + '</div>';
+    html += '<div class="table-wrap"><table class="records-table">';
     html += '<thead><tr style="text-align:left">'
       + '<th style="padding:6px;border-bottom:1px solid #eee">ល.រ</th>'
       + '<th style="padding:6px;border-bottom:1px solid #eee">លេខកាត់បុគ្គលិក</th>'
       + '<th style="padding:6px;border-bottom:1px solid #eee">គោត្តមាននិង នាម</th>'
       + '<th style="padding:6px;border-bottom:1px solid #eee">ថ្ងៃខែឆ្នាំ</th>'
+      + '<th style="padding:6px;border-bottom:1px solid #eee">ថ្ងៃបង្កើត</th>'
       + '<th style="padding:6px;border-bottom:1px solid #eee">ម៉ោងចូល</th>'
       + '<th style="padding:6px;border-bottom:1px solid #eee">ម៉ោងចេញ</th>'
       + '<th style="padding:6px;border-bottom:1px solid #eee">ផ្សេងៗ / កំណត់សម្គាល់</th>'
-      + '<th style="padding:6px;border-bottom:1px solid #eee">មតិរដ្ឋបាល</th>'
-        + '<th style="padding:6px;border-bottom:1px solid #eee;text-align:center">សកម្មភាព</th>'
-        + '</tr></thead>';
+      + '<th style="padding:6px;border-bottom:1px solid #eee">មតិរដ្ឋបាល</th>';
+    if (canEditDelete) {
+      html += '<th style="padding:6px;border-bottom:1px solid #eee;text-align:center">សកម្មភាព</th>';
+    }
+    html += '</tr></thead>';
     html += '<tbody>';
     let idx = 1;
     for (const r of data.slice(0,200)) {
@@ -447,11 +721,13 @@ document.getElementById('showRecords')?.addEventListener('click', async () => {
       const fullName = notesObj.fullName || r.fullName || r.staffName || '';
       const notesText = notesObj.notes || '';
       const approved = r.approved || notesObj.approved || '';
-      html += '<tr>'
+      const created = r.createdAt ? formatDateDMY(r.createdAt) : '';
+      let rowHtml = '<tr>'
         + '<td style="padding:6px;border-top:1px solid #f1f1f1;vertical-align:top">' + escapeHtml(String(idx++)) + '</td>'
         + '<td style="padding:6px;border-top:1px solid #f1f1f1;vertical-align:top">' + escapeHtml(r.staffId || '') + '</td>'
         + '<td style="padding:6px;border-top:1px solid #f1f1f1;vertical-align:top">' + escapeHtml(fullName) + '</td>'
         + '<td style="padding:6px;border-top:1px solid #f1f1f1;vertical-align:top">' + escapeHtml(formatDateDMY(r.date)) + '</td>'
+        + '<td style="padding:6px;border-top:1px solid #f1f1f1;vertical-align:top">' + escapeHtml(created) + '</td>'
         + '<td style="padding:6px;border-top:1px solid #f1f1f1;vertical-align:top">' + escapeHtml(r.checkIn || r.inTime || '') + '</td>'
         + '<td style="padding:6px;border-top:1px solid #f1f1f1;vertical-align:top">' + escapeHtml(r.checkOut || r.outTime || '') + '</td>'
         + '<td style="padding:6px;border-top:1px solid #f1f1f1;vertical-align:top">' + escapeHtml(notesText) + '</td>'
@@ -476,12 +752,19 @@ document.getElementById('showRecords')?.addEventListener('click', async () => {
             if (approved === 'rejected') return '<div style="min-height:5px"><span style="color:red">មិនព្រម</span></div>';
             return '<div style="min-height:5pxស"><span style="color:#666">រង់ចាំមតិ</span></div>';
           })()
-        + '</td>'
-        + '<td style="padding:2px;border-top:1px solid #f1f1f1;vertical-align:top;text-align:center">'
-          + '<button type="button" class="editBtn" data-id="' + escapeHtml(id) + '" style="margin-right:8px;background:#2563eb;color:#fff;border:0;padding:2px 2px;border-radius:2px;cursor:pointer">កែ</button>'
-          + '<button type="button" class="deleteBtn" data-id="' + escapeHtml(id) + '" style="background:#ef4444;color:#fff;border:0;padding:2px 1px;border-radius:1px;cursor:pointer">លុប</button>'
-        + '</td>'
-      + '</tr>';
+        + '</td>';
+      if (canEditDelete) {
+        rowHtml += '<td style="padding:2px;border-top:1px solid #f1f1f1;vertical-align:top;text-align:center">';
+        if (canEdit) {
+          rowHtml += '<button type="button" class="editBtn" data-id="' + escapeHtml(id) + '" style="margin-right:8px;background:#2563eb;color:#fff;border:0;padding:2px 2px;border-radius:2px;cursor:pointer">កែ</button>';
+        }
+        if (canDelete) {
+          rowHtml += '<button type="button" class="deleteBtn" data-id="' + escapeHtml(id) + '" style="background:#ef4444;color:#fff;border:0;padding:2px 1px;border-radius:1px;cursor:pointer">លុប</button>';
+        }
+        rowHtml += '</td>';
+      }
+      rowHtml += '</tr>';
+      html += rowHtml;
     }
     html += '</tbody></table></div>';
     out.innerHTML = html;
@@ -495,6 +778,12 @@ document.getElementById('showRecords')?.addEventListener('click', async () => {
         const newVal = s.value || '';
         const wrap = s.closest('.approveWrap');
         const prev = (wrap && wrap.getAttribute('data-prev')) || '';
+        // Require daily PIN only when interacting with admin approval
+        if (!ensureDailyAdminPin()) {
+          // revert selection if PIN failed/cancelled
+          s.value = prev;
+          return;
+        }
         s.disabled = true;
         try {
           const resp = await fetch('/api/attendance/' + encodeURIComponent(id), {
@@ -518,9 +807,12 @@ document.getElementById('showRecords')?.addEventListener('click', async () => {
         }
       });
     });
-    // attach edit/delete handlers
-    Array.from(out.querySelectorAll('.editBtn')).forEach(btnEl => {
-      btnEl.addEventListener('click', async (ev) => {
+    // attach edit/delete handlers (only when permitted)
+    if (canEditDelete) {
+      if (canEdit) {
+        Array.from(out.querySelectorAll('.editBtn')).forEach(btnEl => {
+          btnEl.addEventListener('click', async (ev) => {
+        if (!ensureDailyAdminPin()) return;
         const id = btnEl.getAttribute('data-id');
         try {
           const r = await fetch('/api/attendance/' + encodeURIComponent(id));
@@ -560,9 +852,12 @@ document.getElementById('showRecords')?.addEventListener('click', async () => {
           alert('Failed to load record for editing: ' + (err.message || err));
         }
       });
-    });
-    Array.from(out.querySelectorAll('.deleteBtn')).forEach(btnEl => {
-      btnEl.addEventListener('click', async (ev) => {
+        });
+      }
+      if (canDelete) {
+        Array.from(out.querySelectorAll('.deleteBtn')).forEach(btnEl => {
+          btnEl.addEventListener('click', async (ev) => {
+        if (!ensureDailyAdminPin()) return;
         const id = btnEl.getAttribute('data-id');
         if (!confirm('លុបកំណត់ត្រានេះ?')) return;
         btnEl.disabled = true;
@@ -576,7 +871,9 @@ document.getElementById('showRecords')?.addEventListener('click', async () => {
           btnEl.disabled = false;
         }
       });
-    });
+        });
+      }
+    }
   } catch (err) {
     out.textContent = 'កើតបញ្ហា: ' + (err.message || err);
   }
@@ -633,8 +930,5 @@ document.getElementById('embedList')?.addEventListener('click', async () => {
   }
 });
 
-// Auto-load records on page load so the list appears without clicking
-window.addEventListener('DOMContentLoaded', () => {
-  // Small delay to allow DOM widgets to initialize
-  setTimeout(() => { document.getElementById('showRecords')?.click(); }, 150);
-});
+// Note: records list will now be shown after a successful face match,
+// triggered from the quick face scan handler above.

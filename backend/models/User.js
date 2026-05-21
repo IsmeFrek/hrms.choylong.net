@@ -29,6 +29,9 @@ const userSchema = new mongoose.Schema(
     // phone number (optional)
     phone: { type: String, trim: true },
 
+    // Staff ID linking to HR
+    staffId: { type: String, trim: true, index: true },
+
     // Password reset token and expiration
     resetToken: { type: String },
     resetTokenExpire: { type: Date },
@@ -37,7 +40,7 @@ const userSchema = new mongoose.Schema(
     telegramId: { type: String, trim: true },
 
     // Telegram Chat IDs for different bots (numeric IDs only)
-    telegramChatId: { type: String, trim: true },   // For Bot 1: @Chantha_hospital_bot
+    telegramChatId: { type: String, trim: true },   // For Bot 1: @Chantha_Attendance_bot
     telegramChatId2: { type: String, trim: true },  // For Bot 2: @frek_automatebot
 
     // department assignment (for leadership users to filter their team's HR records)

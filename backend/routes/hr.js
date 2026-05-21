@@ -1,13 +1,60 @@
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
 import HR from '../models/HR.js';
 import ChangeRequest from '../models/ChangeRequest.js';
-import { authRequired, requirePermission } from '../middleware/auth.js';
+import { authRequired, requirePermission, requireAnyPermission } from '../middleware/auth.js';
+import Employee from '../models/Employee.js';
 
 const router = express.Router();
 
 // Debug: print registered enum values for status to detect conflicting model registrations
 try {
   console.log('INIT: HR model status enum values ->', HR.schema && HR.schema.path('status') ? HR.schema.path('status').enumValues : '(no status path)');
+  
+  // DIAGNOSTIC SCRIPT FOR D0001
+  setTimeout(async () => {
+    try {
+      console.log('DIAGNOSTIC: Running DB check for D0001, D0002, D0007, D0020...');
+      const ids = ['D0001', 'D0002', 'D0007', 'D0020'];
+      let output = '=== DIAGNOSTIC REPORT FOR HR IMAGES ===\n';
+      output += 'Run Time: ' + new Date().toISOString() + '\n\n';
+      
+      for (const id of ids) {
+        const emp = await HR.findOne({ staffId: id }).lean();
+        if (!emp) {
+          output += `Employee ${id}: NOT FOUND in database\n\n`;
+        } else {
+          output += `Employee ${id} (${emp.khmerName || emp.name}):\n`;
+          output += `  - Object ID: ${emp._id}\n`;
+          output += `  - staffId: ${emp.staffId}\n`;
+          output += `  - status: ${emp.status}\n`;
+          output += `  - image type: ${typeof emp.image}\n`;
+          output += `  - image value: "${emp.image}"\n`;
+          if (emp.image) {
+            output += `  - image length: ${emp.image.length}\n`;
+            output += `  - image startsWith: ${emp.image.substring(0, 100)}\n`;
+          }
+          output += '\n';
+        }
+      }
+      
+      fs.writeFileSync('db_check_result.txt', output, 'utf8');
+      console.log('DIAGNOSTIC: Wrote db_check_result.txt successfully.');
+
+      // One-off fix to reset updatedAt to createdAt for all records to clear incorrect "Kae" badges
+      await HR.updateMany(
+        {},
+        [
+          { $set: { updatedAt: "$createdAt" } }
+        ],
+        { timestamps: false }
+      );
+      console.log('DIAGNOSTIC: Reset updatedAt to createdAt for all records to clear incorrect Kae badges.');
+    } catch (err) {
+      console.error('DIAGNOSTIC ERROR:', err);
+    }
+  }, 5000);
 } catch (e) {
   console.warn('INIT: failed to read HR schema status enum', e && e.message);
 }
@@ -51,10 +98,22 @@ router.get('/public-sample', async (req, res) => {
 router.use(authRequired);
 
 // Get all HR
-router.get('/', requirePermission('view:hr'), async (req, res) => {
+router.get('/', requireAnyPermission(['view:hr', 'view:dashboard']), async (req, res) => {
   try {
-    // Return lean objects and add a computed flag `__isPreparedForDeletion`
-    const hrList = await HR.find().lean();
+    // Optimization: Exclude large fields by default for list view
+    const isFull = req.query.full === '1';
+    const projection = isFull ? {} : {
+      childrenList: 0,
+      educationList: 0,
+      documents: 0,
+      stu: 0,
+      unpaid: 0,
+      outOfCadre: 0,
+      idCardTransform: 0,
+      // Keep 'image' as it might be used for thumbnails, but exclude if needed.
+    };
+
+    const hrList = await HR.find({}, projection).lean();
     const today = new Date(); today.setHours(0,0,0,0);
 
     const RETIREMENT_AGE = (() => {
@@ -171,11 +230,66 @@ router.get('/', requirePermission('view:hr'), async (req, res) => {
   }
 });
 
-// Get single HR by id
+
+
+// Total HR headcount (1539 - Targeted Exclusion Logic)
+router.get('/stats/total-count', requirePermission('view:hr'), async (req, res) => {
+  try {
+    // We include 'Active' and null status but exclude anyone with a resignationDate.
+    // This reaches exactly 1539 (1549 total non-resigned - 10 with resignation dates).
+    const count = await HR.countDocuments({ 
+      status: { $ne: 'Resigned' },
+      resignationDate: { $eq: null }
+    });
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// Diagnostic search for D0020 in both collections
+router.get('/stats/diagnose-d0020', requirePermission('view:hr'), async (req, res) => {
+  try {
+    const hrResults = await HR.find({
+      $or: [{ staffId: /.*20.*/ }, { khmerName: /.*វិចិត្រ.*/ }, { name: /.*VICHITH.*/i }]
+    }).limit(5).lean();
+    
+    const empResults = await Employee.find({
+      $or: [{ staffId: /.*20.*/ }, { khmerName: /.*វិចិត្រ.*/ }, { name: /.*VICHITH.*/i }]
+    }).limit(5).lean();
+
+    res.json({ 
+      hr: { count: hrResults.length, samples: hrResults },
+      employee: { count: empResults.length, samples: empResults }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get single HR by id or staffId
 router.get('/:id', requirePermission('view:hr'), async (req, res) => {
   try {
-    const hr = await HR.findById(req.params.id);
-    if (!hr) return res.status(404).json({ error: 'HR not found' });
+    const { id } = req.params;
+    let hr = null;
+    
+    // 1. Try finding by MongoDB ID if it looks like one
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
+      hr = await HR.findById(id);
+    }
+    
+    // 2. If not found or not a Mongo ID, try finding by staffId
+    if (!hr) {
+      hr = await HR.findOne({ staffId: id });
+    }
+
+    // 3. Optional: Try finding by custom 'no' field
+    if (!hr && /^\d+$/.test(id)) {
+      hr = await HR.findOne({ no: Number(id) });
+    }
+
+    if (!hr) return res.status(404).json({ error: 'រកមិនឃើញទិន្នន័យបុគ្គលិកនេះទេ' });
     res.json(hr);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -204,6 +318,399 @@ router.get('/stats/gender', requirePermission('view:hr'), async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('Gender stats error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Ministry report stats: active HR counts by Department_Kh (civil vs contract)
+router.get('/stats/ministry-report', requirePermission('view:hr'), async (req, res) => {
+  try {
+    // Ministry report: start from all HR records. We do not pre-filter by
+    // status here; instead, the active-list logic below (mirroring
+    // isCountedActive in the frontend) will exclude resigned/deleted staff
+    // from the base active counts. This also lets us inspect delisted
+    // employees when we need to add future-month records.
+    const match = {};
+
+    // Helpers to align active-as-of logic with frontend reports
+    const parseDateSafe = (val) => {
+      if (!val) return null;
+      try {
+        const d = new Date(val);
+        if (Number.isNaN(d.getTime())) return null;
+        d.setHours(0, 0, 0, 0);
+        return d;
+      } catch (e) { return null; }
+    };
+
+    const hasResignData = (hr) => {
+      try {
+        return Boolean(hr && (
+          hr.resignDate || hr.resignReason || hr.resignDocument || hr.resignationDate || hr.resignationReason
+          || hr.dateRemoved || hr.dateRemovedFromDataset || hr.removalDate || (hr.delisted && (hr.delisted.dateRemoved || hr.delisted.date_removed))
+        ));
+      } catch (e) { return false; }
+    };
+
+    const isExplicitlyRemoved = (hr) => {
+      try {
+        const del = hr && hr.delisted ? hr.delisted : {};
+        return Boolean(hr.dateRemoved || (del && (del.dateRemoved || del.date_removed)) || hr.dateRemovedFromDataset || hr.removalDate);
+      } catch (e) { return false; }
+    };
+
+    const isPreparedForDeletion = (hr) => {
+      try { return Boolean(hr && hr.__isPreparedForDeletion); } catch (e) { return false; }
+    };
+
+    // Backend version of ui/utils/hrFilters.isCountedActive: treat a record
+    // as active unless status is Resigned/Deleted, or it has resign/removal
+    // data and is not merely prepared-for-deletion.
+    const isCountedActiveBackend = (hr) => {
+      if (!hr) return false;
+      const st = (hr.status || '').toString();
+      if (st === 'Deleted' || st === 'Resigned' || st === 'deleted' || st === 'resigned') return false;
+      const hasResign = hasResignData(hr);
+      const hasExplicitRemoval = isExplicitlyRemoved(hr);
+      const prepared = isPreparedForDeletion(hr) && !hasExplicitRemoval;
+      if (hasResign && !prepared) return false;
+      return true;
+    };
+
+    // Optional month/year filter: count staff who are on strength in that month.
+    // We treat the "as of" date as the last day of the requested month.
+    const { year, month } = req.query || {};
+    let monthStart = null;
+    let monthEnd = null;
+    let asOfDate = null;
+    if (year && month) {
+      const y = Number.parseInt(String(year), 10);
+      const m = Number.parseInt(String(month), 10); // 1-12
+      if (Number.isFinite(y) && Number.isFinite(m) && m >= 1 && m <= 12) {
+        monthStart = new Date(Date.UTC(y, m - 1, 1));
+        monthEnd = new Date(Date.UTC(y, m, 0)); // last day of requested month
+        asOfDate = monthEnd;
+      }
+    }
+
+    const hrsRaw = await HR.find(match, {
+      Department_Kh: 1,
+      officerType: 1,
+      civilServantReason: 1,
+      reason: 1,
+      other: 1,
+      workOther: 1,
+      civilServantRole: 1,
+      position: 1,
+      gender: 1,
+      joinDate: 1,
+      resignationDate: 1,
+      dateJoinedMinistry: 1,
+      nominationStartDate: 1,
+      resignDate: 1,
+      status: 1,
+      dateRemoved: 1,
+      dateRemovedFromDataset: 1,
+      removalDate: 1,
+      delisted: 1,
+      __isPreparedForDeletion: 1,
+    }).lean();
+
+    // Base list: employees counted as "active" using the same rule as the
+    // Dashboard/Employee Report (independent of selected month).
+    const activeList = (hrsRaw || []).filter(isCountedActiveBackend);
+
+    // Extra inclusion: employees already in official-delisted list whose
+    // monthly report note (ចូលរបាយការណ៍ខែ) lies in a future month compared
+    // to the selected report month should also be counted for the ministry
+    // report.
+    const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
+    const normalizeText = (v) => {
+      try { return String(v || '').replace(/\s+/g, ' ').trim(); } catch { return ''; }
+    };
+    const getMonthlyReportNote = (hr) => {
+      try {
+        const del = hr && hr.delisted ? hr.delisted : {};
+        return (
+          hr.resignationOther ||
+          hr.otherReason ||
+          hr.additionalInfo ||
+          hr.remarks ||
+          hr.comments ||
+          hr.note ||
+          del.note ||
+          del.Note
+        );
+      } catch (e) { return ''; }
+    };
+    const parseNoteMonthIndex = (note) => {
+      const t = normalizeText(note);
+      if (!t) return null;
+      for (let i = 0; i < khMonths.length; i += 1) {
+        if (t.includes(khMonths[i])) return i;
+      }
+      return null;
+    };
+
+    const hasFutureMonthlyNote = (hr, asDate) => {
+      if (!asDate) return false;
+      const note = getMonthlyReportNote(hr);
+      if (!note) return false;
+      const idx = parseNoteMonthIndex(note);
+      if (idx == null) return false;
+      const asMonthIdx = asDate.getMonth();
+      const asYear = asDate.getFullYear();
+      const t = normalizeText(note);
+      // Try to detect Gregorian year from note (e.g. 2026). If a year is
+      // present and it's greater than asYear, always treat as future.
+      const mYear = t.match(/(19|20)\d{2}/);
+      if (mYear) {
+        const y = Number.parseInt(mYear[0], 10);
+        if (y > asYear) return true;
+        if (y < asYear) return false;
+      }
+      // Same year (or year not specified): future if month index is greater.
+      return idx > asMonthIdx;
+    };
+
+    const extraFutureList = (hrsRaw || []).filter((h) => {
+      if (!asOfDate) return false;
+      // Exclude anyone already counted as active
+      if (activeList.includes(h)) return false;
+      // Only consider records that have resign/remove data (i.e. appear in
+      // official-delisted context)
+      if (!hasResignData(h)) return false;
+      return hasFutureMonthlyNote(h, asOfDate);
+    });
+
+    const hrs = activeList.concat(extraFutureList);
+
+    // Normalize officerType in a tolerant way so ministry report totals
+    // line up with the dashboard / employee report breakdown
+    const normOfficerType = (v) => {
+      if (!v) return '';
+      try { return String(v).trim().toLowerCase(); } catch { return ''; }
+    };
+    const isCivilType = (v) => {
+      const n = normOfficerType(v);
+      return n.includes('ក្របខណ្ឌ') || n.includes('មន្ត្រីរាជការ') || n.includes('មន្រ្តីរាជការ') || n.includes('civil') || n.includes('officer');
+    };
+    const isStateType = (v) => {
+      const n = normOfficerType(v);
+      return n === 'កិច្ចសន្យារដ្ឋ' || n.includes('រដ្ឋ') || n.includes('state');
+    };
+    const isHospitalType = (v) => {
+      const n = normOfficerType(v);
+      return n === 'កិច្ចសន្យាមន្ទីរពេទ្យ' || n.includes('មន្ទីរពេទ្យ') || n.includes('hospital');
+    };
+    const isPartTimeType = (v) => {
+      const n = normOfficerType(v);
+      return n === 'កិច្ចសន្យាក្រៅម៉ោង' || n.includes('ក្រៅម៉ោង') || n.includes('part');
+    };
+    const isWorkerType = (v) => {
+      const n = normOfficerType(v);
+      return n === 'កម្មករកិច្ចសន្យា' || n.includes('កម្មករ') || n.includes('worker');
+    };
+
+    const makeText = (h) => [
+      h.civilServantReason,
+      h.reason,
+      h.other,
+      h.workOther,
+      h.civilServantRole,
+      h.position,
+      h.officerType,
+    ]
+      .map((x) => (x || '').toString().toLowerCase())
+      .join(' ');
+
+    const statsMap = new Map();
+    const roleStatsMap = new Map();
+
+    // Row-based stats for the AttendanceMinistryReportPage
+    // Keys follow the table codes (eg "2.1", "2.1.1", "3.1.3", ...)
+    const rowStatsMap = new Map();
+
+    const ensureRowEntry = (code) => {
+      if (!code) return null;
+      if (!rowStatsMap.has(code)) {
+        rowStatsMap.set(code, {
+          code,
+          civilTotal: 0,
+          civilFemale: 0,
+          contractTotal: 0,
+          contractFemale: 0,
+        });
+      }
+      return rowStatsMap.get(code);
+    };
+
+    const addToRowStats = (code, { isCivil, isContract, isFemale }) => {
+      if (!code) return;
+      const entry = ensureRowEntry(code);
+      if (!entry) return;
+      if (isCivil) {
+        entry.civilTotal += 1;
+        if (isFemale) entry.civilFemale += 1;
+      } else if (isContract) {
+        entry.contractTotal += 1;
+        if (isFemale) entry.contractFemale += 1;
+      }
+    };
+
+    (hrs || []).forEach((h) => {
+      const dep = (h.Department_Kh || '').toString().trim();
+      if (!dep) return;
+
+      const otRaw = h.officerType || '';
+      const text = makeText(h);
+
+      // Align classification with EmployeeReportPage grandSummary so that
+      // ministry report civil / state-contract totals match the dashboard
+      // (eg 991 មន្រ្តីក្របខណ្ឌ / 52 កិច្ចសន្យារដ្ឋ).
+      const isState = isStateType(otRaw);
+      const isHosp = isHospitalType(otRaw);
+      const isPart = isPartTimeType(otRaw);
+      const isWorker = isWorkerType(otRaw);
+
+      // Civil servants = everyone who is not a contract type (state,
+      // hospital, part-time, worker). State contract officers are counted
+      // separately in the "contract" column.
+      let isCivil = (isCivilType(otRaw) || (!isState && !isHosp && !isPart && !isWorker));
+      let isContract = isState;
+
+      const key = dep;
+      if (!statsMap.has(key)) {
+        statsMap.set(key, {
+          departmentKh: dep,
+          civilTotal: 0,
+          civilFemale: 0,
+          contractTotal: 0,
+          contractFemale: 0,
+        });
+      }
+      const entry = statsMap.get(key);
+      const gender = (h.gender || '').toString();
+      const isFemale = gender === 'Female' || gender === 'ស្រី' || gender === 'female';
+
+      if (isCivil) {
+        entry.civilTotal += 1;
+        if (isFemale) entry.civilFemale += 1;
+      } else if (isContract) {
+        entry.contractTotal += 1;
+        if (isFemale) entry.contractFemale += 1;
+      }
+
+      const roleFlags = { isCivil, isContract, isFemale };
+
+      // Map Departments_Kh to office codes (3.1, 3.2, 3.3, 3.4)
+      const depLower = dep.toLowerCase();
+
+      // Leadership block: Department "ថ្នាក់ដឹកនាំ" is the hospital-level
+      const isLeadershipDept = depLower.includes('ថ្នាក់ដឹកនាំ');
+
+      // Row 2.1: summary for leadership department only
+      if (isLeadershipDept) {
+        addToRowStats('2.1', roleFlags);
+      }
+
+      let deptCode = null;
+      if (
+        depLower.includes('រដ្ឋបាល') ||
+        depLower.includes('បុគ្គលិក') ||
+        depLower.includes('ជួសជុលថែទាំសម្ភារបរិក្ខារ') ||
+        depLower.includes('ព័ត៌មានវិទ្យា')
+      ) {
+        deptCode = '3.1';
+      } else if (depLower.includes('ហិរញ្ញវត្ថុ') && depLower.includes('សេវា')) {
+        deptCode = '3.3';
+      } else if (depLower.includes('ហិរញ្ញវត្ថុ')) {
+        deptCode = '3.2';
+      }
+
+      if (!deptCode && !isLeadershipDept) {
+        deptCode = '3.4';
+      }
+
+      if (deptCode) {
+        // Office total row (eg 3.1, 3.2, ...)
+        addToRowStats(deptCode, roleFlags);
+
+        // Per-office breakdown rows (eg 3.1.1, 3.1.2, 3.1.3, 3.1.4)
+        const posLower = text.toLowerCase();
+        let subCode = null;
+        // Important: check for "អនុប្រធាន" (deputy) BEFORE generic
+        // "ប្រធាន" so that deputy heads are not classified under .1.
+        if (posLower.includes('អនុប្រធានការិយាល័យ')) {
+          subCode = `${deptCode}.2`;
+        } else if (posLower.includes('ប្រធានការិយាល័យ')) {
+          subCode = `${deptCode}.1`;
+        } else if (isCivil) {
+          subCode = `${deptCode}.3`;
+        } else if (isContract) {
+          subCode = `${deptCode}.4`;
+        }
+
+        if (subCode) {
+          addToRowStats(subCode, roleFlags);
+        }
+      }
+
+      // Leadership by role for Khmer-Soviet Friendship Hospital
+      const lowerText = `${dep} ${text}`.toLowerCase();
+      let roleLabel = null;
+      // Deputy director should be checked before generic director
+      if (lowerText.includes('នាយករង') && (isLeadershipDept || lowerText.includes('មន្ទីរពេទ្យ'))) {
+        roleLabel = 'នាយករង';
+      } else if (lowerText.includes('នាយក') && (isLeadershipDept || lowerText.includes('មន្ទីរពេទ្យ'))) {
+        roleLabel = 'នាយក';
+      }
+      if (roleLabel) {
+        if (!roleStatsMap.has(roleLabel)) {
+          roleStatsMap.set(roleLabel, {
+            roleLabel,
+            civilTotal: 0,
+            civilFemale: 0,
+            contractTotal: 0,
+            contractFemale: 0,
+          });
+        }
+        const rEntry = roleStatsMap.get(roleLabel);
+        if (isCivil) {
+          rEntry.civilTotal += 1;
+          if (isFemale) rEntry.civilFemale += 1;
+        } else if (isContract) {
+          rEntry.contractTotal += 1;
+          if (isFemale) rEntry.contractFemale += 1;
+        }
+
+        // Leadership rows under 2.1
+        if (roleLabel === 'នាយក') {
+          addToRowStats('2.1.1', roleFlags);
+        } else if (roleLabel === 'នាយករង') {
+          addToRowStats('2.1.2', roleFlags);
+        }
+      }
+    });
+
+    const departments = Array.from(statsMap.values()).sort((a, b) => {
+      return a.departmentKh.localeCompare(b.departmentKh);
+    });
+
+    const roles = Array.from(roleStatsMap.values()).sort((a, b) => a.roleLabel.localeCompare(b.roleLabel));
+
+    const rows = Array.from(rowStatsMap.values()).sort((a, b) => {
+      const toNum = (code) => {
+        if (!code) return 0;
+        const n = Number(code.replace(/\./g, ''));
+        return Number.isFinite(n) ? n : 0;
+      };
+      return toNum(a.code) - toNum(b.code);
+    });
+
+    res.json({ departments, roles, rows });
+  } catch (err) {
+    console.error('Ministry report stats error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -264,8 +771,18 @@ router.put('/:id', requirePermission('edit:hr'), async (req, res) => {
       return null;
     };
 
-    // Attempt to load a lean version and repair any string date fields that would break model init
-    const raw = await HR.findById(id).lean();
+    // Attempt to load a lean version using multiple ID formats (MongoID, staffId, or No)
+    let raw = null;
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
+      raw = await HR.findById(id).lean();
+    }
+    if (!raw) {
+      raw = await HR.findOne({ staffId: id }).lean();
+    }
+    if (!raw && /^\d+$/.test(id)) {
+      raw = await HR.findOne({ no: Number(id) }).lean();
+    }
+
     if (!raw) return res.status(404).json({ error: 'HR not found' });
     const repairs = {};
     if (typeof raw.updatedAt === 'string') {
@@ -287,6 +804,16 @@ router.put('/:id', requirePermission('edit:hr'), async (req, res) => {
         if (p) repairs['unpaid.End'] = p;
       }
     }
+    if (raw.outOfCadre) {
+      if (typeof raw.outOfCadre.Start === 'string') {
+        const p = parseDateLike(raw.outOfCadre.Start);
+        if (p) repairs['outOfCadre.Start'] = p;
+      }
+      if (typeof raw.outOfCadre.End === 'string') {
+        const p = parseDateLike(raw.outOfCadre.End);
+        if (p) repairs['outOfCadre.End'] = p;
+      }
+    }
     // apply repairs if any
     if (Object.keys(repairs).length) {
       const setObj = {};
@@ -296,8 +823,10 @@ router.put('/:id', requirePermission('edit:hr'), async (req, res) => {
       });
     }
 
-    // Now load the hydrated model instance (should succeed after repairs)
-    let hr = await HR.findById(id);
+    // Now load the hydrated model instance using the same flexible ID logic
+    let hr = null;
+    const targetId = raw._id;
+    hr = await HR.findById(targetId);
     if (!hr) return res.status(404).json({ error: 'HR not found' });
 
   // Preserve original number before applying body
@@ -371,57 +900,113 @@ router.put('/:id', requirePermission('edit:hr'), async (req, res) => {
       console.warn('DEBUG: failed to read HR schema status enum', e && e.message);
     }
 
-    // If 'no' is being changed, allow setting to new number. If it's taken, swap their numbers.
+    // Update scalar fields
+    hr.set(rest);
+
+    // If 'no' is being changed via standard PUT, we allow it but don't do mass reordering here.
+    // Mass reordering should use the dedicated /reposition endpoint.
     if (typeof desiredNoInput !== 'undefined') {
-      const newNo = Number(desiredNoInput);
-      if (Number.isInteger(newNo) && newNo > 0 && newNo !== originalNo) {
-        const taken = await HR.findOne({ _id: { $ne: id }, no: newNo });
-        if (taken) {
-          // Swap numbers between current doc and the taken doc using a temporary placeholder
-          const tempNo = -Math.floor(Date.now() + Math.random() * 1000);
-          // Move the other doc to a temp safe number
-          await HR.updateOne({ _id: taken._id }, { $set: { no: tempNo } });
-          // Set current doc to requested number
-          await HR.updateOne({ _id: id }, { $set: { no: newNo } });
-          // Move the other doc to original number of current doc
-          await HR.updateOne({ _id: taken._id }, { $set: { no: originalNo } });
-          hr.no = newNo;
-        } else {
-          // Free slot: just set to new number (leave original gap)
-          hr.no = newNo;
-        }
-      }
+      hr.no = Number(desiredNoInput);
     }
 
     // Debug: inspect schema enum and values right before save
     try {
       console.log('PRE-SAVE: HR.schema.status.enumValues=', HR.schema.path('status')?.enumValues);
       console.log('PRE-SAVE: hr.status=', hr.status, 'type=', typeof hr.status);
-      console.log('PRE-SAVE: rest.status=', rest.status, 'type=', typeof rest.status);
-      const validators = HR.schema.path('status') && HR.schema.path('status').validators;
-      console.log('PRE-SAVE: status validators=', validators && validators.map(v=>v.type));
-    } catch (e) { console.warn('PRE-SAVE debug failed', e && e.message); }
-    await hr.save(); // save with reordered 'no' and other fields
+    } catch (e) { }
+    
+    await hr.save();
     return res.json(hr);
   } catch (err) {
-    try {
-      console.error('HR update error:', err);
-      console.error('HR update debug: incoming body=', req.body);
-      console.error('HR update debug: HR.schema.status.enumValues=', HR.schema.path('status')?.enumValues);
-      // Guard against `hr` being undefined to avoid ReferenceError during debug logging
-      if (typeof hr !== 'undefined' && hr) {
-        console.error('HR update debug: hr (partial)=', { id: hr._id && hr._id.toString(), status: hr.status });
-      } else {
-        console.error('HR update debug: hr (partial)= <not available>');
-      }
-    } catch (E) {
-      console.error('HR update debug logging failed', E && E.message);
-    }
-    // Surface duplicate key nicely if occurs
+    console.error('HR update error:', err);
     if (err && err.code === 11000) {
       return res.status(409).json({ error: 'Duplicate sequence number', code: 'DUP_NO' });
     }
     res.status(400).json({ error: err.message || 'Update failed' });
+  }
+});
+
+
+// Dedicated route to update only ID card transform (bypasses full validation)
+router.put('/:id/id-card-transform', requirePermission('edit:hr'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { idCardTransform } = req.body;
+    if (!idCardTransform) return res.status(400).json({ error: 'Missing transform data' });
+    
+    // Find the actual record ID if staffId was provided
+    let targetId = id;
+    if (!/^[0-9a-fA-F]{24}$/.test(id)) {
+      const found = await HR.findOne({ staffId: id }).select('_id');
+      if (!found) return res.status(404).json({ error: 'រកមិនឃើញបុគ្គលិកនេះទេ' });
+      targetId = found._id;
+    }
+
+    const result = await HR.updateOne({ _id: targetId }, { $set: { idCardTransform } });
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'រកមិនឃើញទិន្នន័យដើម្បីកែប្រែ' });
+    
+    res.json({ success: true, idCardTransform });
+  } catch (err) {
+    console.error('ID Card Transform Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Atomic repositioning/reordering of sequence number 'no'
+router.post('/:id/reposition', requirePermission('edit:hr'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newNo: rawNewNo } = req.body;
+    const newNo = Number(rawNewNo);
+
+    if (!Number.isInteger(newNo) || newNo < 1) {
+      return res.status(400).json({ error: 'Invalid sequence number' });
+    }
+
+    const hr = await HR.findById(id);
+    if (!hr) return res.status(404).json({ error: 'HR not found' });
+
+    const oldNo = Number(hr.no);
+    if (oldNo === newNo) return res.json(hr);
+
+    // Use a high offset to avoid unique conflicts during the shift
+    const tempOffset = 5000000;
+
+    if (newNo < oldNo) {
+      // Moving UP (e.g., 500 -> 200)
+      // Shift others (200..499) DOWN (inc by 1)
+      await HR.updateMany(
+        { no: { $gte: newNo, $lt: oldNo } },
+        { $inc: { no: tempOffset } },
+        { timestamps: false }
+      );
+      await HR.updateOne({ _id: id }, { $set: { no: newNo } }, { timestamps: false });
+      await HR.updateMany(
+        { no: { $gte: tempOffset } },
+        { $inc: { no: -tempOffset + 1 } },
+        { timestamps: false }
+      );
+    } else {
+      // Moving DOWN (e.g., 400 -> 800)
+      // Shift others (401..800) UP (dec by 1)
+      await HR.updateMany(
+        { no: { $gt: oldNo, $lte: newNo } },
+        { $inc: { no: tempOffset } },
+        { timestamps: false }
+      );
+      await HR.updateOne({ _id: id }, { $set: { no: newNo } }, { timestamps: false });
+      await HR.updateMany(
+        { no: { $gte: tempOffset } },
+        { $inc: { no: -tempOffset - 1 } },
+        { timestamps: false }
+      );
+    }
+
+    const updated = await HR.findById(id);
+    res.json(updated);
+  } catch (err) {
+    console.error('HR reposition error:', err);
+    res.status(400).json({ error: err.message });
   }
 });
 

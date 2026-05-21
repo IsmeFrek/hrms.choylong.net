@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=Siemreap&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -190,8 +190,13 @@ body {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Modal styles */
@@ -283,17 +288,17 @@ body {
     margin: 0;
     border-radius: 0;
   }
-  
+
   .data-table th,
   .data-table td {
     padding: 6px 8px;
     font-size: 12px;
   }
-  
+
   .data-table {
     font-size: 12px;
   }
-  
+
   /* Hide less important columns on mobile */
   .data-table th:nth-child(5),
   .data-table td:nth-child(5),
@@ -306,6 +311,7 @@ body {
 }
 
 @media (max-width: 1024px) {
+
   .data-table th,
   .data-table td {
     padding: 8px 12px;
@@ -358,4 +364,40 @@ body {
 .dashboard-card:hover {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   transform: translateY(-1px);
+}
+
+/* Marquee Animation (Seamless with Gap) */
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee-seamless 40s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Border Trace Animation (SVG Style) */
+@keyframes border-trace {
+  0% { stroke-dashoffset: 480; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes marquee-seamless {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Border Beam Animation for Selected Cards */
+.border-beam-active {
+  position: relative;
+}
+
+.border-beam-active::before {
+  display: none; /* Disable the old effect */
+}
+
+@keyframes border-beam-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

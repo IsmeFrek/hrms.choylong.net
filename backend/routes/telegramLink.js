@@ -21,7 +21,8 @@ setInterval(() => {
 // POST /api/telegram/generate-link-code - Generate unique code for current user
 router.post('/generate-link-code', authRequired, async (req, res) => {
   try {
-    const userId = req.user._id;
+    if (!req.auth || !req.auth.user) return res.status(401).json({ message: 'Unauthorized' });
+    const userId = req.auth.user._id;
     
     // Check if user already has telegram linked
     const user = await User.findById(userId);
@@ -56,7 +57,8 @@ router.post('/generate-link-code', authRequired, async (req, res) => {
 // GET /api/telegram/link-status - Check if user has telegram linked
 router.get('/link-status', authRequired, async (req, res) => {
   try {
-    const userId = req.user._id;
+    if (!req.auth || !req.auth.user) return res.status(401).json({ message: 'Unauthorized' });
+    const userId = req.auth.user._id;
     const user = await User.findById(userId).select('telegramChatId telegramChatId2 telegramId');
     
     return res.json({

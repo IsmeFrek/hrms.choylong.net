@@ -1,10 +1,13 @@
 import express from 'express';
 import ShiftSchedule from '../models/ShiftSchedule.js';
+import { authRequired, requireAnyPermission } from '../middleware/auth.js';
 
 const router = express.Router();
 
+router.use(authRequired);
+
 // create or update schedule for a date
-router.post('/', async (req, res, next) => {
+router.post('/', requireAnyPermission(['edit:group-timetables']), async (req, res, next) => {
   try {
     const { date, scheduledStart, scheduledEnd, scheduledGraceMinutes, scheduledEndGraceMinutes, department, notes } = req.body;
     if (!date) return res.status(400).json({ message: 'date required' });
@@ -27,7 +30,7 @@ router.post('/', async (req, res, next) => {
 });
 
 // list schedules in a date range
-router.get('/', async (req, res, next) => {
+router.get('/', requireAnyPermission(['view:group-timetables', 'edit:group-timetables']), async (req, res, next) => {
   try {
     const { from, to } = req.query;
     const q = {};
@@ -40,7 +43,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // get by id
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', requireAnyPermission(['view:group-timetables', 'edit:group-timetables']), async (req, res, next) => {
   try {
     const rec = await ShiftSchedule.findById(req.params.id);
     if (!rec) return res.status(404).json({ message: 'Not found' });
@@ -49,7 +52,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // create multiple schedules at once (bulk operation)
-router.post('/bulk', async (req, res, next) => {
+router.post('/bulk', requireAnyPermission(['edit:group-timetables']), async (req, res, next) => {
   try {
     const { schedules } = req.body;
     if (!Array.isArray(schedules) || schedules.length === 0) {
@@ -110,7 +113,7 @@ router.post('/bulk', async (req, res, next) => {
 });
 
 // delete
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requireAnyPermission(['edit:group-timetables']), async (req, res, next) => {
   try {
     await ShiftSchedule.findByIdAndDelete(req.params.id);
     res.json({ ok: true });

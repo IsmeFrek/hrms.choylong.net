@@ -3,7 +3,44 @@ import GeoFencePolicy from '../models/GeoFencePolicy.js';
 import HR from '../models/HR.js';
 import { authRequired, requireAnyPermission, requirePermission } from '../middleware/auth.js';
 
+import axios from 'axios';
+
 const router = express.Router();
+
+// Resolve Google Maps short link to coordinates
+router.get('/resolve-link', authRequired, async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url) return res.status(400).json({ error: 'URL is required' });
+
+    console.log('Resolving Map Link:', url);
+    
+    // Follow redirects to get the long URL
+    const response = await axios.get(url, {
+      maxRedirects: 5,
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+
+    const finalUrl = response.request.res.responseUrl || response.config.url;
+    console.log('Final URL:', finalUrl);
+
+    // Regular expression to find coordinates in Google Maps URL
+    // Format: ...@11.5369,104.9126,17z... or ...q=11.5369,104.9126...
+    const coordsMatch = finalUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || 
+                       finalUrl.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+
+    if (coordsMatch) {
+      const lat = parseFloat(coordsMatch[1]);
+      const lng = parseFloat(coordsMatch[2]);
+      return res.json({ lat, lng });
+    }
+
+    res.status(404).json({ error: 'Could not find coordinates in this link' });
+  } catch (err) {
+    console.error('Map Resolve Error:', err.message);
+    res.status(500).json({ error: 'Failed to resolve map link' });
+  }
+});
 
 function toRad(v) {
   return (v * Math.PI) / 180;

@@ -17,7 +17,8 @@
     "network-setup": "powershell -ExecutionPolicy Bypass -File setup-network.ps1",
     "dev-network": "vite --host 0.0.0.0",
     "backend-network": "cd backend && npm run dev",
-    "test-import": "node tools/test-import.js"
+    "test-import": "node tools/test-import.js",
+    "start": "node server.js"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.0.0",
@@ -27,11 +28,17 @@
     "@zxing/library": "^0.21.3",
     "axios": "^1.5.0",
     "date-fns": "^2.30.0",
+    "dayjs": "^1.11.20",
+    "exceljs": "^4.4.0",
+    "form-data": "^4.0.5",
     "html2pdf.js": "^0.10.3",
+    "http-proxy-middleware": "^3.0.5",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.563.0",
+    "mongodb": "^7.1.0",
     "pdfjs-dist": "^5.4.449",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hook-form": "^7.45.4",
@@ -55,5 +62,18 @@
     "globals": "^16.3.0",
     "postcss": "^8.4.29",
     "vite": "^7.1.0"
-  }
+  },
+  "description": "ប្រព័ន្ធគ្រប់គ្រងធនធានមនុស្សដែលបង្កើតដោយប្រើ React + Vite (Frontend) និង Node.js + MongoDB (Backend)",
+  "main": "app.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ksfh174/KSFH.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ksfh174/KSFH/issues"
+  },
+  "homepage": "https://github.com/ksfh174/KSFH#readme"
 }

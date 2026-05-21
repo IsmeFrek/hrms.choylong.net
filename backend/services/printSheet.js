@@ -53,7 +53,7 @@ export function buildPrintSheetHtml(item, options = {}) {
         const v = stages[k];
         if (v !== undefined && v !== null && String(v).trim() !== '') return true;
       }
-    } catch (e) {}
+    } catch (e) { }
     return false;
   };
 

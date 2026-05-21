@@ -75,6 +75,10 @@ const employeeSchema = new mongoose.Schema({
   // Additional Information
   status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
   image: { type: String },
+  customPattern: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
   other: { type: String }
 }, {
   timestamps: true
@@ -102,5 +106,5 @@ employeeSchema.pre('save', async function(next) {
   next();
 });
 
-const Employee = mongoose.model('Employee', employeeSchema);
+const Employee = mongoose.model('Employee', employeeSchema, 'hrs');
 export default Employee;
