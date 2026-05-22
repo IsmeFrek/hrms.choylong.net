@@ -269,12 +269,11 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
       setLoading(true); setError('');
       
       const [yStr, mStr] = selectedMonth.split('-');
-      const y = parseInt(yStr);
-      const m = parseInt(mStr);
-      const startD = new Date(y, m - 2, 22);
-      const endD = new Date(y, m - 1, 21);
-      const startStr = toLocalYmd(startD);
-      const endStr = toLocalYmd(endD);
+      if (!startDate || !endDate) { setLoading(false); return; }
+      const startStr = startDate;
+      const endStr = endDate;
+      const startD = new Date(startStr);
+      const endD = new Date(endStr);
 
       try {
         const [hrRes, attRes, leaveRes, evalRes] = await Promise.all([
@@ -612,66 +611,64 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
       <style dangerouslySetInnerHTML={{ __html: SCREEN_CSS }} />
 
       {/* Top Filter Bar */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8 max-w-[1600px] mx-auto">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 max-w-[1600px] mx-auto">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="relative flex-1 min-w-[200px]">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none pb-1">
               <Search size={18} className="text-gray-400" />
             </div>
-            <input type="text" placeholder="ស្វែងរកឈ្មោះ, អត្តលេខ, ផ្នែក, តួនាទី..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-indigo-400 text-sm" />
+            <input type="text" placeholder="ស្វែងរកឈ្មោះ, អត្តលេខ, ផ្នែក..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full pl-10 pr-4 py-1.5 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-indigo-400 text-sm h-[34px] mb-0.5" />
           </div>
-          <div className="flex items-center gap-2">
-            {perms.isAdmin && (
-              <button onClick={() => setShowGroupModal(true)} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-bold text-sm hover:bg-indigo-100 transition-all">បង្កើតក្រុមជំនាញ</button>
-            )}
-            <button onClick={handleExportExcel} className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-sm hover:bg-emerald-100 transition-all">នាំចេញ Excel</button>
-            <button onClick={handlePrint} className="px-4 py-2 bg-gray-50 text-gray-700 rounded-lg font-bold text-sm hover:bg-gray-100 transition-all">បោះពុម្ព</button>
-          </div>
-        </div>
 
-        <div className="flex flex-wrap items-end gap-x-4 gap-y-4">
-          <div className="flex flex-col min-w-[140px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ប្រចាំខែ:</label><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none" /></div>
-          <div className="flex flex-col min-w-[140px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ចាប់ពីថ្ងៃ:</label><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none" /></div>
-          <div className="flex flex-col min-w-[140px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ដល់ថ្ងៃ:</label><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none" /></div>
-          <div className="flex flex-col min-w-[200px]">
-            <label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ក្រុម:</label>
-            <select value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none bg-white" disabled={!perms.isAdmin}>
-              {!perms.isAdmin ? (
-                <option value={perms.user?.department || ''}>{perms.user?.department || 'គ្មានផ្នែក'}</option>
-              ) : (
-                <>
+          <div className="flex flex-col min-w-[120px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ប្រចាំខែ:</label><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none h-[34px]" /></div>
+          <div className="flex flex-col min-w-[120px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ចាប់ពីថ្ងៃ:</label><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none h-[34px]" /></div>
+          <div className="flex flex-col min-w-[120px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ដល់ថ្ងៃ:</label><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none h-[34px]" /></div>
+
+          {perms.isAdmin && (
+            <>
+              <div className="flex flex-col min-w-[180px]">
+                <label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ក្រុម:</label>
+                <select value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none bg-white h-[34px]">
                   <option value="">— ជ្រើសរើសក្រុម —</option>
                   {evaluationGroups.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}
                   {departments.map(d => <option key={d._id} value={d.Department_Kh}>{d.Department_Kh}</option>)}
-                </>
-              )}
-            </select>
-          </div>
-          <div className="flex flex-col min-w-[120px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">របៀប:</label><select value={layout} onChange={e => setLayout(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none bg-white"><option>បញ្ឈរ (A4)</option><option>ផ្តេក (A4)</option></select></div>
-          <div className="flex flex-col min-w-[120px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1 text-center">Row Height:</label><div className="flex items-center gap-2"><input type="range" min={20} max={60} value={rowHeight} onChange={e => setRowHeight(parseInt(e.target.value))} className="w-full h-1.5 bg-blue-100 rounded-lg appearance-none cursor-pointer accent-blue-600" /></div></div>
-
-          <div className="relative">
-            <button onClick={() => setShowColsMenu(!showColsMenu)} className="px-4 py-1.5 border border-gray-200 rounded-md text-sm font-bold text-gray-600 bg-white hover:bg-gray-50 h-[34px]">Columns</button>
-            {showColsMenu && (
-              <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 shadow-xl rounded-xl p-4 min-w-[260px] z-[100]">
-                <div className="text-[11px] font-bold text-gray-400 mb-3 uppercase tracking-wider">បង្ហាញជួរឈរ</div>
-                <div className="flex flex-col gap-1 max-h-[400px] overflow-y-auto pr-2">
-                  {listColumns.map(c => (
-                    <label key={c.key} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={!!visibleCols[c.key]}
-                        onChange={() => toggleCol(c.key)}
-                        className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 transition-all shrink-0"
-                      />
-                      <span className="text-[13px] text-gray-700 group-hover:text-indigo-600 transition-colors">
-                        {Array.isArray(c.label) ? c.label.join('') : c.label}
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                </select>
               </div>
+              <div className="flex flex-col min-w-[110px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">របៀប:</label><select value={layout} onChange={e => setLayout(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none bg-white h-[34px]"><option>បញ្ឈរ (A4)</option><option>ផ្តេក (A4)</option></select></div>
+              <div className="flex flex-col min-w-[110px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1 text-center">Row Height:</label><div className="flex items-center gap-2 h-[34px]"><input type="range" min={20} max={60} value={rowHeight} onChange={e => setRowHeight(parseInt(e.target.value))} className="w-full h-1.5 bg-blue-100 rounded-lg appearance-none cursor-pointer accent-blue-600" /></div></div>
+
+              <div className="relative">
+                <button onClick={() => setShowColsMenu(!showColsMenu)} className="px-4 py-1.5 border border-gray-200 rounded-md text-sm font-bold text-gray-600 bg-white hover:bg-gray-50 h-[34px]">Columns</button>
+                {showColsMenu && (
+                  <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 shadow-xl rounded-xl p-4 min-w-[260px] z-[100]">
+                    <div className="text-[11px] font-bold text-gray-400 mb-3 uppercase tracking-wider">បង្ហាញជួរឈរ</div>
+                    <div className="flex flex-col gap-1 max-h-[400px] overflow-y-auto pr-2">
+                      {listColumns.map(c => (
+                        <label key={c.key} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={!!visibleCols[c.key]}
+                            onChange={() => toggleCol(c.key)}
+                            className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 transition-all shrink-0"
+                          />
+                          <span className="text-[13px] text-gray-700 group-hover:text-indigo-600 transition-colors">
+                            {Array.isArray(c.label) ? c.label.join('') : c.label}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          <div className="flex items-center gap-2 mb-0.5">
+            {perms.isAdmin && (
+              <button onClick={() => setShowGroupModal(true)} className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg font-bold text-sm hover:bg-indigo-100 transition-all h-[34px]">បង្កើតក្រុម</button>
             )}
+            <button onClick={handleExportExcel} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-sm hover:bg-emerald-100 transition-all h-[34px]">នាំចេញ Excel</button>
+            <button onClick={handlePrint} className="px-3 py-1.5 bg-gray-50 text-gray-700 rounded-lg font-bold text-sm hover:bg-gray-100 transition-all h-[34px]">បោះពុម្ព</button>
           </div>
         </div>
       </div>
@@ -845,7 +842,8 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
       </div>
 
       {/* Signature Policy Info Panel (Screen Only) */}
-      <div className="max-w-[1000px] mx-auto mt-12 mb-20 no-print">
+      {perms.isAdmin && (
+        <div className="max-w-[1000px] mx-auto mt-12 mb-20 no-print">
         <div className="bg-white rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
           <div className="bg-blue-50/50 px-6 py-4 border-b border-blue-100 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -886,6 +884,7 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
           </div>
         </div>
       </div>
+      )}
 
       {/* Policy Management Modal */}
       {showPolicyModal && (

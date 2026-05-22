@@ -250,7 +250,11 @@ export default function RolesPage() {
         'view:report.promotionDiploma', 'edit:report.promotionDiploma',
         'view:report.promotionHonor', 'edit:report.promotionHonor',
         'view:report.promotionRotation', 'edit:report.promotionRotation',
-        'view:report.transformation', 'edit:report.transformation'
+        'view:report.transformation', 'edit:report.transformation',
+        'view:absence', 'view:attendance_report', 'view:attendance_daily', 'view:attendance_monthly',
+        'view:attendance_sum_day_report', 'view:report.attendanceMonthlyData', 'view:report.attendanceMonthly',
+        'view:attendance_day_data', 'view:attendance_monthly_data', 'view:attendance_audit',
+        'view:attendance_ministry', 'view:attendance_daily_checkinme', 'view:employee_evaluation'
       ].forEach(np => {
         if (!basePerms.includes(np)) basePerms.push(np);
       });
