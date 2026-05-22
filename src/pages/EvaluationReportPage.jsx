@@ -84,10 +84,15 @@ export default function EvaluationReportPage() {
     return d.toISOString().slice(0, 10);
   });
   const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [selectedGroup, setSelectedGroup] = useState('ថ្នាក់ដឹកនាំ');
   const [rowHeight, setRowHeight] = useState(35);
   const [layout, setLayout] = useState('បញ្ឈរ (A4)');
   const [showColsMenu, setShowColsMenu] = useState(false);
+
+  // Default selected group based on permissions
+  const [selectedGroup, setSelectedGroup] = useState(() => {
+    if (perms.isAdmin) return 'ថ្នាក់ដឹកនាំ';
+    return perms.user?.department || '';
+  });
 
   // Default visible columns for evaluation report
   const [visibleCols, setVisibleCols] = useState({
@@ -272,10 +277,11 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
       const endStr = toLocalYmd(endD);
 
       try {
-        const [hrRes, attRes, leaveRes] = await Promise.all([
+        const [hrRes, attRes, leaveRes, evalRes] = await Promise.all([
           api.get('/hr'),
           api.get('/attendance/summary', { params: { from: startStr, to: endStr, year: yStr, month: mStr } }),
-          api.get('/leave-requests', { params: { from: startStr, to: endStr } })
+          api.get('/leave-requests', { params: { from: startStr, to: endStr } }),
+          api.get('/evaluation-records', { params: { yearMonth: selectedMonth } })
         ]);
         if (!mounted) return;
         const hrData = hrRes.data;
@@ -283,6 +289,11 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
         const leaveData = (Array.isArray(leaveRes.data) ? leaveRes.data : []).filter(lv => {
           const s = (lv.status || '').toLowerCase();
           return s === 'approved' || s === 'pending';
+        });
+        const evalRecordsData = Array.isArray(evalRes.data) ? evalRes.data : [];
+        const evalMap = {};
+        evalRecordsData.forEach(r => {
+          if (r.staffId) evalMap[r.staffId.toUpperCase()] = r;
         });
 
         // Exact day-by-day mapping logic from Sum-Day Report
@@ -348,20 +359,49 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
             
             attendanceMap[sid] = {
               percent: overallPercent > 0 ? toKhmerDigits(overallPercent) + '%' : (dayWorkCount > 0 ? toKhmerDigits(0) + '%' : ''),
-              result: result
+              result: result,
+              typeCounts: typeCounts
             };
           });
         }
 
         const merged = (Array.isArray(hrData) ? hrData : []).map(hr => {
           const sid = String(hr.staffId || hr.no || '').trim().toUpperCase();
-          const att = attendanceMap[sid] || { percent: '', result: '' };
+          const att = attendanceMap[sid] || { percent: '', result: '', typeCounts: {} };
+          
+          let specialLeaves = [];
+          let hasSpecialLeave = false;
+          Object.entries(att.typeCounts || {}).forEach(([t, c]) => {
+            if (t.includes('ទំនេរគ្មានបៀវត្ស') || t.includes('ទៅរៀន') || t.includes('មាតុភាព') || t.includes('ប្រចាំ​ឆ្នាំ') || t.includes('ប្រចាំឆ្នាំ')) {
+              hasSpecialLeave = true;
+              let name = t;
+              if (t.includes('ប្រចាំ')) name = 'ច្បាប់ប្រចាំឆ្នាំ';
+              else if (t.includes('មាតុភាព')) name = 'មាតុភាព';
+              else if (t.includes('ទំនេរគ្មានបៀវត្ស')) name = 'ទំនេរគ្មានបៀវត្ស';
+              else if (t.includes('ទៅរៀន')) name = 'ទៅរៀន';
+              specialLeaves.push(`${name} ${toKhmerDigits(c)}ថ្ងៃ`);
+            }
+          });
+          const note = specialLeaves.join(', ');
+
+          const dbRec = evalMap[sid];
+          let finalPerf = '';
+          let finalNote = '';
+          if (dbRec) {
+            finalPerf = dbRec.performanceResult || '';
+            finalNote = dbRec.otherNotes || '';
+          } else {
+            finalPerf = hasSpecialLeave ? note : '';
+            finalNote = note;
+          }
+
           return { 
             ...hr, 
             attendancePercentage: att.percent,
             totalMonthlyAttendance: att.result, 
-            performanceResult: '', 
-            otherNotes: '' 
+            performanceResult: finalPerf, 
+            otherNotes: finalNote,
+            hasSpecialLeave: hasSpecialLeave
           };
         });
         setList(merged);
@@ -374,10 +414,40 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
     };
     load();
     return () => { mounted = false; };
-  }, [perms.canViewHR, perms.canViewEmployees, startDate, endDate]);
+  }, [perms.canViewHR, perms.canViewEmployees, startDate, endDate, selectedMonth]);
+
+  const handleEditEvaluation = (staffId, field, value) => {
+    setList(prev => prev.map(hr => {
+      const sid = String(hr.staffId || hr.no || '').trim().toUpperCase();
+      if (sid === String(staffId).trim().toUpperCase()) {
+        return { ...hr, [field]: value };
+      }
+      return hr;
+    }));
+  };
+
+  const saveEvaluation = async (staffId, performanceResult, otherNotes) => {
+    if (!staffId) return;
+    try {
+      await api.post('/evaluation-records', {
+        staffId: String(staffId).trim().toUpperCase(),
+        yearMonth: selectedMonth,
+        performanceResult: performanceResult || '',
+        otherNotes: otherNotes || ''
+      });
+    } catch (e) {
+      console.error('Failed to save evaluation', e);
+    }
+  };
 
   const filteredList = useMemo(() => {
     let filtered = list.filter(hr => isIncludedAsOf(hr, endDate));
+    
+    // Enforce department access rule: Non-admins can ONLY see their own department
+    if (!perms.isAdmin && perms.user?.department) {
+      filtered = filtered.filter(hr => (hr.Department_Kh || hr.department || '').toString() === perms.user.department);
+    }
+
     if (filterText) {
       const q = filterText.toLowerCase();
       filtered = filtered.filter(hr => (hr.khmerName || '').toLowerCase().includes(q) || (hr.name || '').toLowerCase().includes(q) || (hr.staffId || '').toString().includes(q));
@@ -551,7 +621,9 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
             <input type="text" placeholder="ស្វែងរកឈ្មោះ, អត្តលេខ, ផ្នែក, តួនាទី..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-indigo-400 text-sm" />
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowGroupModal(true)} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-bold text-sm hover:bg-indigo-100 transition-all">បង្កើតក្រុមជំនាញ</button>
+            {perms.isAdmin && (
+              <button onClick={() => setShowGroupModal(true)} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-bold text-sm hover:bg-indigo-100 transition-all">បង្កើតក្រុមជំនាញ</button>
+            )}
             <button onClick={handleExportExcel} className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-sm hover:bg-emerald-100 transition-all">នាំចេញ Excel</button>
             <button onClick={handlePrint} className="px-4 py-2 bg-gray-50 text-gray-700 rounded-lg font-bold text-sm hover:bg-gray-100 transition-all">បោះពុម្ព</button>
           </div>
@@ -561,7 +633,20 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
           <div className="flex flex-col min-w-[140px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ប្រចាំខែ:</label><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none" /></div>
           <div className="flex flex-col min-w-[140px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ចាប់ពីថ្ងៃ:</label><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none" /></div>
           <div className="flex flex-col min-w-[140px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ដល់ថ្ងៃ:</label><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none" /></div>
-          <div className="flex flex-col min-w-[200px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ក្រុម:</label><select value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none bg-white"><option value="">— ជ្រើសរើសក្រុម —</option>{evaluationGroups.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}{departments.map(d => <option key={d._id} value={d.Department_Kh}>{d.Department_Kh}</option>)}</select></div>
+          <div className="flex flex-col min-w-[200px]">
+            <label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ក្រុម:</label>
+            <select value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none bg-white" disabled={!perms.isAdmin}>
+              {!perms.isAdmin ? (
+                <option value={perms.user?.department || ''}>{perms.user?.department || 'គ្មានផ្នែក'}</option>
+              ) : (
+                <>
+                  <option value="">— ជ្រើសរើសក្រុម —</option>
+                  {evaluationGroups.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}
+                  {departments.map(d => <option key={d._id} value={d.Department_Kh}>{d.Department_Kh}</option>)}
+                </>
+              )}
+            </select>
+          </div>
           <div className="flex flex-col min-w-[120px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">របៀប:</label><select value={layout} onChange={e => setLayout(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none bg-white"><option>បញ្ឈរ (A4)</option><option>ផ្តេក (A4)</option></select></div>
           <div className="flex flex-col min-w-[120px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1 text-center">Row Height:</label><div className="flex items-center gap-2"><input type="range" min={20} max={60} value={rowHeight} onChange={e => setRowHeight(parseInt(e.target.value))} className="w-full h-1.5 bg-blue-100 rounded-lg appearance-none cursor-pointer accent-blue-600" /></div></div>
 
@@ -636,8 +721,45 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
                         {visibleCols.position && <td className="left" style={{ fontSize: getFontSize(r.position), whiteSpace: 'nowrap', paddingLeft: '2px' }}>{r.position || ''}</td>}
                         {visibleCols.attendancePercentage && <td className="center">{r.attendancePercentage || ''}</td>}
                         {visibleCols.totalMonthlyAttendance && <td className="center">{r.totalMonthlyAttendance || ''}</td>}
-                        {visibleCols.performanceResult && <td className="center">{r.performanceResult || ''}</td>}
-                        {visibleCols.otherNotes && <td className="left">{r.otherNotes || ''}</td>}
+                        {(visibleCols.performanceResult && visibleCols.otherNotes && r.hasSpecialLeave) ? (
+                          <td colSpan={2} className="center" style={{ padding: 0 }}>
+                            <input
+                              className="no-print-border"
+                              style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', textAlign: 'center', outline: 'none', fontWeight: 'bold', minHeight: '30px' }}
+                              value={r.otherNotes || ''}
+                              onChange={(e) => {
+                                handleEditEvaluation(r.staffId || r.no, 'performanceResult', e.target.value);
+                                handleEditEvaluation(r.staffId || r.no, 'otherNotes', e.target.value);
+                              }}
+                              onBlur={() => saveEvaluation(r.staffId || r.no, r.otherNotes, r.otherNotes)}
+                            />
+                          </td>
+                        ) : (
+                          <>
+                            {visibleCols.performanceResult && (
+                              <td className="center" style={{ padding: 0 }}>
+                                <input
+                                  className="no-print-border"
+                                  style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', textAlign: 'center', outline: 'none', minHeight: '30px' }}
+                                  value={r.performanceResult || ''}
+                                  onChange={(e) => handleEditEvaluation(r.staffId || r.no, 'performanceResult', e.target.value)}
+                                  onBlur={() => saveEvaluation(r.staffId || r.no, r.performanceResult, r.otherNotes)}
+                                />
+                              </td>
+                            )}
+                            {visibleCols.otherNotes && (
+                              <td className="left" style={{ padding: 0 }}>
+                                <input
+                                  className="no-print-border"
+                                  style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', textAlign: 'left', outline: 'none', paddingLeft: '4px', minHeight: '30px' }}
+                                  value={r.otherNotes || ''}
+                                  onChange={(e) => handleEditEvaluation(r.staffId || r.no, 'otherNotes', e.target.value)}
+                                  onBlur={() => saveEvaluation(r.staffId || r.no, r.performanceResult, r.otherNotes)}
+                                />
+                              </td>
+                            )}
+                          </>
+                        )}
                         {visibleCols.staffId && <td className="center">{r.staffId || ''}</td>}
                       </tr>
                     ))}

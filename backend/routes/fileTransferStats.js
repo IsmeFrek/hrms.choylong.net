@@ -116,7 +116,7 @@ router.get('/file-transfer-stats/detailed', authRequired, async (req, res, next)
     const { status } = req.query; // 'completed', 'notCompleted', 'noFeedback'
     
     const fileTransfers = await FileTransfer.find({})
-      .select('_id type letterNo source date content meta createdAt')
+      .select('_id no type title letterNo source date content meta createdAt')
       .lean()
       .exec();
     
@@ -145,14 +145,17 @@ router.get('/file-transfer-stats/detailed', authRequired, async (req, res, next)
         feedbackStages[key] && String(feedbackStages[key]).trim() !== ''
       );
       
+      const contentTrimmed = (ft.content || ft.title || '').substring(0, 100);
+
       if (!hasAssignedStages) {
         categorizedRecords.noFeedback.push({
           _id: ft._id,
+          no: ft.no || '',
           type: ft.type,
-          letterNo: ft.letterNo,
+          letterNo: ft.letterNo || 'មិនមាន',
           source: ft.source,
-          date: ft.date,
-          content: ft.content?.substring(0, 100) + '...',
+          date: ft.date || ft.createdAt,
+          content: contentTrimmed,
           status: 'មិនមានផ្ញើមតិ'
         });
         return;
@@ -160,35 +163,51 @@ router.get('/file-transfer-stats/detailed', authRequired, async (req, res, next)
       
       let hasCompletedStage = false;
       let completedStageInfo = null;
+      let commented = [];
+      let pending = [];
       
-      for (const stageKey of stageSequence) {
-        const noteKey = stageNoteKeys[stageKey];
-        if (noteKey && meta[noteKey] && String(meta[noteKey]).trim()) {
+      for (const [key, val] of Object.entries(feedbackStages)) {
+        if (!val || String(val).trim() === '') continue;
+        const upperKey = String(key).toUpperCase();
+        const noteKey = stageNoteKeys[upperKey];
+        if (noteKey && meta[noteKey] && String(meta[noteKey]).trim() !== '') {
+          commented.push(upperKey);
           hasCompletedStage = true;
-          completedStageInfo = {
-            stage: stageKey,
-            note: meta[noteKey],
-            date: meta[noteKey.replace('Note', 'Date')]
-          };
-          break;
+          if (!completedStageInfo) {
+            completedStageInfo = {
+              stage: upperKey,
+              note: meta[noteKey],
+              date: meta[noteKey.replace('Note', 'Date')]
+            };
+          }
+        } else {
+          pending.push(upperKey);
         }
       }
       
       const record = {
         _id: ft._id,
+        no: ft.no || '',
         type: ft.type,
-        letterNo: ft.letterNo,
+        letterNo: ft.letterNo || 'មិនមាន',
         source: ft.source,
-        date: ft.date,
-        content: ft.content?.substring(0, 100) + '...',
-        assignedStages: Object.keys(feedbackStages).filter(k => feedbackStages[k])
+        date: ft.date || ft.createdAt,
+        content: contentTrimmed,
+        assignedStages: Object.keys(feedbackStages).filter(k => feedbackStages[k]),
+        commented,
+        pending
       };
       
-      if (hasCompletedStage) {
+      if (hasCompletedStage && pending.length === 0) {
         categorizedRecords.completed.push({
           ...record,
           status: 'រួចរាល់',
           lastCompletedStage: completedStageInfo
+        });
+      } else if (hasCompletedStage && pending.length > 0) {
+        categorizedRecords.notCompleted.push({
+          ...record,
+          status: 'មិនទាន់រួច'
         });
       } else {
         categorizedRecords.notCompleted.push({

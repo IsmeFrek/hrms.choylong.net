@@ -1917,13 +1917,13 @@ export default function Replayfile2Page(props) {
   // head of office signature: prefer 'HO' then prefer S6 (stage 6), then fallback to S4/S3
   const sigHeadOffice = sigFor && (sigFor('HO') || sigFor('S6') || sigFor('S4') || sigFor('S3'));
   const sigHeadOfficeUrl = signatureUrl(sigHeadOffice);
-  const hasCourseNote = Boolean((meta && meta.CourseNote) || (leftContent && leftContent.trim() !== ''));
-  const hasCourse1Note = Boolean((meta && meta.Course1Note) || (s1Content && s1Content.trim() !== ''));
-  const hasDeptNote = Boolean((meta && meta.Course2Note) || (deptContent && deptContent.trim() !== ''));
-  const hasDeputy = Boolean((meta && meta.Course3Note) || (deputyContent && deputyContent.trim() !== ''));
-  const hasDeputyRight = Boolean((meta && meta.Course4Note) || (deputyRightContent && deputyRightContent.trim() !== ''));
-  const hasHeadOffice = Boolean((meta && meta.Course6Note) || (headOfficeContent && headOfficeContent.trim() !== ''));
-  const hasDirector = Boolean((meta && meta.Course5Note) || (directorContent && directorContent.trim() !== ''));
+  const hasCourseNote = Boolean((meta && meta.CourseNote && String(meta.CourseNote).includes('៕')) || (leftContent && String(leftContent).includes('៕')));
+  const hasCourse1Note = Boolean((meta && meta.Course1Note && String(meta.Course1Note).includes('៕')) || (s1Content && String(s1Content).includes('៕')));
+  const hasDeptNote = Boolean((meta && meta.Course2Note && String(meta.Course2Note).includes('៕')) || (deptContent && String(deptContent).includes('៕')));
+  const hasDeputy = Boolean((meta && meta.Course3Note && String(meta.Course3Note).includes('៕')) || (deputyContent && String(deputyContent).includes('៕')));
+  const hasDeputyRight = Boolean((meta && meta.Course4Note && String(meta.Course4Note).includes('៕')) || (deputyRightContent && String(deputyRightContent).includes('៕')));
+  const hasHeadOffice = Boolean((meta && meta.Course6Note && String(meta.Course6Note).includes('៕')) || (headOfficeContent && String(headOfficeContent).includes('៕')));
+  const hasDirector = Boolean((meta && meta.Course5Note && String(meta.Course5Note).includes('៕')) || (directorContent && String(directorContent).includes('៕')));
 
   // If any visible note exists but we don't yet have a captured date, default it to now
   useEffect(() => {

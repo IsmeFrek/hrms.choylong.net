@@ -534,7 +534,8 @@ export default function FileTransfer() {
       { value: 'លិខិតចូលAdmin', label: 'លិខិតចូលAdmin' }
     ];
     if (isOutgoingPage) {
-      return base.filter(t => t.value === 'លិខិតចេញ' || t.value === 'លិខិតចេញផ្ទៃក្នុង' || t.value === 'លិខិតចូល');
+      const filteredBase = base.filter(t => t.value === 'លិខិតចេញ' || t.value === 'លិខិតចេញផ្ទៃក្នុង' || t.value === 'លិខិតចូល');
+      return [{ value: 'ទាំងអស់', label: 'ទាំងអស់' }, ...filteredBase];
     }
     return [{ value: 'ទាំងអស់', label: 'ទាំងអស់' }, ...base];
   }, [isOutgoingPage]);

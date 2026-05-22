@@ -237,41 +237,29 @@ export default function FileTransferStats() {
               {selectedStatus && detailedData.records ? (
                 <div className="space-y-3">
                   {detailedData.records.map((record) => (
-                    <div key={record._id} className="border rounded-lg p-4 hover:bg-gray-50">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            {getStatusIcon(record.status)}
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(record.status)}`}>
-                              {record.status}
-                            </span>
-                          </div>
-                          <p className="font-medium">{record.type}</p>
-                          <p className="text-sm text-gray-600">លេខ: {record.letterNo}</p>
-                          <p className="text-sm text-gray-600">ប្រភព: {record.source}</p>
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {new Date(record.date).toLocaleDateString('km-KH')}
-                        </div>
+                    <div key={record._id} className="border rounded-lg p-4 hover:bg-gray-50 bg-white">
+                      <div className="grid grid-cols-[180px_1fr] gap-x-4 gap-y-2 text-sm">
+                        <div className="font-semibold text-gray-700">លេខរៀងឯកសារ / No</div>
+                        <div>{record.no || 'មិនមាន'}</div>
+
+                        <div className="font-semibold text-gray-700">លេខលិខិត / Letter No</div>
+                        <div>{record.letterNo || 'មិនមាន'}</div>
+
+                        <div className="font-semibold text-gray-700">កាលបរិច្ឆេទ / Date</div>
+                        <div>{new Date(record.date).toLocaleDateString('km-KH')}</div>
+
+                        <div className="font-semibold text-gray-700">ខ្លឹមសារ / Content</div>
+                        <div>{record.content || 'មិនមាន'}</div>
+
+                        <div className="font-semibold text-gray-700">ត្រូវផ្ញើមតិប៉ុន្មាន / Stages needed</div>
+                        <div>{record.assignedStages?.length || 0} វគ្គ</div>
+
+                        <div className="font-semibold text-gray-700">អ្នកណាមានមតិរួច / Commented</div>
+                        <div>{record.commented && record.commented.length > 0 ? record.commented.join(', ') : 'មិនទាន់មាន'}</div>
+
+                        <div className="font-semibold text-gray-700">អ្នកណានៅ / Pending</div>
+                        <div>{record.pending && record.pending.length > 0 ? record.pending.join(', ') : 'គ្មាន'}</div>
                       </div>
-                      
-                      {record.content && (
-                        <p className="text-sm text-gray-700 mb-2">{record.content}</p>
-                      )}
-                      
-                      {record.assignedStages && record.assignedStages.length > 0 && (
-                        <div className="text-xs text-gray-500">
-                          វគ្គដែលកំណត់: {record.assignedStages.join(', ')}
-                        </div>
-                      )}
-                      
-                      {record.lastCompletedStage && (
-                        <div className="mt-2 p-2 bg-green-50 rounded text-sm">
-                          <strong>វគ្គចុងក្រោយរួច:</strong> {record.lastCompletedStage.stage}
-                          <br />
-                          <strong>មតិ:</strong> {record.lastCompletedStage.note?.substring(0, 100)}...
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -285,13 +273,29 @@ export default function FileTransferStats() {
                       </h6>
                       <div className="grid gap-2">
                         {records.slice(0, 5).map((record) => (
-                          <div key={record._id} className="p-3 bg-gray-50 rounded flex justify-between">
-                            <div>
-                              <span className="font-medium">{record.type}</span> - {record.letterNo}
+                          <div key={record._id} className="border rounded-lg p-4 hover:bg-gray-50 bg-white">
+                            <div className="grid grid-cols-[180px_1fr] gap-x-4 gap-y-2 text-sm">
+                              <div className="font-semibold text-gray-700">លេខរៀងឯកសារ / No</div>
+                              <div>{record.no || 'មិនមាន'}</div>
+
+                              <div className="font-semibold text-gray-700">លេខលិខិត / Letter No</div>
+                              <div>{record.letterNo || 'មិនមាន'}</div>
+
+                              <div className="font-semibold text-gray-700">កាលបរិច្ឆេទ / Date</div>
+                              <div>{new Date(record.date).toLocaleDateString('km-KH')}</div>
+
+                              <div className="font-semibold text-gray-700">ខ្លឹមសារ / Content</div>
+                              <div>{record.content || 'មិនមាន'}</div>
+
+                              <div className="font-semibold text-gray-700">ត្រូវផ្ញើមតិប៉ុន្មាន / Stages needed</div>
+                              <div>{record.assignedStages?.length || 0} វគ្គ</div>
+
+                              <div className="font-semibold text-gray-700">អ្នកណាមានមតិរួច / Commented</div>
+                              <div>{record.commented && record.commented.length > 0 ? record.commented.join(', ') : 'មិនទាន់មាន'}</div>
+
+                              <div className="font-semibold text-gray-700">អ្នកណានៅ / Pending</div>
+                              <div>{record.pending && record.pending.length > 0 ? record.pending.join(', ') : 'គ្មាន'}</div>
                             </div>
-                            <span className="text-sm text-gray-600">
-                              {new Date(record.date).toLocaleDateString('km-KH')}
-                            </span>
                           </div>
                         ))}
                         {records.length > 5 && (

@@ -7,25 +7,24 @@ import headerBg from '../assets/3.JPG';
 
 function buildPrintStyleSumDay(orientation) {
   const o = (orientation === 'landscape') ? 'landscape' : 'portrait';
-  const contentWidth = o === 'landscape' ? '277mm' : '190mm';
   return `
 @media print {
   @page {
     size: A4 ${o};
-    margin: 12mm;
+    margin: 0;
   }
   html, body {
     margin: 0 !important;
     padding: 0 !important;
     background: white !important;
+    width: 100% !important;
   }
   #attendance-sumday-print-content {
     box-sizing: border-box;
-    margin: 0 auto !important;
-    padding: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 10mm !important;
     background: white !important;
-    page-break-after: avoid;
-    max-width: ${contentWidth};
   }
   body * {
     visibility: hidden;
@@ -36,10 +35,15 @@ function buildPrintStyleSumDay(orientation) {
   #attendance-sumday-print-content {
     position: static;
   }
-
-  #attendance-sumday-print-content h1 { font-size: 18px !important; }
-  #attendance-sumday-print-content p { font-size: 14px !important; }
-  #attendance-sumday-print-content table { table-layout: fixed; }
+  #attendance-sumday-print-content table {
+    width: 100% !important;
+    table-layout: auto !important;
+  }
+  #attendance-sumday-print-content {
+    border: none !important;
+    box-shadow: none !important;
+    min-height: unset !important;
+  }
 }
 `;
 }
@@ -1152,15 +1156,16 @@ export default function AttendanceSumDayReportPage() {
       <html>
         <head>
           <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width,initial-scale=1" />
           <title>AttendanceSumDay_ByDepartment</title>
           <style>
             ${printCss}
-            body { font-family: "Khmer OS Siemreap", "Noto Sans Khmer", Arial, sans-serif; margin: 0; }
+            body { font-family: 'Khmer OS Siemreap','Noto Sans Khmer',Arial,sans-serif; margin: 0; padding: 0; }
             ${extraCss}
           </style>
         </head>
         <body>
-          <div id="dept-root" style="padding: 12mm;"></div>
+          <div id="dept-root" style="width:100%;margin:0;padding:0;"></div>
         </body>
       </html>
     `);
@@ -1186,11 +1191,10 @@ export default function AttendanceSumDayReportPage() {
     groupList.forEach(([deptName, rows]) => {
       const page = makeEl('div', {
         background: '#fff',
-        border: '1px solid #e5e7eb',
-        boxShadow: '0 6px 18px rgba(0,0,0,0.08)',
-        padding: '24px',
-        margin: '0 auto 18px',
-        maxWidth: (printOrientation === 'landscape') ? '297mm' : '210mm',
+        padding: '10mm',
+        margin: '0',
+        width: '100%',
+        boxSizing: 'border-box',
         minHeight: (printOrientation === 'landscape') ? '210mm' : '297mm'
       });
       page.className = 'dept-page';
@@ -1198,8 +1202,8 @@ export default function AttendanceSumDayReportPage() {
       const header = makeEl('div', { marginBottom: '16px', borderBottom: '2px solid #ddd', paddingBottom: '10px' });
       header.appendChild(makeText('h1', 'ព្រះរាជាណាចក្រកម្ពុជា', { margin: '0', fontSize: '20px', fontWeight: '400', textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }));
       header.appendChild(makeText('h1', 'ជាតិ សាសនា ព្រះមហាក្សត្រ', { margin: '0', fontSize: '20px', fontWeight: '400', textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }));
-      header.appendChild(makeText('h1', 'ក្រសួងសុខាភិបាល', { margin: '0', fontSize: '18px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
-      header.appendChild(makeText('h1', 'មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត', { margin: '0', fontSize: '18px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
+      header.appendChild(makeText('h1', 'ក្រសួងសុខាភិបាល', { margin: '0', fontSize: '16px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
+      header.appendChild(makeText('h1', 'មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត', { margin: '0', fontSize: '16px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
       header.appendChild(makeText('h1', 'វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា', { margin: '0', fontSize: '20px', fontWeight: '700', textAlign: 'center' }));
       header.appendChild(makeText('div', `ផ្នែក: ${deptName}`, { marginTop: '6px', fontSize: '14px', fontWeight: '700', textAlign: 'center' }));
       header.appendChild(makeText('div', `គិតពី ${fmtKhmerLongDateSumDay(fromDate)} ដល់ ${fmtKhmerLongDateSumDay(toDate)}`, { marginTop: '4px', fontSize: '14px', textAlign: 'center', color: '#141313' }));
@@ -1210,10 +1214,11 @@ export default function AttendanceSumDayReportPage() {
       page.appendChild(makeText('div', `សរុប: ${toKhmerDigitsSumDay(rows.length)} នាក់ ( ប្រុស: ${toKhmerDigitsSumDay(male)} — ស្រី: ${toKhmerDigitsSumDay(female)} )`, { marginBottom: '10px', fontSize: '12px', color: '#313030' }));
 
       const table = makeEl('table');
+      Object.assign(table.style, { width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' });
       const thead = makeEl('thead');
       const trh = makeEl('tr');
       visibleKeysNow.forEach((k) => {
-        const th = makeEl('th', { textAlign: 'center', fontSize: '12px', width: `${Number(colWidths?.[k]) || columnMeta[k]?.width || 80}px` });
+        const th = makeEl('th', { textAlign: 'center', fontSize: '11px', padding: '4px 3px', border: '1px solid #8f8b8b', background: '#f3f4f6', wordBreak: 'break-word' });
         th.textContent = columnMeta[k]?.label || k;
         trh.appendChild(th);
       });
@@ -1227,10 +1232,12 @@ export default function AttendanceSumDayReportPage() {
         visibleKeysNow.forEach((k) => {
           const cell = renderCell(k, row);
           const td = makeEl('td', {
-            fontSize: `${Math.max(10, Math.round(rowHeight * 0.46))}px`,
+            fontSize: '11px',
             verticalAlign: 'middle',
             textAlign: cell?.style?.textAlign || columnMeta[k]?.align || 'center',
-            width: `${Number(colWidths?.[k]) || columnMeta[k]?.width || 80}px`
+            border: '1px solid #8f8b8b',
+            padding: '3px 4px',
+            wordBreak: 'break-word'
           });
           td.textContent = (cell?.value ?? '').toString();
           tbody.appendChild(tr).appendChild(td);
@@ -1239,7 +1246,7 @@ export default function AttendanceSumDayReportPage() {
       });
       page.appendChild(table);
 
-      const footer = makeEl('div', { marginTop: '20px', borderTop: '2px solid #8f8b8b', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '12px' });
+      const footer = makeEl('div', { marginTop: '20px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '12px' });
       const f1 = makeEl('div', { textAlign: 'left' });
       f1.appendChild(makeText('p', 'ផលប័ត្រមន្ត្រីឃ្មាំងរដ្ឋ', { margin: '0' }));
       f1.appendChild(makeText('p', '____________________', { margin: '0' }));

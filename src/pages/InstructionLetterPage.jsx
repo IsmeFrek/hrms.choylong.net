@@ -48,6 +48,41 @@ export default function InstructionLetterPage() {
   const templateType = searchParams.get('template');
   const perms = usePermission();
 
+  const hasAccess = () => {
+    if (perms.isAdmin) return true;
+    if (!templateType) return perms.canViewDocuments;
+    if (templateType === 'maternity') return perms.canViewMaternityLeaveReport;
+    if (templateType === 'resignation') return perms.canViewResignationLetter;
+    if (templateType === 'onboarding') return perms.canViewOnboardingLetter;
+    if (templateType === 'appointment') return perms.canViewAppointmentLetter;
+    if (templateType === 'termination') return perms.canViewTerminationLetter;
+    if (templateType === 'others') return perms.canViewOtherLetters;
+    return false;
+  };
+
+  const canEditAccess = () => {
+    if (perms.isAdmin) return true;
+    if (!templateType) return perms.canEditDocuments;
+    if (templateType === 'maternity') return perms.canEditMaternityLeaveReport;
+    if (templateType === 'resignation') return perms.canEditResignationLetter;
+    if (templateType === 'onboarding') return perms.canEditOnboardingLetter;
+    if (templateType === 'appointment') return perms.canEditAppointmentLetter;
+    if (templateType === 'termination') return perms.canEditTerminationLetter;
+    if (templateType === 'others') return perms.canEditOtherLetters;
+    return false;
+  };
+
+  if (!hasAccess()) {
+    return (
+      <div className="p-6 min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center py-12 bg-white px-8 rounded-lg shadow-md border border-red-100">
+          <h2 className="text-xl font-semibold text-red-600">គ្មានសិទ្ធិអនុញ្ញាត (Permission required)</h2>
+          <p className="text-gray-600 mt-2">អ្នកមិនមានសិទ្ធិមើលឯកសារគំរូនេះទេ។ សូមទាក់ទងអ្នកគ្រប់គ្រងប្រព័ន្ធ។</p>
+        </div>
+      </div>
+    );
+  }
+
   const persistLocalLetters = (letter) => {
     try {
       const cur = JSON.parse(localStorage.getItem('localInstructionLetters') || '[]');
@@ -370,11 +405,12 @@ export default function InstructionLetterPage() {
       return;
     }
     const content = previewEl.innerHTML;
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map(s => s.outerHTML).join('\n');
     const win = window.open('', '_blank', 'toolbar=0,location=0,menubar=0,width=900,height=800');
     if (win) {
       try {
         win.document.open();
-        win.document.write(a4Wrapper(content));
+        win.document.write(a4Wrapper(content, styles));
         win.document.close();
         win.focus();
         setTimeout(() => {
@@ -388,9 +424,9 @@ export default function InstructionLetterPage() {
     }
   };
 
-  const a4Wrapper = (innerHtml) => {
-    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@300;400;700&display=swap" rel="stylesheet"><style>
-      @page { size: A4; margin: 20mm; }
+  const a4Wrapper = (innerHtml, styles = '') => {
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${styles}<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@300;400;700&display=swap" rel="stylesheet"><style>
+      @page { size: A4; margin: 0; }
       html,body{height:100%; margin:0; padding:0;}
       body{
         font-family:"Noto Sans Khmer", "Khmer OS", Arial, serif;
@@ -400,11 +436,11 @@ export default function InstructionLetterPage() {
         display:block;
         background: #fff;
       }
-      .a4-container { box-sizing: border-box; width:8.27in; height:11.69in; padding:12mm; background:#fff; margin:0 auto; overflow:hidden; }
+      .a4-container { box-sizing: border-box; width:8.27in; min-height:11.69in; padding: 5mm 18mm 5mm 28mm; background:#fff; margin:0 auto; overflow:hidden; position: relative; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .a4-container .doc-sign, .a4-container p, .a4-container h1, .a4-container h2 { break-inside: avoid; page-break-inside: avoid; }
       @media print {
-        html,body { height: auto; }
-        .a4-container { box-shadow:none; margin:0; page-break-after:avoid; }
+        html,body { height: 100%; -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; padding: 0; }
+        .a4-container { box-shadow:none; margin:0; width: 100%; height: 100%; min-height: 100%; overflow: visible; page-break-after:avoid; }
       }
     </style></head><body><div class="a4-container">${innerHtml}</div></body></html>`;
   };
@@ -416,8 +452,8 @@ export default function InstructionLetterPage() {
       ministry: 'ក្រសួងសុខាភិបាល',
       department: 'មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត',
       subject: 'លិខិតបង្គាប់ការ',
-      recipient: '- លិខិតអនុញ្ញាតលេខ ...... ចុះថ្ងៃទី... ខែ... ឆ្នាំ... \n- តាមការចាំបាច់របស់មន្ទីរពេទ្យ',
-      body: 'លោកស្រី ...... ជា...... បន្ទាប់ពីសម្រាកលំហែមាតុភាព ត្រូវបានចាត់ឱ្យចូលបម្រើការនៅ ផ្នែក...... វិញចាប់ពីថ្ងៃទី...... ខែ...... ឆ្នាំ...... នេះតទៅ។\n\nការិយាល័យរដ្ឋបាលនិងបុគ្គលិក - ការិយាល័យបច្ចេកទេស - ការិយាល័យហិរញ្ញវត្ថុ - ផ្នែកពាក់ព័ន្ធនានា - សាមីខ្លួន ត្រូវអនុវត្តតាមលិខិតបង្គាប់ការនេះ ចាប់ពីថ្ងៃទី...... ខែ...... ឆ្នាំ...... នេះតទៅ។',
+      recipient: 'លិខិតអនុញ្ញាតលេខ ...... ចុះថ្ងៃ...... ទី...... ខែ...... ឆ្នាំ...... របស់ក្រសួងសុខាភិបាល ស្តីពី “ការអនុញ្ញាតឱ្យសម្រាកលំហែមាតុភាពរបស់ លោកស្រី ...... “។',
+      body: '\tលោកស្រី ...... ជា ...... (......) បន្ទាប់ពីសម្រាកលំហែមាតុភាពមក ត្រូវបានចាត់ឲ្យចូលបំរើការនៅ ផ្នែក...... វិញ ចាប់ពីថ្ងៃទី...... ខែ...... ឆ្នាំ...... នេះតទៅ។\n\n\tការិយាល័យរដ្ឋបាល និងបុគ្គលិក-ការិយាល័យបច្ចេកទេស-ការិយាល័យហិរញ្ញវត្ថុ-ផ្នែកពាក់ព័ន្ធនានា-សាមីខ្លួន ត្រូវអនុវត្តតាមលិខិតបង្គាប់ការនេះ ចាប់ពីថ្ងៃទី...... ខែ...... ឆ្នាំ...... នេះតទៅ។\n\nចម្លងជូន:\n- ការិយាល័យទាំងបី\n- ផ្នែកពាក់ព័ន្ធ\n- ផ្នែកសេវា\n    “ជ្រាបជាព័ត៌មាន“\n- សាមីខ្លួន \n    “ដើម្បីអនុវត្ត”\n- ឯកសារ-កាលប្បវត្តិ',
       signPlace: 'រាជធានីភ្នំពេញ',
       signTitle: 'នាយកមន្ទីរពេទ្យ',
       signName: 'សាស្ត្រាចារ្យ ងី ម៉េង',
@@ -502,7 +538,52 @@ export default function InstructionLetterPage() {
       
       const t = templates.find((x) => x.id === id);
       if (t) {
-        applyTemplate(t);
+        let appliedT = { ...t };
+        if (templateType === 'maternity') {
+          const name = searchParams.get('name') || '......';
+          const dept = searchParams.get('department') || '......';
+          const pos = searchParams.get('position') || '......';
+          
+          if (name !== '......') {
+            appliedT.recipient = appliedT.recipient.replace('លោកស្រី ......', `លោកស្រី ${name}`);
+            appliedT.body = appliedT.body.replace('លោកស្រី ......', `លោកស្រី ${name}`);
+          }
+          if (pos !== '......') {
+            appliedT.body = appliedT.body.replace('ជា ......', `ជា ${pos}`);
+          }
+          if (dept !== '......') {
+            appliedT.body = appliedT.body.replace('ផ្នែក......', `ផ្នែក${dept}`);
+          }
+          
+          const civilType = searchParams.get('civilType');
+          if (civilType) {
+            appliedT.body = appliedT.body.replace('(......)', `(${civilType})`);
+          }
+          
+          const endDateStr = searchParams.get('endDate');
+          if (endDateStr && endDateStr !== '......') {
+            const endDateObj = new Date(endDateStr);
+            if (!isNaN(endDateObj.getTime())) {
+              let returnDate = new Date(endDateObj);
+              returnDate.setDate(returnDate.getDate() + 1);
+              
+              // Skip weekends (0 = Sunday, 6 = Saturday)
+              while (returnDate.getDay() === 0 || returnDate.getDay() === 6) {
+                returnDate.setDate(returnDate.getDate() + 1);
+              }
+              
+              // Format date into Khmer digits and text
+              const khDigits = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
+              const day = String(returnDate.getDate()).split('').map(ch => (khDigits[+ch] ?? ch)).join('');
+              const months = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
+              const month = months[returnDate.getMonth()] || '';
+              const year = String(returnDate.getFullYear()).split('').map(ch => (khDigits[+ch] ?? ch)).join('');
+              
+              appliedT.body = appliedT.body.replace(/ចាប់ពីថ្ងៃទី\.\.\.\.\.\.\s*ខែ\.\.\.\.\.\.\s*ឆ្នាំ\.\.\.\.\.\./g, `ចាប់ពីថ្ងៃទី${day} ខែ${month} ឆ្នាំ${year}`);
+            }
+          }
+        }
+        applyTemplate(appliedT);
       }
     }
   }, [templateType]);
@@ -555,15 +636,17 @@ export default function InstructionLetterPage() {
                   ត្រឡប់ក្រោយ
                 </button>
               )}
-              <button
-                className="px-3 py-1 bg-green-600 text-white rounded"
-                onClick={() => {
-                  setCreating(true);
-                  setShowPreview(true);
-                }}
-              >
-                បង្កើត
-              </button>
+              {canEditAccess() && (
+                <button
+                  className="px-3 py-1 bg-green-600 text-white rounded"
+                  onClick={() => {
+                    setCreating(true);
+                    setShowPreview(true);
+                  }}
+                >
+                  បង្កើត
+                </button>
+              )}
             </div>
           </div>
 
@@ -615,10 +698,12 @@ export default function InstructionLetterPage() {
                         </span>
                       </td>
                       <td className="border px-4 py-3 text-center">
-                        <div className="flex gap-2 justify-center items-center">
-                          <button onClick={() => onRowClick(l)} className="w-8 h-6 flex items-center justify-center bg-green-600 text-white text-xs rounded-full">កែ</button>
-                          <button onClick={(e) => deleteLetter(e, l)} className="w-8 h-6 flex items-center justify-center bg-red-600 text-white text-xs rounded-full">លុប</button>
-                        </div>
+                        {canEditAccess() && (
+                          <div className="flex gap-2 justify-center items-center">
+                            <button onClick={() => onRowClick(l)} className="w-8 h-6 flex items-center justify-center bg-green-600 text-white text-xs rounded-full">កែ</button>
+                            <button onClick={(e) => deleteLetter(e, l)} className="w-8 h-6 flex items-center justify-center bg-red-600 text-white text-xs rounded-full">លុប</button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -686,20 +771,22 @@ export default function InstructionLetterPage() {
                     </label>
                     <div className="flex gap-2">
                       <button onClick={handlePrint} className="px-3 py-1 bg-gray-600 text-white rounded">Print</button>
-                      <button onClick={saveLetter} disabled={saving} className="px-3 py-1 bg-green-600 text-white rounded">{saving ? 'Saving...' : 'រក្សាទុក'}</button>
+                      {canEditAccess() && (
+                        <button onClick={saveLetter} disabled={saving} className="px-3 py-1 bg-green-600 text-white rounded">{saving ? 'Saving...' : 'រក្សាទុក'}</button>
+                      )}
                     </div>
                   </div>
 
                   <div className="w-full flex justify-center">
-                    <div ref={contentRef} style={{ width: '8.27in', minHeight: '11.69in', background: '#fff', padding: '10mm', boxSizing: 'border-box', boxShadow: '0 6px 20px rgba(0,0,0,0.12)', fontFamily: 'Khmer OS, Arial, serif', color: '#000', position: 'relative' }}>
+                    <div ref={contentRef} style={{ width: '8.27in', minHeight: '11.69in', background: '#fff', padding: '5mm 18mm 5mm 28mm', boxSizing: 'border-box', boxShadow: '0 6px 20px rgba(0,0,0,0.12)', fontFamily: 'Khmer OS, Arial, serif', color: '#000', position: 'relative' }}>
                       <style>{`
                         .doc-row { display: grid; grid-template-columns: 80px 1fr; margin-top: 20px; }
                         .doc-label { font-family: 'Khmer OS Muol Light', 'Khmer OS', Arial, serif; font-size: 16px; }
-                        .doc-value { font-family: "Khmer OS Siemreap", Arial, sans-serif; font-size: 16px; }
+                        .doc-value { font-family: "Khmer OS Siemreap", Arial, sans-serif; font-size: 16px; line-height: 1.9; text-align: justify; }
                         
-                        .doc-body { margin-top: 20px; font-family: "Khmer OS Siemreap", Arial, sans-serif; font-size: 16px; text-align: justify; white-space: pre-line; }
+                        .doc-body { margin-top: 20px; font-family: "Khmer OS Siemreap", Arial, sans-serif; font-size: 16px; text-align: justify; white-space: pre-line; line-height: 1.9; }
                         
-                        .doc-sign { margin-top: 40px; text-align: right; }
+                        .doc-sign { margin-top: 40px; text-align: center; width: fit-content; margin-left: auto; padding-right: 25mm; }
                         .place-date { font-family: "Khmer OS Siemreap"; font-size: 16px; }
                         .sign-title { font-family: 'Khmer OS Muol Light', 'Khmer OS', Arial, serif; font-size: 16px; margin-top: 5px; }
                         .sign-name { font-family: 'Khmer OS Muol Light', 'Khmer OS', Arial, serif; font-size: 16px; margin-top: 80px; }
@@ -715,28 +802,59 @@ export default function InstructionLetterPage() {
                       )}
 
                       <div className="relative z-10" style={{ marginTop: '200px' }}>
-                        <div className="text-center font-nomal text-[20px] mb-6" style={{ fontFamily: 'Khmer OS Muol Light' }}>{form.subject}</div>
-
-                        <div className="doc-row">
-                          <div className="doc-label">កម្មវត្ថុ៖</div>
-                          <div className="doc-value">{form.subject}</div>
+                        <div className="text-center font-nomal text-[20px] mb-6" style={{ fontFamily: 'Khmer OS Muol Light', paddingTop: '32px' }}>
+                          <div>{form.subject}</div>
+                          <div className="flex justify-center mt-1">
+                            <img src="/3.JPG" alt="ornament" style={{ height: '15px' }} />
+                          </div>
                         </div>
 
                         <div className="doc-row">
                           <div className="doc-label">យោង៖</div>
-                          <div className="doc-value" style={{ whiteSpace: 'pre-line' }}>{form.recipient}</div>
+                          <div className="doc-value" dangerouslySetInnerHTML={{ __html: (() => {
+                            let html = (form.recipient || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>').replace(/\t/g, '<span style="display:inline-block; width:80px;"></span>');
+                            const n = searchParams.get('name'), d = searchParams.get('department'), p = searchParams.get('position');
+                            if (n && n !== '......') html = html.split(n).join(`<span style="font-family: 'Khmer OS Muol Light'">${n}</span>`);
+                            if (d && d !== '......') html = html.split(d).join(`<span style="font-family: 'Khmer OS Muol Light'">${d}</span>`);
+                            if (p && p !== '......') html = html.split(p).join(`<span style="font-family: 'Khmer OS Muol Light'">${p}</span>`);
+                            return html;
+                          })() }} />
                         </div>
 
-                        <div className="doc-body">
-                          {form.body}
-                        </div>
+                        <div className="doc-body" dangerouslySetInnerHTML={{ __html: (() => {
+                            let raw = (form.body || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                            if (raw.includes('ចម្លងជូន:')) {
+                              raw = raw.split('ចម្លងជូន:')[0];
+                            }
+                            let html = raw.replace(/\n/g, '<br/>').replace(/\t/g, '<span style="display:inline-block; width:80px;"></span>');
+                            const n = searchParams.get('name'), d = searchParams.get('department'), p = searchParams.get('position');
+                            if (n && n !== '......') html = html.split(n).join(`<span style="font-family: 'Khmer OS Muol Light'">${n}</span>`);
+                            if (d && d !== '......') html = html.split(d).join(`<span style="font-family: 'Khmer OS Muol Light'">${d}</span>`);
+                            if (p && p !== '......') html = html.split(p).join(`<span style="font-family: 'Khmer OS Muol Light'">${p}</span>`);
+                            return html;
+                          })() }} />
 
                         <div className="doc-sign">
-                          <div className="place-date">{form.signPlace}, {formatDateKhmer(form.createdAt)}</div>
+                          {templateType !== 'maternity' && (
+                            <div className="place-date">{form.signPlace}, {formatDateKhmer(form.createdAt)}</div>
+                          )}
                           <div className="sign-title">{form.signTitle}</div>
-                          <div className="sign-name">{form.signName}</div>
+                          {templateType !== 'maternity' && (
+                            <div className="sign-name">{form.signName}</div>
+                          )}
                         </div>
                       </div>
+
+                      {(() => {
+                        const raw = (form.body || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        if (raw.includes('ចម្លងជូន:')) {
+                          const ccPart = 'ចម្លងជូន:' + raw.split('ចម្លងជូន:')[1];
+                          return (
+                            <div className="absolute" style={{ bottom: '10mm', left: '28mm', fontSize: '10pt', fontFamily: '"Khmer OS Siemreap", Arial, sans-serif', whiteSpace: 'pre-line', lineHeight: '1.4', zIndex: 20 }} dangerouslySetInnerHTML={{ __html: ccPart }} />
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
                 </div>

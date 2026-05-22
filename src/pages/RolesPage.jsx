@@ -15,36 +15,36 @@ const PERMISSION_LABELS = {
   'edit:hr': 'កែសម្រួលព័ត៌មានបុគ្គលិក (HR)',
   'approve:hr': 'អនុម័តព័ត៌មានបុគ្គលិក',
   'print:hr': 'បោះពុម្ពព័ត៌មានបុគ្គលិក',
-  'view:departments': 'មើលផ្នែក/មន្ទីរ',
-  'edit:departments': 'កែសម្រួលផ្នែក/មន្ទីរ',
-  'view:department-units': 'មើលយូនីតផ្នែក',
-  'edit:department-units': 'កែសម្រួលយូនីតផ្នែក',
+  'view:departments': 'មើលផ្នែក (Departments)',
+  'edit:departments': 'កែសម្រួលផ្នែក',
+  'view:department-units': 'មើលអង្គភាព (Department Units)',
+  'edit:department-units': 'កែសម្រួលអង្គភាព',
   'view:positions': 'មើលតួនាទី',
   'edit:positions': 'កែសម្រួលតួនាទី',
-  'view:skills': 'មើលជំនាញ',
+  'view:skills': 'មើលជំនាញ / ជំនាញក្រសួង',
   'edit:skills': 'កែសម្រួលជំនាញ',
-  'view:setup': 'មើលការកំណត់ប្រព័ន្ធ',
-  'view:settings': 'មើលការកំណត់',
-  'geo-fence': 'កំណត់តំបន់វត្តមាន (Geo-fence)',
+  'view:setup': 'មើលការកំណត់ (Setup)',
+  'view:settings': 'មើលការកំណត់ (Settings / ទីតាំងស្កេន)',
+  'geo-fence': 'កំណត់ទីតាំងស្កេន (Geo-fence)',
   'view:employees': 'មើលបុគ្គលិក',
   'edit:employees': 'កែសម្រួលបុគ្គលិក',
-  'view:employee-id-docs': 'មើលអត្តសញ្ញាណប័ណ្ណ',
-  'edit:employee-id-docs': 'កែប្រែអត្តសញ្ញាណប័ណ្ណ',
+  'view:employee-id-docs': 'មើលអត្តសញ្ញាណប័ណ្ណ / ឯកសារផ្សេងៗ',
+  'edit:employee-id-docs': 'កែប្រែអត្តសញ្ញាណប័ណ្ណ / ឯកសារផ្សេងៗ',
 
   // Documents / Missions
-  'view:missions': 'មើលបេសកកម្ម',
-  'edit:missions': 'កែសម្រួលបេសកកម្ម',
+  'view:missions': 'មើលលិខិតបញ្ជាបេសកកម្ម (Missions)',
+  'edit:missions': 'កែសម្រួលលិខិតបញ្ជាបេសកកម្ម',
   'view:kamprak': 'មើលការគ្រប់គ្រងកាំប្រាក់',
   'edit:kamprak': 'កែសម្រួលការគ្រប់គ្រងកាំប្រាក់',
   'view:files': 'មើលឯកសារ',
-  'view:signSchemas': 'មើលគំរូហត្ថលេខា',
-  'create:signSchemas': 'បង្កើតគំរូហត្ថលេខា',
-  'edit:signSchemas': 'កែសម្រួលគំរូហត្ថលេខា',
-  'delete:signSchemas': 'លុបគំរូហត្ថលេខា',
+  'view:signSchemas': 'មើលគ្រប់គ្រងហត្ថលេខា',
+  'create:signSchemas': 'បង្កើតគ្រប់គ្រងហត្ថលេខា',
+  'edit:signSchemas': 'កែសម្រួលគ្រប់គ្រងហត្ថលេខា',
+  'delete:signSchemas': 'លុបគ្រប់គ្រងហត្ថលេខា',
   'delete:fileTransfers': 'លុបការផ្ទេរឯកសារ',
   'edit:fileTransfers': 'កែសម្រួលការផ្ទេរឯកសារ',
   'reply:fileTransfers': 'ឆ្លើយតបការផ្ទេរឯកសារ',
-  'view:fileTransfers': 'មើលការផ្ទេរឯកសារ',
+  'view:fileTransfers': 'មើលផ្ទេរឯកសារ / ស្ថិតិឯកសារ',
   'view:fileTransfersOutgoing': 'មើលឯកសារចេញ',
   'edit:fileTransfersOutgoing': 'កែសម្រួលឯកសារចេញ',
 
@@ -54,31 +54,29 @@ const PERMISSION_LABELS = {
   'attendance:edit': 'កែសម្រួលវត្តមាន',
   'attendance:delete': 'លុបវត្តមាន',
   'addattendance:approve': 'អនុម័តការបន្ថែមវត្តមាន',
-  'view:work-schedule': 'មើលកាលវិភាគការងារ',
-  'edit:work-schedule': 'កែសម្រួលកាលវិភាគការងារ',
-  'view:shifts': 'មើលវេនការងារ',
-  'edit:shifts': 'កែសម្រួលវេនការងារ',
-  'view:shift-groups': 'មើលក្រុមវេនការងារ',
-  'edit:shift-groups': 'កែសម្រួលក្រុមវេនការងារ',
-  'view:group-timetables': 'មើលតារាងពេលវេលាក្រុម',
-  'edit:group-timetables': 'កែសម្រួលតារាងពេលវេលាក្រុម',
+  'view:work-schedule': 'មើលប្រតិទិនការងារ',
+  'edit:work-schedule': 'កែសម្រួលប្រតិទិនការងារ',
+  'view:shifts': 'មើលវេនការងារ (Shifts)',
+  'edit:shifts': 'កែសម្រួលវេនការងារ (Shifts)',
+  'view:shift-groups': 'មើលក្រុមវេនការងារ (Shift Groups)',
+  'edit:shift-groups': 'កែសម្រួលក្រុមវេនការងារ (Shift Groups)',
+  'view:group-timetables': 'មើលគ្រប់គ្រងម៉ោងក្រុម',
+  'edit:group-timetables': 'កែសម្រួលគ្រប់គ្រងម៉ោងក្រុម',
 
   // Reports
   'view:report.employee': 'មើលរបាយការណ៍បុគ្គលិក',
   'edit:report.employee': 'កែសម្រួលរបាយការណ៍បុគ្គលិក',
   'view:report.newEmployeesThisMonth': 'មើលរបាយការណ៍បុគ្គលិកថ្មី',
   'edit:report.newEmployeesThisMonth': 'កែសម្រួលរបាយការណ៍បុគ្គលិកថ្មី',
-  'view:report.officialDelisted': 'មើលរបាយការណ៍លុបឈ្មោះ',
-  'edit:report.officialDelisted': 'កែសម្រួលរបាយការណ៍លុបឈ្មោះ',
-  'view:report.studyLeave': 'មើលរបាយការណ៍ច្បាប់សិក្សា',
-  'edit:report.studyLeave': 'កែសម្រួលរបាយការណ៍ច្បាប់សិក្សា',
-  'view:report.unpaidLeave': 'មើលរបាយការណ៍ច្បាប់គ្មានប្រាក់ខែ',
-  'edit:report.unpaidLeave': 'កែសម្រួលរបាយការណ៍ច្បាប់គ្មានប្រាក់ខែ',
+  'view:report.officialDelisted': 'មើលរបាយការណ៍មន្ត្រីឈប់ពីការងារ',
+  'edit:report.officialDelisted': 'កែសម្រួលរបាយការណ៍មន្ត្រីឈប់ពីការងារ',
+  'view:report.studyLeave': 'មើលរបាយការណ៍មន្ត្រីទៅសិក្សា',
+  'edit:report.studyLeave': 'កែសម្រួលរបាយការណ៍មន្ត្រីទៅសិក្សា',
+  'view:report.unpaidLeave': 'មើលរបាយការណ៍ទំនេរគ្មានបៀវត្ស',
+  'edit:report.unpaidLeave': 'កែសម្រួលរបាយការណ៍ទំនេរគ្មានបៀវត្ស',
   'view:report.retirement': 'មើលរបាយការណ៍ចូលនិវត្តន៍',
   'edit:report.retirement': 'កែសម្រួលរបាយការណ៍ចូលនិវត្តន៍',
-  'view:report.maternityLeave': 'មើលរបាយការណ៍ច្បាប់សម្រាលកូន',
-  'view:report.attendanceMonthly': 'មើលរបាយការណ៍វត្តមានប្រចាំខែ',
-  'view:report.attendanceMonthlyData': 'មើលទិន្នន័យវត្តមានប្រចាំខែ',
+  'view:report.maternityLeave': 'មើលរបាយការណ៍មាតុភាព (Maternity Leave)',
   'view:report.daily': 'មើលរបាយការណ៍ប្រចាំថ្ងៃ',
   'edit:report.daily': 'កែសម្រួលរបាយការណ៍ប្រចាំថ្ងៃ',
   'view:report.group': 'មើលរបាយការណ៍តាមក្រុម',
@@ -95,10 +93,10 @@ const PERMISSION_LABELS = {
   'edit:hr-skill-summary': 'កែសម្រួលសង្ខេបជំនាញ HR',
   'view:hr-display': 'មើលការបង្ហាញ HR',
   'edit:hr-display': 'កែសម្រួលការបង្ហាញ HR',
-  'view:report.promotionRotation': 'មើលរបាយការណ៍ផ្លាស់ប្តូរតួនាទី',
+  'view:report.promotionRotation': 'មើលរបាយការណ៍ប្តូរវេន',
   'view:report.promotionHonor': 'មើលរបាយការណ៍គ្រឿងឥស្សរិយយស',
   'view:report.promotionDiploma': 'មើលរបាយការណ៍សញ្ញាបត្រ',
-  'view:report.transformation': 'មើលរបាយការណ៍បំប្លែង',
+  'view:report.transformation': 'មើលរបាយការណ៍ប្តូរទម្រង់',
 
   // Admin / Users
   'manage:users': 'គ្រប់គ្រងអ្នកប្រើប្រាស់',
@@ -117,15 +115,33 @@ const PERMISSION_LABELS = {
   'face:delete': 'លុបផ្ទៃមុខ',
   'send:feedback': 'ផ្ញើមតិយោបល់',
   'send:telegram': 'ផ្ញើតេឡេក្រាម',
+  'view:letter.resignation': 'មើលលិខិតឈប់ពីការងារ',
+  'edit:letter.resignation': 'កែសម្រួលលិខិតឈប់ពីការងារ',
+  'view:letter.onboarding': 'មើលលិខិតចូលបុគ្គលិកថ្មី',
+  'edit:letter.onboarding': 'កែសម្រួលលិខិតចូលបុគ្គលិកថ្មី',
+  'view:letter.appointment': 'មើលលិខិតតែងតាំង',
+  'edit:letter.appointment': 'កែសម្រួលលិខិតតែងតាំង',
+  'view:letter.termination': 'មើលលិខិតបញ្ចប់មុខតំណែង',
+  'edit:letter.termination': 'កែសម្រួលលិខិតបញ្ចប់មុខតំណែង',
+  'view:letter.others': 'មើលលិខិតផ្សេងៗ',
+  'edit:letter.others': 'កែសម្រួលលិខិតផ្សេងៗ',
   // New Granular Permissions
   'scan:qr': 'ស្កេន QR/Barcode',
   'scan:face': 'ស្កេនមុខ (Single)',
   'scan:face_group': 'ស្កេនមុខ (Group)',
   'view:absence': 'វត្តមាន',
   'view:attendance_report': 'របាយការណ៍វត្តមាន',
-  'view:attendance_monthly': 'វត្តមានប្រចាំខែ',
   'view:attendance_daily': 'វត្តមានប្រចាំថ្ងៃ',
-  'view:attendance_sum_day_report': 'មើលរបាយការណ៍សរុបវត្តមាន'
+  'view:attendance_monthly': 'វត្តមានប្រចាំខែ',
+  'view:attendance_sum_day_report': 'វត្តមានថវិកា',
+  'view:report.attendanceMonthlyData': 'សរុបវត្តមានចន្លោះថ្ងៃ',
+  'view:report.attendanceMonthly': 'រ_វត្តមានក្រសួង',
+  'view:attendance_day_data': 'ទិន្នន័យវត្តមានថ្ងៃ',
+  'view:attendance_monthly_data': 'ទិន្នន័យវត្តមានខែ',
+  'view:attendance_audit': 'វត្តមានអូឌិត',
+  'view:attendance_ministry': 'វត្តមានក្រសួង',
+  'view:attendance_daily_checkinme': 'Daily Report Checkinme',
+  'view:employee_evaluation': 'វាយតំលៃបុគ្គលិក'
 };
 
 // Group permissions by category (outside component to avoid recreation on each render)
@@ -134,6 +150,7 @@ const groupPermissions = (permissions) => {
     'ទំព័រដើម': { view: [], action: [] },
     'កំណត់': { view: [], action: [] },
     'ឯកសារ': { view: [], action: [] },
+    'លិខិតបង្គាប់ការ': { view: [], action: [] },
     'ស្កែនវត្តមាន': { view: [], action: [] },
     'វត្តមាន': { view: [], action: [] },
     'កាលវិភាគការងារ': { view: [], action: [] },
@@ -151,13 +168,15 @@ const groupPermissions = (permissions) => {
       perm.includes('department') || perm.includes('positions') || perm.includes('skills') || perm.includes('view:setup') ||
       perm.includes('view:settings') || perm.includes('geo-fence')) {
       targetGroup = 'កំណត់';
+    } else if (perm.includes('letter') || perm.includes('report.maternityLeave')) {
+      targetGroup = 'លិខិតបង្គាប់ការ';
     } else if (perm.includes('file') || perm.includes('document') || perm.includes('signSchema') || perm.includes('mission') || perm.includes('employee-id-docs')) {
       targetGroup = 'ឯកសារ';
     } else if (perm.includes('scan') || perm.includes('face')) {
       targetGroup = 'ស្កែនវត្តមាន';
     } else if (perm.includes('work-schedule') || perm.includes('shifts') || perm.includes('shift-groups') || perm.includes('group-timetables')) {
       targetGroup = 'កាលវិភាគការងារ';
-    } else if ((perm.includes('attendance') || perm.includes('view:absence')) && !perm.includes('report')) {
+    } else if (perm.includes('attendance') || perm.includes('view:absence') || perm.includes('employee_evaluation')) {
       targetGroup = 'វត្តមាន';
     } else if (perm.includes('report')) {
       targetGroup = 'របាយការណ៍';
@@ -210,6 +229,7 @@ export default function RolesPage() {
         'view:missions', 'edit:missions',
         'view:employee-id-docs', 'edit:employee-id-docs',
         'view:fileTransfersOutgoing', 'edit:fileTransfersOutgoing',
+        'view:letter.resignation', 'edit:letter.resignation', 'view:letter.onboarding', 'edit:letter.onboarding', 'view:letter.appointment', 'edit:letter.appointment', 'view:letter.termination', 'edit:letter.termination', 'view:letter.others', 'edit:letter.others',
         'view:report.unpaidLeave', 'edit:report.unpaidLeave',
         'view:report.retirement', 'edit:report.retirement',
         'view:report.employee', 'edit:report.employee',

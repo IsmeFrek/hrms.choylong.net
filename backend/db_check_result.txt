@@ -1,0 +1,39 @@
+=== DIAGNOSTIC REPORT FOR HR IMAGES ===
+Run Time: 2026-05-22T06:54:10.303Z
+
+Employee D0001 (ងី ម៉េង):
+  - Object ID: 69702d2dcf31e0e23b472a25
+  - staffId: D0001
+  - status: Active
+  - image type: string
+  - image value: "/Uploads/D0001-1779169459502.jpg"
+  - image length: 32
+  - image startsWith: /Uploads/D0001-1779169459502.jpg
+
+Employee D0002 (ចាន់ វិចិត្រ):
+  - Object ID: 69702d2dcf31e0e23b472a26
+  - staffId: D0002
+  - status: undefined
+  - image type: string
+  - image value: "/Uploads/D0002.jpg"
+  - image length: 18
+  - image startsWith: /Uploads/D0002.jpg
+
+Employee D0007 (លឹម តាំង):
+  - Object ID: 69702d2dcf31e0e23b472a27
+  - staffId: D0007
+  - status: Active
+  - image type: string
+  - image value: "/Uploads/D0007.jpg"
+  - image length: 18
+  - image startsWith: /Uploads/D0007.jpg
+
+Employee D0020 (ចាន់ វិចិត្រ):
+  - Object ID: 69702d2dcf31e0e23b472a28
+  - staffId: D0020
+  - status: Resigned
+  - image type: string
+  - image value: "/Uploads/D0020.jpg"
+  - image length: 18
+  - image startsWith: /Uploads/D0020.jpg
+

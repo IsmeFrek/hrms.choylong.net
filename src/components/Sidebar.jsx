@@ -163,7 +163,7 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
 
   const menuItems = [
     ...(hasDashboardPerm ? [{ id: 'dashboard', label: 'ទំព័រដើម', icon: Home, path: 'dashboard', route: '/' }] : []),
-    { id: 'staff-biography', label: 'ប្រវត្តរូបបុគ្គលិក', icon: FileText, path: 'staff-biography', route: '/staff-biography' },
+    ...(perms.canViewStaffBiography ? [{ id: 'staff-biography', label: 'ប្រវត្តរូបបុគ្គលិក', icon: FileText, path: 'staff-biography', route: '/staff-biography' }] : []),
 
     // Root level items as per image
     ...(canViewDeptUnits ? [{ id: 'department-units', label: 'អង្គភាព', icon: BarChart3, path: 'department-units', route: '/department-units' }] : []),
@@ -207,18 +207,18 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
     }] : []),
 
     // Group 3.5: Instruction Letters (លិខិតបង្គាប់ការ)
-    ...(perms.canViewDocuments ? [{
+    ...(perms.canViewMaternityLeaveReport || perms.canViewResignationLetter || perms.canViewOnboardingLetter || perms.canViewAppointmentLetter || perms.canViewTerminationLetter || perms.canViewOtherLetters ? [{
       id: 'instruction-letters-group',
       label: 'លិខិតបង្គាប់ការ',
       icon: FileText,
       hasSubmenu: true,
       submenu: [
-        { id: 'il-maternity', label: 'មាតុភាព', icon: FileText, route: '/maternity-leave-report', path: 'maternity-leave-report' },
-        { id: 'il-resignation', label: 'ឈប់ពីការងារ', icon: FileText, route: '/instruction-letters?template=resignation', path: 'instruction-letters' },
-        { id: 'il-onboarding', label: 'ចូលបុគ្គលិកថ្មី', icon: FileText, route: '/instruction-letters?template=onboarding', path: 'instruction-letters' },
-        { id: 'il-appointment', label: 'តែងតាំង', icon: FileText, route: '/instruction-letters?template=appointment', path: 'instruction-letters' },
-        { id: 'il-termination', label: 'បញ្ចប់មុខតំណែង', icon: FileText, route: '/instruction-letters?template=termination', path: 'instruction-letters' },
-        { id: 'il-others', label: 'ផ្សេងៗ', icon: FileText, route: '/instruction-letters?template=others', path: 'instruction-letters' },
+        ...(perms.canViewMaternityLeaveReport ? [{ id: 'il-maternity', label: 'មាតុភាព', icon: FileText, route: '/maternity-leave-report', path: 'maternity-leave-report' }] : []),
+        ...(perms.canViewResignationLetter ? [{ id: 'il-resignation', label: 'ឈប់ពីការងារ', icon: FileText, route: '/instruction-letters?template=resignation', path: 'instruction-letters' }] : []),
+        ...(perms.canViewOnboardingLetter ? [{ id: 'il-onboarding', label: 'ចូលបុគ្គលិកថ្មី', icon: FileText, route: '/instruction-letters?template=onboarding', path: 'instruction-letters' }] : []),
+        ...(perms.canViewAppointmentLetter ? [{ id: 'il-appointment', label: 'តែងតាំង', icon: FileText, route: '/instruction-letters?template=appointment', path: 'instruction-letters' }] : []),
+        ...(perms.canViewTerminationLetter ? [{ id: 'il-termination', label: 'បញ្ចប់មុខតំណែង', icon: FileText, route: '/instruction-letters?template=termination', path: 'instruction-letters' }] : []),
+        ...(perms.canViewOtherLetters ? [{ id: 'il-others', label: 'ផ្សេងៗ', icon: FileText, route: '/instruction-letters?template=others', path: 'instruction-letters' }] : []),
       ]
     }] : []),
 
@@ -240,7 +240,7 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
     }] : []),
 
     // Group 5: Attendance Documents (វត្តមាន)
-    ...(perms.canViewAbsence || perms.canViewAttendanceReport || perms.canViewAttendanceMonthly || perms.canViewAttendanceDaily ? [{
+    ...(perms.canViewAbsence || perms.canViewAttendanceReport || perms.canViewAttendanceMonthly || perms.canViewAttendanceDaily || perms.canViewAttendanceSumDayReport || perms.canViewAttendanceMonthlyData || perms.canViewAttendanceMonthlyReport || perms.canViewAttendanceDayData || perms.canViewAttendanceMonthlyDataFile || perms.canViewAttendanceAudit || perms.canViewAttendanceMinistry || perms.canViewDailyReportCheckinme || perms.canViewEmployeeEvaluation ? [{
       id: 'attendance',
       label: 'វត្តមាន',
       icon: CalendarCheck,
@@ -255,16 +255,22 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
         ...(perms.canViewAttendanceMonthlyReport ? [
           { id: 'attendance-ministry-report', label: 'រ_វត្តមានក្រសួង', icon: FileSearch, path: 'attendance-ministry-report' }
         ] : []),
-        ...(perms.canViewAttendanceMonthlyData ? [
-          { id: 'attendance-day-data', label: 'ទិន្នន័យវត្តមានថ្ងៃ', icon: FileSpreadsheet, path: 'attendance-day-data' },
+        ...(perms.canViewAttendanceDayData ? [
+          { id: 'attendance-day-data', label: 'ទិន្នន័យវត្តមានថ្ងៃ', icon: FileSpreadsheet, path: 'attendance-day-data' }
+        ] : []),
+        ...(perms.canViewAttendanceMonthlyDataFile ? [
           { id: 'attendance-monthly-data', label: 'ទិន្នន័យវត្តមានខែ', icon: FileSpreadsheet, path: 'attendance-monthly-data' }
         ] : []),
-        ...(perms.canViewAttendanceReport ? [
-          { id: 'attendance-audit', label: 'វត្តមានអូឌិត', icon: SearchCheck, path: 'attendance-audit' },
-          { id: 'attendance-ministry', label: 'វត្តមានក្រសួង', icon: TrendingUp, path: 'attendance-ministry' },
+        ...(perms.canViewAttendanceAudit ? [
+          { id: 'attendance-audit', label: 'វត្តមានអូឌិត', icon: SearchCheck, path: 'attendance-audit' }
+        ] : []),
+        ...(perms.canViewAttendanceMinistry ? [
+          { id: 'attendance-ministry', label: 'វត្តមានក្រសួង', icon: TrendingUp, path: 'attendance-ministry' }
+        ] : []),
+        ...(perms.canViewDailyReportCheckinme ? [
           { id: 'attendance-daily-report', label: 'Daily Report Checkinme', icon: CloudDownload, route: '/attendance-daily-report' }
         ] : []),
-        ...(perms.canViewEmployeeReport ? [{ id: 'employee-evaluation-report', label: 'វាយតំលៃបុគ្គលិក', icon: FileText, route: '/evaluation' }] : [])
+        ...(perms.canViewEmployeeEvaluation ? [{ id: 'employee-evaluation-report', label: 'វាយតំលៃបុគ្គលិក', icon: FileText, route: '/evaluation' }] : [])
       ]
     }] : []),
     ...(perms.canViewLeaveRequests ? [{ id: 'leave-requests', label: 'ច្បាប់', icon: ClipboardList, path: 'leave-requests' }] : []),

@@ -11,14 +11,7 @@ export default function MeetingRoomPage() {
   const [activeBookingPages, setActiveBookingPages] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(null);
-  const [customRoomImages, setCustomRoomImages] = useState(() => {
-    try {
-      const stored = localStorage.getItem('custom_room_images');
-      return stored ? JSON.parse(stored) : {};
-    } catch (e) {
-      return {};
-    }
-  });
+  const [customRoomImages, setCustomRoomImages] = useState({});
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [imageModalRoomId, setImageModalRoomId] = useState(null);
   const [tempImageUrl, setTempImageUrl] = useState('');
@@ -51,8 +44,21 @@ export default function MeetingRoomPage() {
     }
   };
 
+  const fetchRoomImages = async () => {
+    try {
+      const res = await fetch(`${API_PREFIX}/meeting-rooms/images`);
+      if (res.ok) {
+        const data = await res.json();
+        setCustomRoomImages(data);
+      }
+    } catch (err) {
+      console.error("Error fetching room images:", err);
+    }
+  };
+
   useEffect(() => {
     fetchBookings();
+    fetchRoomImages();
     
     // Silently sync Google Sheets in background when user opens the page
     const silentSync = async () => {
@@ -327,22 +333,51 @@ export default function MeetingRoomPage() {
     setIsImageModalOpen(true);
   };
 
-  const handleSaveImage = (url) => {
+  const handleSaveImage = async (url) => {
     if (!url) return;
     const updated = { ...customRoomImages, [imageModalRoomId]: url };
     setCustomRoomImages(updated);
-    localStorage.setItem('custom_room_images', JSON.stringify(updated));
     setIsImageModalOpen(false);
+
+    try {
+      await fetch(`${API_PREFIX}/meeting-rooms/images`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: imageModalRoomId, imageUrl: url })
+      });
+    } catch (err) {
+      console.error('Failed to save image to server', err);
+    }
   };
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      handleSaveImage(reader.result);
-    };
-    reader.readAsDataURL(file);
+    
+    if (file.size > 20 * 1024 * 1024) {
+      alert("ទំហំឯកសារធំពេក! អនុញ្ញាតត្រឹម 20MB ប៉ុណ្ណោះ។");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch(`${API_PREFIX}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        handleSaveImage(data.url);
+      } else {
+        alert("បរាជ័យក្នុងការបង្ហោះរូបភាព!");
+      }
+    } catch (err) {
+      console.error("Error uploading file:", err);
+      alert("មានបញ្ហាក្នុងការបង្ហោះរូបភាពទៅកាន់ម៉ាស៊ីនមេ!");
+    }
   };
 
   return (

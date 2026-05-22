@@ -65,6 +65,8 @@ export default function usePermission() {
 			canViewOfficialDelistedReport: isAdmin || has('view:report.officialDelisted'),
 			canViewNewEmployeesThisMonthReport: isAdmin || has('view:report.newEmployeesThisMonth'),
 			canEditNewEmployeesThisMonthReport: isAdmin || has('edit:report.newEmployeesThisMonth'),
+			canViewStaffBiography: isAdmin || has('view:staff-biography'),
+			canViewMeetingRooms: isAdmin || has('view:meeting-rooms'),
 			canViewAttendanceMonthlyReport: isAdmin || has('view:report.attendanceMonthly'),
 			canViewAttendanceMonthlyData: isAdmin || has('view:report.attendanceMonthlyData'),
 			canViewDailyReport: isAdmin || has('view:report.daily'),
@@ -107,9 +109,20 @@ export default function usePermission() {
 			canEditLettersDirector: isAdmin || has('edit:letters.director'),
 			canEditLettersApproved: isAdmin || has('edit:letters.approved'),
 			canSendTelegram: isAdmin || has('send:feedback') || has('send:telegram'),
-			// Missions specific
+			// Mission specific
 			canViewMissions: isAdmin || has('view:missions'),
 			canEditMissions: isAdmin || has('edit:missions'),
+			// Instruction Letters (Templates)
+			canViewResignationLetter: isAdmin || has('view:letter.resignation'),
+			canEditResignationLetter: isAdmin || has('edit:letter.resignation'),
+			canViewOnboardingLetter: isAdmin || has('view:letter.onboarding'),
+			canEditOnboardingLetter: isAdmin || has('edit:letter.onboarding'),
+			canViewAppointmentLetter: isAdmin || has('view:letter.appointment'),
+			canEditAppointmentLetter: isAdmin || has('edit:letter.appointment'),
+			canViewTerminationLetter: isAdmin || has('view:letter.termination'),
+			canEditTerminationLetter: isAdmin || has('edit:letter.termination'),
+			canViewOtherLetters: isAdmin || has('view:letter.others'),
+			canEditOtherLetters: isAdmin || has('edit:letter.others'),
 			// Report edit permissions
 			canEditEmployeeReport: isAdmin || has('edit:report.employee'),
 			canEditMaternityLeaveReport: isAdmin || has('edit:report.maternityLeave'),
@@ -139,6 +152,12 @@ export default function usePermission() {
 			canViewAttendanceDaily: isAdmin || has('view:attendance_daily'),
 			canViewAttendanceMonthly: isAdmin || has('view:attendance_monthly'),
 			canViewAttendanceSumDayReport: isAdmin || has('view:attendance_sum_day_report'),
+			canViewAttendanceDayData: isAdmin || has('view:attendance_day_data'),
+			canViewAttendanceMonthlyDataFile: isAdmin || has('view:attendance_monthly_data'),
+			canViewAttendanceAudit: isAdmin || has('view:attendance_audit'),
+			canViewAttendanceMinistry: isAdmin || has('view:attendance_ministry'),
+			canViewDailyReportCheckinme: isAdmin || has('view:attendance_daily_checkinme'),
+			canViewEmployeeEvaluation: isAdmin || has('view:employee_evaluation'),
 			// User info access
 			user: user,
 		};
