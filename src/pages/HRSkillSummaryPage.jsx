@@ -202,12 +202,12 @@ export default function HRSkillSummaryPage() {
       const g = localStorage.getItem('hrskill_groups');
       if (g) {
         const parsed = JSON.parse(g);
-        if (Array.isArray(parsed)) setGroups(parsed);
+        if (Array.isArray(parsed) && parsed.length > 0) setGroups(parsed);
       }
       const t = localStorage.getItem('hrskill_tableOrder');
       if (t) {
         const parsedT = JSON.parse(t);
-        if (Array.isArray(parsedT)) setTableOrder(parsedT);
+        if (Array.isArray(parsedT) && parsedT.length > 0) setTableOrder(parsedT);
         else if (allSkillNames && allSkillNames.length > 0) setTableOrder(allSkillNames.slice());
       } else if (allSkillNames && allSkillNames.length > 0) {
         setTableOrder(allSkillNames.slice());
@@ -219,22 +219,27 @@ export default function HRSkillSummaryPage() {
     // run when skills list changes
   }, [allSkillNames.length]);
 
+  const [isLoaded, setIsLoaded] = useState(false);
+
   // Persist groups to localStorage whenever they change
   useEffect(() => {
+    if (!isLoaded) return;
     try {
       localStorage.setItem('hrskill_groups', JSON.stringify(groups || []));
     } catch (err) { /* ignore */ }
-  }, [groups]);
+  }, [groups, isLoaded]);
 
   // Persist table order to localStorage whenever it changes
   useEffect(() => {
+    if (!isLoaded) return;
     try {
       localStorage.setItem('hrskill_tableOrder', JSON.stringify(tableOrder || []));
     } catch (err) { /* ignore */ }
-  }, [tableOrder]);
+  }, [tableOrder, isLoaded]);
 
   // Persist groups/tableOrder to server (debounced) so preferences survive across devices
   useEffect(() => {
+    if (!isLoaded) return;
     // Debounced save to server
     let t = null;
     setSaveStatus('saving');
@@ -250,7 +255,7 @@ export default function HRSkillSummaryPage() {
         });
     }, 700);
     return () => { if (t) clearTimeout(t); };
-  }, [groups, tableOrder]);
+  }, [groups, tableOrder, isLoaded]);
 
   // On mount try to load persisted prefs from server if local state is empty
   useEffect(() => {
@@ -259,10 +264,17 @@ export default function HRSkillSummaryPage() {
         const res = await api.get('/report-settings/hr-skill-groups');
         if (res && res.data && res.data.ok && res.data.prefs) {
           const prefs = res.data.prefs || {};
-          if ((!groups || groups.length === 0) && Array.isArray(prefs.groups) && prefs.groups.length > 0) setGroups(prefs.groups);
-          if ((!tableOrder || tableOrder.length === 0) && Array.isArray(prefs.tableOrder) && prefs.tableOrder.length > 0) setTableOrder(prefs.tableOrder);
+          if (Array.isArray(prefs.groups) && prefs.groups.length > 0) {
+            setGroups(prefs.groups);
+          }
+          if (Array.isArray(prefs.tableOrder) && prefs.tableOrder.length > 0) {
+            setTableOrder(prefs.tableOrder);
+          }
         }
       } catch (err) { /* ignore */ }
+      finally {
+        setIsLoaded(true);
+      }
     })();
   }, []);
 
@@ -661,7 +673,7 @@ export default function HRSkillSummaryPage() {
         {(reportType === 'summary' || reportType === 'both') && (
           <>
             <h2 style={{ fontSize: '14px', fontWeight: 'bold', margin: '12px 0', textAlign: 'center' }}>
-              របាយការណ៍សរុបជំនាញ
+              របាយការណ៍សរុបជំនាញបច្ចេកទេស នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត
             </h2>
             <div style={{ textAlign: 'center', marginBottom: '10px', color: '#555' }}>កាលបរិច្ឆេទ៖ {new Date().toLocaleDateString('km-KH')}</div>
             <table className="a4-report-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', background: '#fff', marginBottom: '32px' }}>
@@ -752,7 +764,7 @@ export default function HRSkillSummaryPage() {
         {(reportType === 'byType' || reportType === 'both' || reportType === 'group') && (
           <>
             <div style={{ fontWeight: 'bold', fontSize: '14px', margin: '18px 0 8px 0', textAlign: 'center', fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', Arial, sans-serif" }}>
-              របាយការណ៍សរុបជំនាញ តាមប្រភេទមន្រ្តីរាជការ និងកិច្ចសន្យា
+              របាយការណ៍សរុបជំនាញបច្ចេកទេស តាមប្រភេទមន្រ្តីរាជការ និងកិច្ចសន្យា នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត
             </div>
             {/* Second table: Civil Servant, Contract, Other
                 If grouping is enabled and groups exist, show grouped summary table instead */}

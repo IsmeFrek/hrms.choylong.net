@@ -384,6 +384,8 @@ export default function EmployeeReportPage() {
       return raw ? JSON.parse(raw) : [];
     } catch { return []; }
   });
+  const [isSkillGroupsLoaded, setIsSkillGroupsLoaded] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('idle');
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupNameInput, setGroupNameInput] = useState('');
   const [groupSelection, setGroupSelection] = useState(new Set());
@@ -430,9 +432,41 @@ export default function EmployeeReportPage() {
     return allSkillNames.filter(s => !excludeSet.has(s));
   }, [allSkillNames, existingGroupMembers, existingGroupMembersExcludingCurrent, selectedEditGroupIndex]);
 
+  // Load groups from backend on mount
   useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/report-settings/employee-skill-groups');
+        if (res?.data?.ok && res.data.prefs?.groups) {
+          if (Array.isArray(res.data.prefs.groups) && res.data.prefs.groups.length > 0) {
+            setSkillGroups(res.data.prefs.groups);
+          }
+        }
+      } catch (err) { /* ignore */ }
+      finally {
+        setIsSkillGroupsLoaded(true);
+      }
+    })();
+  }, []);
+
+  // Save to local storage and backend whenever skillGroups change (debounced)
+  useEffect(() => {
+    if (!isSkillGroupsLoaded) return;
     try { localStorage.setItem('employee_skill_groups', JSON.stringify(skillGroups || [])); } catch { void 0; }
-  }, [skillGroups]);
+    
+    let t = null;
+    setSaveStatus('saving');
+    t = setTimeout(() => {
+      api.post('/report-settings/employee-skill-groups', { groups: skillGroups || [], groupName: 'global' })
+        .then(() => {
+          setSaveStatus('saved');
+          setTimeout(() => setSaveStatus('idle'), 1500);
+        }).catch(() => {
+          setSaveStatus('error');
+        });
+    }, 700);
+    return () => { if (t) clearTimeout(t); };
+  }, [skillGroups, isSkillGroupsLoaded]);
 
   const toggleSelectSkillForGroup = (skillName) => {
     setGroupSelection(prev => {
@@ -1192,9 +1226,9 @@ export default function EmployeeReportPage() {
         else if (hr.gender === 'Female' || hr.gender === 'ស្រី') otherFemale++;
       }
 
-      if (hasOthers) {
-        rows.unshift({ name: 'ផ្សេងៗ', male: otherMale, female: otherFemale, total: otherMale + otherFemale, civil: otherCivil, contract: otherContract, isGroup: false });
-      }
+      // if (hasOthers) {
+      //   rows.unshift({ name: 'ផ្សេងៗ', male: otherMale, female: otherFemale, total: otherMale + otherFemale, civil: otherCivil, contract: otherContract, isGroup: false });
+      // }
 
       const totals = rows.reduce((acc, r) => ({
         male: acc.male + (r.male || 0),

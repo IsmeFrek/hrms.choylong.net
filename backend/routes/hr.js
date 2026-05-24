@@ -106,11 +106,8 @@ router.get('/', requireAnyPermission(['view:hr', 'view:dashboard']), async (req,
       childrenList: 0,
       educationList: 0,
       documents: 0,
-      stu: 0,
-      unpaid: 0,
-      outOfCadre: 0,
       idCardTransform: 0,
-      // Keep 'image' as it might be used for thumbnails, but exclude if needed.
+      // Keep 'image', 'stu', 'unpaid', 'outOfCadre' as they are needed for reports.
     };
 
     const hrList = await HR.find({}, projection).lean();
@@ -869,6 +866,21 @@ router.put('/:id', requirePermission('edit:hr'), async (req, res) => {
   }
   // Apply all fields except 'no' first
   const { no: desiredNoInput, ...rest } = body;
+  
+  // Track historical role if position or department changed
+  if ((typeof rest.position !== 'undefined' && rest.position !== hr.position) || 
+      (typeof rest.Department_Kh !== 'undefined' && rest.Department_Kh !== hr.Department_Kh)) {
+    if (hr.position || hr.Department_Kh) {
+      if (!hr.roleHistory) hr.roleHistory = [];
+      hr.roleHistory.push({
+        position: hr.position,
+        department: hr.Department_Kh,
+        startDate: hr.joinDate || null, // Best guess for start date if not previously tracked
+        endDate: new Date()
+      });
+    }
+  }
+
   // Use Mongoose `set` so schema setters run on assignment and we can validate early
   hr.set(rest);
 
@@ -1119,7 +1131,22 @@ router.post('/:id/proposed-changes/:crId/approve', requirePermission('approve:hr
       const prev = {};
       if (existing) {
         for (const k of Object.keys(update)) prev[k] = existing[k];
+        
+        // Track historical role if position or department changed
+        if ((typeof update.position !== 'undefined' && update.position !== existing.position) || 
+            (typeof update.Department_Kh !== 'undefined' && update.Department_Kh !== existing.Department_Kh)) {
+          if (existing.position || existing.Department_Kh) {
+            update.$push = update.$push || {};
+            update.$push.roleHistory = {
+              position: existing.position,
+              department: existing.Department_Kh,
+              startDate: existing.joinDate || null,
+              endDate: new Date()
+            };
+          }
+        }
       }
+      
       const updated = await HR.findByIdAndUpdate(id, update, { new: true, runValidators: true });
       if (!updated) return res.status(404).json({ error: 'HR not found' });
       cr.prev = prev;

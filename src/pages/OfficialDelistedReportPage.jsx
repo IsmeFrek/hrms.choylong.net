@@ -175,6 +175,7 @@ export default function OfficialDelistedReportPage() {
   const [editingHr, setEditingHr] = useState(null);
   const [editingDelisted, setEditingDelisted] = useState({});
   const [selectedMonthKey, setSelectedMonthKey] = useState('all');
+  const [showAllMonths, setShowAllMonths] = useState(false);
   const [noteAutoMode, setNoteAutoMode] = useState(false);
   const fileInputRef = useRef();
   const [originalDelisted, setOriginalDelisted] = useState(null);
@@ -648,8 +649,12 @@ export default function OfficialDelistedReportPage() {
       } else if (delDate) {
         y = delDate.getFullYear();
         m = delDate.getMonth() + 1;
+      } else if (remDate) {
+        y = remDate.getFullYear();
+        m = remDate.getMonth() + 1;
       } else {
-        return;
+        y = new Date().getFullYear();
+        m = new Date().getMonth() + 1;
       }
 
       const key = `${y}-${String(m).padStart(2, '0')}`;
@@ -676,7 +681,8 @@ export default function OfficialDelistedReportPage() {
     });
 
     // Group NEW employees
-    (list || []).forEach(hr => {
+    matchedRows.forEach(r => {
+      const hr = r.hr;
       // Exclude those already in 'deleted' if they are also new (rare but possible)
       // Actually, we want them in both if they joined and left in the same month?
       // For now, just count all new entries.
@@ -1199,7 +1205,8 @@ export default function OfficialDelistedReportPage() {
     } catch (err) {
       console.error('Save delisted failed', err);
       const errMsg = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Unknown error';
-      window.alert('រក្សាទុកបរាជ័យ: ' + errMsg);
+      const detailsMsg = err?.response?.data?.details ? '\n' + JSON.stringify(err.response.data.details, null, 2) : '';
+      window.alert('រក្សាទុកបរាជ័យ: ' + errMsg + detailsMsg);
     } finally {
       setSaving(false);
     }
@@ -1383,8 +1390,7 @@ export default function OfficialDelistedReportPage() {
     const isFullyClosed = (resignedRows.length === 0 || isResignedClosed) && (joinedRows.length === 0 || isJoinedClosed);
 
     const refClosing = closingDate || entryClosingDate || footerDate;
-    const day = refClosing ? new Date(refClosing).getDate() : new Date().getDate();
-    const title = `ថ្ងៃទី ${toKhmerDigits(day)} ${label}`;
+    const title = refClosing ? fmtKhmerLongDate(refClosing) : label;
 
     const columnDefsResigned = [
       { key: 'index', label: 'ល.រ', width: '40px' },
@@ -1714,16 +1720,24 @@ export default function OfficialDelistedReportPage() {
             return (
               <div>
                 {prepared.length > 0 && renderGroupTable({ label: 'ត្រៀមលុបឈ្មោះ (Prepared for deletion)', records: prepared }, true)}
-                {derived.monthlyGroups.map(g => {
+                {derived.monthlyGroups.map((g, index) => {
                   if (selectedMonthKey !== 'all' && `${g.year}-${String(g.month).padStart(2, '0')}` !== selectedMonthKey) return null;
+                  if (selectedMonthKey === 'all' && !hasSearch && !showAllMonths && index >= 3) return null;
                   return (
                     <div key={`${g.year}-${g.month}`} style={{ marginBottom: '24px' }}>
                       {renderGroupTable(g, true)}
                     </div>
                   );
                 })}
+                {selectedMonthKey === 'all' && !hasSearch && !showAllMonths && derived.monthlyGroups.length > 3 && (
+                  <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                    <button type="button" onClick={() => setShowAllMonths(true)} className="px-4 py-2 border rounded-md text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors">
+                      បង្ហាញខែផ្សេងទៀតទាំងអស់ ({toKhmerDigits(derived.monthlyGroups.length - 3)} ខែទៀត)
+                    </button>
+                  </div>
+                )}
 
-                {hasSearch && other.length > 0 && renderGroupTable('ផ្សេងៗ (Other)', other, true)}
+                {hasSearch && other.length > 0 && renderGroupTable({ label: 'ផ្សេងៗ (Other)', records: other }, true)}
               </div>
             );
           })()}

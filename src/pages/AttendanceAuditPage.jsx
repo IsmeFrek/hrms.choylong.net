@@ -843,6 +843,24 @@ export default function AttendanceAuditPage() {
             });
           });
 
+          // Determine historical role based on end date of the report
+          let activePosition = h.position || '';
+          let activeDepartment = h.Department_Kh || h.department || '';
+          
+          if (h.roleHistory && h.roleHistory.length > 0) {
+            // Find a historical role that was active during the end of the report period
+            const reportEnd = new Date(rangeEndStr);
+            const historicalRole = h.roleHistory.find(role => {
+              const start = role.startDate ? new Date(role.startDate) : new Date(0);
+              const end = role.endDate ? new Date(role.endDate) : new Date();
+              return reportEnd >= start && reportEnd <= end;
+            });
+            if (historicalRole) {
+              activePosition = historicalRole.position || activePosition;
+              activeDepartment = historicalRole.department || activeDepartment;
+            }
+          }
+
           acc.push({
             staffId: sidOriginal,
             hrSortKey: h.no ? Number(h.no) : 999999,
@@ -850,8 +868,8 @@ export default function AttendanceAuditPage() {
             khmerName: h.khmerName || h.name || '',
             name: h.name || '',
             gender: h.gender || '',
-            position: h.position || '',
-            department: h.Department_Kh || h.department || '',
+            position: activePosition,
+            department: activeDepartment,
             dayWorkCount: res.dayWorkCount,
             attendanceCount: res.attendanceCount,
             leaveCount: res.leaveCount,

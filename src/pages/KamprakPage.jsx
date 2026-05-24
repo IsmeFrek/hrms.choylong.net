@@ -654,6 +654,13 @@ export default function KamprakPage() {
           font-family: "Khmer OS Siemreap", "Noto Sans Khmer", Arial, sans-serif;
           font-size: 12pt;
         }
+        .kh-muol {
+          font-family: "Khmer OS Muol Light", "Khmer OS Muol", "Noto Serif Khmer", serif;
+          font-weight: normal;
+        }
+        .biography-line .label {
+          padding-right: 5px;
+          background: white;
           position: relative;
           z-index: 1;
         }

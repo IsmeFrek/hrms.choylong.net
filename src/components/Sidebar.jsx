@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Users,
   User,
@@ -40,6 +40,30 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
   const { user, logout } = useAuth();
   const perms = usePermission() || {};
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const getIsSubActive = (subItem) => {
+    if (subItem.route) {
+      try {
+        const url = new URL(subItem.route, window.location.origin);
+        const subTemplate = url.searchParams.get('template');
+        
+        const currentParams = new URLSearchParams(location.search);
+        const curTemplate = currentParams.get('template');
+        
+        if (location.pathname === url.pathname) {
+          if (subTemplate || curTemplate) {
+            return subTemplate === curTemplate;
+          }
+          return true;
+        }
+      } catch (e) {
+        return activeSection === subItem.path;
+      }
+      return false;
+    }
+    return activeSection === subItem.path;
+  };
   const [activeUsers, setActiveUsers] = useState([]);
   const [showUsersList, setShowUsersList] = useState(false);
 
@@ -181,7 +205,7 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
       submenu: [
         { id: 'hr', label: 'បញ្ជីបុគ្គលិក', icon: Users, path: 'hr' },
         ...(perms.canViewDepartments ? [{ id: 'departments', label: 'ផ្នែក', icon: BarChart3, path: 'departments' }] : []),
-        ...(perms.canViewSkills ? [{ id: 'skills', label: 'ជំនាញ', icon: Award, path: 'skills' }] : []),
+        ...(perms.canViewSkills ? [{ id: 'skills', label: 'ជំនាញ (KSFH Skills)', icon: Award, path: 'skills' }] : []),
         ...(perms.canViewSkills ? [{ id: 'ministry-skills', label: 'ជំនាញក្រសួង', icon: Award, path: 'ministry-skills' }] : []),
         ...(perms.canViewPositions ? [{ id: 'positions', label: 'តួនាទី', icon: UserPlus, path: 'positions' }] : []),
         ...(perms.isAdmin ? [{ id: 'system-settings', label: 'កំណត់ប្រព័ន្ធ', icon: Settings, path: 'system-settings' }] : [])
@@ -218,6 +242,7 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
         ...(perms.canViewOnboardingLetter ? [{ id: 'il-onboarding', label: 'ចូលបុគ្គលិកថ្មី', icon: FileText, route: '/instruction-letters?template=onboarding', path: 'instruction-letters' }] : []),
         ...(perms.canViewAppointmentLetter ? [{ id: 'il-appointment', label: 'តែងតាំង', icon: FileText, route: '/instruction-letters?template=appointment', path: 'instruction-letters' }] : []),
         ...(perms.canViewTerminationLetter ? [{ id: 'il-termination', label: 'បញ្ចប់មុខតំណែង', icon: FileText, route: '/instruction-letters?template=termination', path: 'instruction-letters' }] : []),
+        ...(perms.canViewOtherLetters ? [{ id: 'il-adjustment', label: 'កែសម្រួលភារកិច្ច', icon: FileText, route: '/instruction-letters?template=adjustment', path: 'instruction-letters' }] : []),
         ...(perms.canViewOtherLetters ? [{ id: 'il-others', label: 'ផ្សេងៗ', icon: FileText, route: '/instruction-letters?template=others', path: 'instruction-letters' }] : []),
       ]
     }] : []),
@@ -371,7 +396,7 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
           {isExpanded && (
             <div className="ml-6 mt-1 space-y-1">
               {item.submenu.map(subItem => {
-                const isSubActive = activeSection === subItem.path;
+                const isSubActive = getIsSubActive(subItem);
                 return (
                   <button key={subItem.id} onClick={() => {
                     if (subItem.route) { navigate(subItem.route); return; }

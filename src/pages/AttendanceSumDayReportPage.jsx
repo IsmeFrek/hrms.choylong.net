@@ -159,7 +159,7 @@ export default function AttendanceSumDayReportPage() {
       const v = localStorage.getItem('attendanceSumDayReportPrintOrientation');
       if (v === 'landscape' || v === 'portrait') return v;
     } catch { void 0; }
-    return 'portrait';
+    return 'landscape';
   });
 
   useEffect(() => {
@@ -1630,7 +1630,7 @@ export default function AttendanceSumDayReportPage() {
         </div>
 
         {/* Bottom Row: Filters */}
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #f1f5f9', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569' }}>ប្រចាំខែ:</label>
             <input

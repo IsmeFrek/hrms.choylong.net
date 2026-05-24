@@ -281,6 +281,12 @@ const hrSchema = new mongoose.Schema({
   salaryPromotionBy: {
     type: String
   },
+  roleHistory: [{
+    position: { type: String },
+    department: { type: String },
+    startDate: { type: Date },
+    endDate: { type: Date }
+  }],
   // Medal/Award
   medalType: { type: String },
   medalReceivedDate: { type: Date },

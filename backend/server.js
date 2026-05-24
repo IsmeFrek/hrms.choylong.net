@@ -11,8 +11,10 @@ import fs from 'fs';
 import departmentRoutes from './routes/departments.js';
 import employeeRoutes from './routes/employees.js';
 import documentRoutes from './routes/documents.js';
-import fileRoutes from './routes/files.js';
+import authRoutes from './routes/auth.js';
 import skillRoutes from './routes/skills.js';
+import ministrySkillRoutes from './routes/ministrySkills.js';
+import fileRoutes from './routes/files.js';
 import positionRoutes from './routes/positions.js';
 import hrRoutes from './routes/hr.js';
 import documentFlowRoutes from './routes/documentFlow.js';
@@ -32,7 +34,6 @@ import Role from './models/Role.js';
 import User from './models/User.js';
 import { PERMISSIONS } from './permissions.js';
 // Auth/admin routes
-import authRoutes from './routes/auth.js';
 import usersRoutes from './routes/users.js';
 import rolesRoutes from './routes/roles.js';
 import approvalsRoutes from './routes/approvals.js'; // new
@@ -251,8 +252,9 @@ app.use('/api/telegram', telegramLinkRoutes); // Telegram linking
 app.use('/api/departments', departmentRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/documents', documentRoutes);
-app.use('/api/files', fileRoutes);
 app.use('/api/skills', skillRoutes);
+app.use('/api/ministry-skills', ministrySkillRoutes);
+app.use('/api/files', fileRoutes);
 app.use('/api/positions', positionRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/dashboard', dashboardRoutes);

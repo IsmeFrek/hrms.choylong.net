@@ -301,20 +301,21 @@ export default function SkillPage() {
 
   // Filtering, Pagination
   const filteredSkills = sortedSkills.filter(skill =>
-    (skill.skills_Kh || '').toLowerCase().includes(search.toLowerCase()) ||
+    (!skill.ministryFunction || skill.ministryFunction.trim() === '') &&
+    ((skill.skills_Kh || '').toLowerCase().includes(search.toLowerCase()) ||
     (skill.skills_En || '').toLowerCase().includes(search.toLowerCase()) ||
-    (skill.other || '').toLowerCase().includes(search.toLowerCase())
+    (skill.other || '').toLowerCase().includes(search.toLowerCase()))
   );
   const pagedSkills = filteredSkills.slice((page - 1) * limit, page * limit);
   const totalPages = Math.ceil(filteredSkills.length / limit);
 
   if (!perms.canViewSkills) {
-    return <div className="p-6"><h2 className="text-2xl font-bold mb-2 text-gray-900">ជំនាញ (Skills)</h2><div className="mt-4 p-3 border rounded bg-yellow-50 text-yellow-800">Requires permission: view:skills</div></div>;
+    return <div className="p-6"><h2 className="text-2xl font-bold mb-2 text-gray-900">ជំនាញ (KSFH Skills)</h2><div className="mt-4 p-3 border rounded bg-yellow-50 text-yellow-800">Requires permission: view:skills</div></div>;
   }
 
   return (
     <div className="p-6" style={{ fontFamily: "'Khmer OS Siemreap', 'Noto Sans Khmer', sans-serif" }}>
-      <h2 className="text-2xl font-bold mb-2 text-gray-900">ជំនាញ (Skills)</h2>
+      <h2 className="text-2xl font-bold mb-2 text-gray-900">ជំនាញ (KSFH Skills)</h2>
       <div className="mb-4 flex items-center">
         <input
           value={search}

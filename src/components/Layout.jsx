@@ -101,7 +101,11 @@ const Layout = ({ children, activeSection, onSectionChange }) => {
 
         <div
           className={`flex-1 flex flex-col transition-all duration-200`}
-          style={{ marginLeft: isMobile ? 0 : (sidebarCompact ? '4.5rem' : '14rem') }}
+          style={{ 
+            marginLeft: isMobile ? 0 : (sidebarCompact ? '4.5rem' : '14rem'),
+            width: isMobile ? '100%' : (sidebarCompact ? 'calc(100% - 4.5rem)' : 'calc(100% - 14rem)'),
+            maxWidth: isMobile ? '100%' : (sidebarCompact ? 'calc(100% - 4.5rem)' : 'calc(100% - 14rem)')
+          }}
         >
           <main className="flex-1 pb-12 p-4">
             <div className="w-full">
