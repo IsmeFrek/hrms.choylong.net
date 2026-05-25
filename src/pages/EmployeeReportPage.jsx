@@ -1174,9 +1174,9 @@ export default function EmployeeReportPage() {
         else if (hr.gender === 'Female' || hr.gender === 'ស្រី') otherFemale++;
       }
 
-      // if (hasOthers) {
-      //   rows.unshift({ name: 'ផ្សេងៗ', male: otherMale, female: otherFemale, total: otherMale + otherFemale, civil: otherCivil, contract: otherContract, isGroup: false });
-      // }
+      if (hasOthers) {
+        rows.push({ name: 'ផ្សេងៗ', male: otherMale, female: otherFemale, total: otherMale + otherFemale, civil: otherCivil, contract: otherContract, isGroup: false });
+      }
 
       const totals = rows.reduce((acc, r) => ({
         male: acc.male + (r.male || 0),
@@ -1249,6 +1249,10 @@ export default function EmployeeReportPage() {
         if (hr.civilServantId) otherCivil++; else otherContract++;
         if (hr.gender === 'Male' || hr.gender === 'ប្រុស') otherMale++;
         else if (hr.gender === 'Female' || hr.gender === 'ស្រី') otherFemale++;
+      }
+
+      if (hasOthers) {
+        rows.push({ name: 'ផ្សេងៗ', male: otherMale, female: otherFemale, total: otherMale + otherFemale, civil: otherCivil, contract: otherContract, isGroup: false });
       }
       
       const totals = rows.reduce((acc, r) => ({
