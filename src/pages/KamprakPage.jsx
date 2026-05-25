@@ -264,6 +264,22 @@ export default function KamprakPage() {
     setTimeout(() => { w.print(); w.close(); }, 500);
   };
 
+  const exportBudgetExcel = async () => {
+    try {
+      const response = await api.get('/hr/export-budget-excel', {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = 'គម្រោងថវិកាឆ្នាំ២០២៦.xlsx';
+      link.click();
+    } catch (e) {
+      console.error(e);
+      window.alert('មិនអាចទាញយកឯកសារ Excel បានទេ');
+    }
+  };
+
   const exportToExcel = () => {
     const data = filtered.map((hr, idx) => ({
       'ល.រ': idx + 1,
@@ -309,6 +325,7 @@ export default function KamprakPage() {
         </div>
         <div className="flex gap-2">
           <button onClick={exportToExcel} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 transition">📊 Excel</button>
+          <button onClick={exportBudgetExcel} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-emerald-700 transition">📊 គម្រោងថវិកា ២០២៦</button>
           <button onClick={handlePrint} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition">🖨️ បោះពុម្ព (Word Style)</button>
         </div>
       </div>

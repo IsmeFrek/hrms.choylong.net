@@ -1,6 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import ExcelJS from 'exceljs';
 import HR from '../models/HR.js';
 import ChangeRequest from '../models/ChangeRequest.js';
 import { authRequired, requirePermission, requireAnyPermission } from '../middleware/auth.js';
@@ -1156,10 +1157,184 @@ router.post('/:id/proposed-changes/:crId/approve', requirePermission('approve:hr
     cr.status = 'approved';
     cr.reviewedBy = req.auth?.user?._id || req.auth?.user?.id;
     cr.reviewedAt = new Date();
-  await cr.save();
+    await cr.save();
     res.json({ message: 'Approved', id: cr._id.toString(), applied: Object.keys(update) });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+router.get('/export-budget-excel', requirePermission('view:hr'), async (req, res) => {
+  try {
+    const ka = ['ក.១.១', 'ក.១.២', 'ក.១.៣', 'ក.១.៤', 'ក.១.៥', 'ក.១.៦', 'ក.២.១', 'ក.២.២', 'ក.២.៣', 'ក.២.៤', 'ក.៣.១', 'ក.៣.២', 'ក.៣.៣', 'ក.៣.៤'];
+    const kha = ['ខ.១.១', 'ខ.១.២', 'ខ.១.៣', 'ខ.១.៤', 'ខ.១.៥', 'ខ.១.៦', 'ខ.២.១', 'ខ.២.២', 'ខ.២.៣', 'ខ.២.៤', 'ខ.៣.១', 'ខ.៣.២', 'ខ.៣.៣', 'ខ.៣.៤'];
+    const ko = ['គ.១', 'គ.២', 'គ.៣', 'គ.៤', 'គ.៥', 'គ.៦', 'គ.៧', 'គ.៨', 'គ.៩', 'គ.១០'];
+
+    function demoteLevel(lvl) {
+      if (!lvl) return '';
+      const s = lvl.trim();
+      let idx = ka.indexOf(s);
+      if (idx !== -1 && idx < ka.length - 1) return ka[idx + 1];
+      idx = kha.indexOf(s);
+      if (idx !== -1 && idx < kha.length - 1) return kha[idx + 1];
+      idx = ko.indexOf(s);
+      if (idx !== -1 && idx < ko.length - 1) return ko[idx + 1];
+      return s;
+    }
+
+    function getEmployeeCategory(emp) {
+      const ot = (emp.officerType || '').toString().trim();
+      if (ot.includes('រាជការ') || ot.includes('ក្របខណ្ឌ')) {
+        return 'civil';
+      }
+      if (ot.includes('កិច្ចសន្យារដ្ឋ') || ot === 'កិច្ចសន្យា') {
+        return 'contract_state';
+      }
+      return 'floating';
+    }
+
+    const hasResignData = (hr) => {
+      try {
+        return Boolean(hr && (
+          hr.resignDate || hr.resignReason || hr.resignDocument || hr.resignationDate || hr.resignationReason
+          || hr.dateRemoved || hr.dateRemovedFromDataset || hr.removalDate || (hr.delisted && (hr.delisted.dateRemoved || hr.delisted.date_removed))
+        ));
+      } catch (e) { return false; }
+    };
+
+    const isExplicitlyRemoved = (hr) => {
+      try {
+        const del = hr && hr.delisted ? hr.delisted : {};
+        return Boolean(hr.dateRemoved || (del && (del.dateRemoved || del.date_removed)) || hr.dateRemovedFromDataset || hr.removalDate);
+      } catch (e) { return false; }
+    };
+
+    const isCountedActiveBackend = (hr) => {
+      if (!hr) return false;
+      const st = (hr.status || '').toString();
+      if (st === 'Deleted' || st === 'Resigned' || st === 'deleted' || st === 'resigned' || st === 'Inactive') return false;
+      const hasResign = hasResignData(hr);
+      const hasExplicitRemoval = isExplicitlyRemoved(hr);
+      const prepared = (hr.__isPreparedForDeletion) && !hasExplicitRemoval;
+      if (hasResign && !prepared) return false;
+      return true;
+    };
+
+    const allEmployees = await HR.find({}).lean();
+    const activeEmployees = allEmployees.filter(isCountedActiveBackend);
+
+    const counts2025 = {};
+    const counts2026 = {};
+
+    activeEmployees.forEach(emp => {
+      const cat = getEmployeeCategory(emp);
+      if (cat === 'civil') {
+        const lvl = (emp.salaryLevel || '').toString().trim();
+        if (!lvl) return;
+        let lvl2025 = lvl;
+        let lvl2026 = lvl;
+        if (emp.salaryPromotionDate) {
+          const promoYear = new Date(emp.salaryPromotionDate).getFullYear();
+          if (promoYear === 2026) {
+            lvl2025 = demoteLevel(lvl);
+          }
+        }
+        counts2025[lvl2025] = (counts2025[lvl2025] || 0) + 1;
+        counts2026[lvl2026] = (counts2026[lvl2026] || 0) + 1;
+      } else if (cat === 'contract_state') {
+        counts2025['កិច្ចសន្យា'] = (counts2025['កិច្ចសន្យា'] || 0) + 1;
+        counts2026['កិច្ចសន្យា'] = (counts2026['កិច្ចសន្យា'] || 0) + 1;
+      } else {
+        counts2025['អណ្ដែត'] = (counts2025['អណ្ដែត'] || 0) + 1;
+        counts2026['អណ្ដែត'] = (counts2026['អណ្ដែត'] || 0) + 1;
+      }
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile('D:\\Gitdb\\គម្រោងថវិកាឆ្នាំ២០២៦.xlsx');
+    const sheet = workbook.getWorksheet('គម្រោងថវិការ');
+
+    const leafRowMapping = {
+      13: 'ក.១.១', 14: 'ក.១.២', 15: 'ក.១.៣', 16: 'ក.១.៤', 17: 'ក.១.៥', 18: 'ក.១.៦',
+      20: 'ក.២.១', 21: 'ក.២.២', 22: 'ក.២.៣', 23: 'ក.២.៤',
+      25: 'ក.៣.១', 26: 'ក.៣.២', 27: 'ក.៣.៣', 28: 'ក.៣.៤',
+      31: 'ខ.១.១', 32: 'ខ.១.២', 33: 'ខ.១.៣', 34: 'ខ.១.៤', 35: 'ខ.១.៥', 36: 'ខ.១.៦',
+      38: 'ខ.២.១', 39: 'ខ.២.២', 40: 'ខ.២.៣', 41: 'ខ.២.៤',
+      43: 'ខ.៣.១', 44: 'ខ.៣.២', 45: 'ខ.៣.៣', 46: 'ខ.៣.៤',
+      48: 'គ.១', 49: 'គ.២', 50: 'គ.៣', 51: 'គ.៤', 52: 'គ.៥', 53: 'គ.៦', 54: 'គ.៧', 55: 'គ.៨', 56: 'គ.៩', 57: 'គ.១០',
+      59: 'កិច្ចសន្យា', 60: 'អណ្ដែត'
+    };
+
+    const leafRates = {};
+    Object.keys(leafRowMapping).forEach(rNoKey => {
+      const rNo = Number(rNoKey);
+      const row = sheet.getRow(rNo);
+      const tempCount26 = Number(row.getCell(4).value) || 0;
+      leafRates[rNo] = {};
+      for (let colIdx = 6; colIdx <= 16; colIdx++) {
+        const tempVal = Number(row.getCell(colIdx).value) || 0;
+        leafRates[rNo][colIdx] = tempCount26 > 0 ? (tempVal / tempCount26) : 0;
+      }
+    });
+
+    Object.keys(leafRowMapping).forEach(rNoKey => {
+      const rNo = Number(rNoKey);
+      const code = leafRowMapping[rNoKey];
+      const row = sheet.getRow(rNo);
+      const count25 = counts2025[code] || 0;
+      const count26 = counts2026[code] || 0;
+      row.getCell(3).value = count25;
+      row.getCell(4).value = count26;
+      let rowTotal = 0;
+      for (let colIdx = 6; colIdx <= 16; colIdx++) {
+        const cell = row.getCell(colIdx);
+        const rate = leafRates[rNo][colIdx] || 0;
+        const newVal = Math.round(rate * count26);
+        cell.value = newVal;
+        rowTotal += newVal;
+      }
+      row.getCell(5).value = rowTotal;
+    });
+
+    function sumRows(targetRowNo, sourceRowNos) {
+      const targetRow = sheet.getRow(targetRowNo);
+      let count25 = 0;
+      let count26 = 0;
+      let moneyCols = Array(12).fill(0);
+      sourceRowNos.forEach(rNo => {
+        const r = sheet.getRow(rNo);
+        count25 += Number(r.getCell(3).value) || 0;
+        count26 += Number(r.getCell(4).value) || 0;
+        for (let colIdx = 5; colIdx <= 16; colIdx++) {
+          moneyCols[colIdx - 5] += Number(r.getCell(colIdx).value) || 0;
+        }
+      });
+      targetRow.getCell(3).value = count25;
+      targetRow.getCell(4).value = count26;
+      for (let colIdx = 5; colIdx <= 16; colIdx++) {
+        targetRow.getCell(colIdx).value = moneyCols[colIdx - 5];
+      }
+    }
+
+    sumRows(12, [13, 14, 15, 16, 17, 18]);
+    sumRows(19, [20, 21, 22, 23]);
+    sumRows(24, [25, 26, 27, 28]);
+    sumRows(11, [12, 19, 24]);
+    sumRows(30, [31, 32, 33, 34, 35, 36]);
+    sumRows(37, [38, 39, 40, 41]);
+    sumRows(42, [43, 44, 45, 46]);
+    sumRows(29, [30, 37, 42]);
+    sumRows(47, [48, 49, 50, 51, 52, 53, 54, 55, 56, 57]);
+    sumRows(10, [11, 29, 47]);
+    sumRows(58, [59, 60]);
+    sumRows(9, [10, 58]);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="budget_2026.xlsx"');
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
