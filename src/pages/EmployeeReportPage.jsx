@@ -89,6 +89,11 @@ function isHospitalType(v) { const n = normOfficerType(v); return n === 'កិ�
 function isPartTimeType(v) { const n = normOfficerType(v); return n === 'កិច្ចសន្យាក្រៅម៉ោង' || n.includes('ក្រៅម៉ោង') || n.includes('part'); }
 function isWorkerType(v) { const n = normOfficerType(v); return n === 'កម្មករកិច្ចសន្យា' || n.includes('កម្មករ') || n.includes('worker'); }
 
+function isCivil(hr) {
+  if (!hr) return false;
+  return !isStateType(hr.officerType) && !isHospitalType(hr.officerType) && !isPartTimeType(hr.officerType) && !isWorkerType(hr.officerType);
+}
+
 function fmtDateLong(d) {
   if (!d) return '';
   const dt = new Date(d);
@@ -1112,7 +1117,7 @@ export default function EmployeeReportPage() {
               const hs = hrSkillNormOf(hr);
               if (!hs) continue;
               if (!groupSet.has(hs)) continue;
-              if (hr.civilServantId) civil++; else contract++;
+              if (isCivil(hr)) civil++; else contract++;
               if (hr.gender === 'Male' || hr.gender === 'ប្រុស') male++;
               else if (hr.gender === 'Female' || hr.gender === 'ស្រី') female++;
             }
@@ -1129,7 +1134,7 @@ export default function EmployeeReportPage() {
           const hs = hrSkillNormOf(hr);
           if (!hs) continue;
           if (hs !== skillNorm) continue;
-          if (hr.civilServantId) civil++; else contract++;
+          if (isCivil(hr)) civil++; else contract++;
           if (hr.gender === 'Male' || hr.gender === 'ប្រុស') male++;
           else if (hr.gender === 'Female' || hr.gender === 'ស្រី') female++;
         }
@@ -1148,7 +1153,7 @@ export default function EmployeeReportPage() {
           if (!hs) continue;
           if (!groupSet.has(hs)) continue;
           groupHasMembersInData = true;
-          if (hr.civilServantId) civil++; else contract++;
+          if (isCivil(hr)) civil++; else contract++;
           if (hr.gender === 'Male' || hr.gender === 'ប្រុស') male++;
           else if (hr.gender === 'Female' || hr.gender === 'ស្រី') female++;
           processedSkills.add(hs); // Mark members as processed
@@ -1169,7 +1174,7 @@ export default function EmployeeReportPage() {
         if (memberToGroup.has(hs)) continue; // Should have been caught by group loop above
 
         hasOthers = true;
-        if (hr.civilServantId) otherCivil++; else otherContract++;
+        if (isCivil(hr)) otherCivil++; else otherContract++;
         if (hr.gender === 'Male' || hr.gender === 'ប្រុស') otherMale++;
         else if (hr.gender === 'Female' || hr.gender === 'ស្រី') otherFemale++;
       }
@@ -1195,7 +1200,7 @@ export default function EmployeeReportPage() {
       const key = label(hr.skill);
       if (!rowsMap.has(key)) rowsMap.set(key, { name: key, male: 0, female: 0, civil: 0, contract: 0 });
       const row = rowsMap.get(key);
-      if (hr.civilServantId) row.civil += 1; else row.contract += 1;
+      if (isCivil(hr)) row.civil += 1; else row.contract += 1;
       if (hr.gender === 'Male' || hr.gender === 'ប្រុស') row.male += 1;
       else if (hr.gender === 'Female' || hr.gender === 'ស្រី') row.female += 1;
     }
@@ -1230,7 +1235,7 @@ export default function EmployeeReportPage() {
           const hs = hrMinistrySkillNormOf(hr);
           if (!hs) continue;
           if (hs !== skillNorm) continue;
-          if (hr.civilServantId) civil++; else contract++;
+          if (isCivil(hr)) civil++; else contract++;
           if (hr.gender === 'Male' || hr.gender === 'ប្រុស') male++;
           else if (hr.gender === 'Female' || hr.gender === 'ស្រី') female++;
         }
@@ -1246,7 +1251,7 @@ export default function EmployeeReportPage() {
         if (processedSkills.has(hs)) continue;
 
         hasOthers = true;
-        if (hr.civilServantId) otherCivil++; else otherContract++;
+        if (isCivil(hr)) otherCivil++; else otherContract++;
         if (hr.gender === 'Male' || hr.gender === 'ប្រុស') otherMale++;
         else if (hr.gender === 'Female' || hr.gender === 'ស្រី') otherFemale++;
       }
@@ -1271,7 +1276,7 @@ export default function EmployeeReportPage() {
       const key = label(hr.civilServantRole);
       if (!rowsMap.has(key)) rowsMap.set(key, { name: key, male: 0, female: 0, civil: 0, contract: 0 });
       const row = rowsMap.get(key);
-      if (hr.civilServantId) row.civil += 1; else row.contract += 1;
+      if (isCivil(hr)) row.civil += 1; else row.contract += 1;
       if (hr.gender === 'Male' || hr.gender === 'ប្រុស') row.male += 1;
       else if (hr.gender === 'Female' || hr.gender === 'ស្រី') row.female += 1;
     }
