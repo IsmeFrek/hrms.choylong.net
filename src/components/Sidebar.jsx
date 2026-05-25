@@ -343,7 +343,10 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
       icon: Award,
       hasSubmenu: true,
       submenu: [
-        ...(perms.canViewKamprak ? [{ id: 'kamprak-page', label: 'គ្រប់គ្រងកាំប្រាក់', icon: Settings, route: '/kamprak' }] : []),
+        ...(perms.canViewKamprak ? [
+          { id: 'kamprak-page', label: 'គ្រប់គ្រងកាំប្រាក់', icon: Settings, route: '/kamprak' },
+          { id: 'budget-report', label: 'គម្រោងថវិកា', icon: FileSpreadsheet, route: '/budget-report' }
+        ] : []),
         ...(perms.canViewTransformationReport ? [{ id: 'picture-report-k', label: 'របាយការណ៍ប្តូរទម្រង់', icon: FileText, path: 'picture-report' }] : []),
         ...(perms.canViewPromotionByRotationReport ? [{ id: 'promotion-rotation-report', label: 'របាយការណ៍ប្តូរវេន', icon: FileText, path: 'promotion-rotation-report' }] : []),
         ...(perms.canViewPromotionByDiplomaReport ? [{ id: 'promotion-diploma-report', label: 'របាយការណ៍សញ្ញាបត្រ', icon: FileText, path: 'promotion-diploma-report' }] : []),

@@ -105,6 +105,7 @@ import MobileScanPage from './pages/MobileScanPage.jsx';
 import MobileFaceEnrollPage from './pages/MobileFaceEnrollPage.jsx';
 import GeoFencePoliciesPage from './pages/GeoFencePoliciesPage.jsx';
 import KamprakPage from './pages/KamprakPage.jsx';
+import BudgetReportPage from './pages/BudgetReportPage.jsx';
 import StaffBiographyPage from './pages/StaffBiographyPage.jsx';
 import TelegramPage from './pages/TelegramPage.jsx';
 import TelegramMiniApp from './pages/TelegramMiniApp.jsx';
@@ -783,6 +784,7 @@ export default function App() {
           <Route path="/file-transfer-outgoing" element={<RequireAuth><LayoutWrapper section="file-transfer-outgoing"><FileTransferPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/missions" element={<RequireAuth><LayoutWrapper section="missions"><MissionsRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/kamprak" element={<RequireAuth><LayoutWrapper section="kamprak"><KamprakPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/budget-report" element={<RequireAuth><LayoutWrapper section="budget-report"><BudgetReportPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/staff-biography" element={<RequireAuth><LayoutWrapper section="staff-biography"><StaffBiographyRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/staff-biography/:id" element={<RequireAuth><LayoutWrapper section="staff-biography"><StaffBiographyRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/file-transfer-stats" element={<RequireAuth><LayoutWrapper section="file-transfer-stats"><FileTransferStats /></LayoutWrapper></RequireAuth>} />

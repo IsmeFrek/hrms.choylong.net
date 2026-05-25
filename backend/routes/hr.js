@@ -1166,9 +1166,17 @@ router.post('/:id/proposed-changes/:crId/approve', requirePermission('approve:hr
 
 router.get('/export-budget-excel', requirePermission('view:hr'), async (req, res) => {
   try {
+    const targetYear = Number(req.query.year) || 2026;
+    const prevYear = targetYear - 1;
+
     const ka = ['ក.១.១', 'ក.១.២', 'ក.១.៣', 'ក.១.៤', 'ក.១.៥', 'ក.១.៦', 'ក.២.១', 'ក.២.២', 'ក.២.៣', 'ក.២.៤', 'ក.៣.១', 'ក.៣.២', 'ក.៣.៣', 'ក.៣.៤'];
     const kha = ['ខ.១.១', 'ខ.១.២', 'ខ.១.៣', 'ខ.១.៤', 'ខ.១.៥', 'ខ.១.៦', 'ខ.២.១', 'ខ.២.២', 'ខ.២.៣', 'ខ.២.៤', 'ខ.៣.១', 'ខ.៣.២', 'ខ.៣.៣', 'ខ.៣.៤'];
     const ko = ['គ.១', 'គ.២', 'គ.៣', 'គ.៤', 'គ.៥', 'គ.៦', 'គ.៧', 'គ.៨', 'គ.៩', 'គ.១០'];
+
+    function toKhmerDigits(n) {
+      const map = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
+      return String(n).replace(/[0-9]/g, (d) => map[d]);
+    }
 
     function demoteLevel(lvl) {
       if (!lvl) return '';
@@ -1179,6 +1187,18 @@ router.get('/export-budget-excel', requirePermission('view:hr'), async (req, res
       if (idx !== -1 && idx < kha.length - 1) return kha[idx + 1];
       idx = ko.indexOf(s);
       if (idx !== -1 && idx < ko.length - 1) return ko[idx + 1];
+      return s;
+    }
+
+    function promoteLevel(lvl) {
+      if (!lvl) return '';
+      const s = lvl.trim();
+      let idx = ka.indexOf(s);
+      if (idx !== -1 && idx > 0) return ka[idx - 1];
+      idx = kha.indexOf(s);
+      if (idx !== -1 && idx > 0) return kha[idx - 1];
+      idx = ko.indexOf(s);
+      if (idx !== -1 && idx > 0) return ko[idx - 1];
       return s;
     }
 
@@ -1211,8 +1231,21 @@ router.get('/export-budget-excel', requirePermission('view:hr'), async (req, res
 
     const isCountedActiveBackend = (hr) => {
       if (!hr) return false;
-      const st = (hr.status || '').toString();
-      if (st === 'Deleted' || st === 'Resigned' || st === 'deleted' || st === 'resigned' || st === 'Inactive') return false;
+
+      const parseDateSafe = (v) => {
+        if (!v) return null;
+        const d = new Date(v);
+        return isNaN(d.getTime()) ? null : d;
+      };
+
+      const resDate = parseDateSafe(hr.resignDate || hr.resignationDate || hr.dateRemoved);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (resDate && resDate > today) return true;
+
+      const st = (hr.status || '').toString().toLowerCase();
+      if (st === 'deleted' || st === 'resigned' || st === 'inactive') return false;
       const hasResign = hasResignData(hr);
       const hasExplicitRemoval = isExplicitlyRemoved(hr);
       const prepared = (hr.__isPreparedForDeletion) && !hasExplicitRemoval;
@@ -1226,21 +1259,73 @@ router.get('/export-budget-excel', requirePermission('view:hr'), async (req, res
     const counts2025 = {};
     const counts2026 = {};
 
+    const RETIREMENT_AGE = (() => {
+      const n = Number.parseInt(String(process.env.CIVIL_RETIRE_AGE || '60'), 10);
+      return Number.isFinite(n) && n > 0 ? n : 60;
+    })();
+
+    const parseDob = (v) => {
+      if (!v) return null;
+      try {
+        const d = (v instanceof Date) ? v : new Date(v);
+        if (Number.isNaN(d.getTime())) return null;
+        const dt = new Date(d);
+        dt.setHours(0, 0, 0, 0);
+        return dt;
+      } catch {
+        return null;
+      }
+    };
+
+    const computeRetirementDate = (dob) => {
+      if (!dob) return null;
+      try {
+        const r = new Date(dob);
+        r.setFullYear(r.getFullYear() + RETIREMENT_AGE);
+        r.setHours(0, 0, 0, 0);
+        return r;
+      } catch {
+        return null;
+      }
+    };
+
     activeEmployees.forEach(emp => {
       const cat = getEmployeeCategory(emp);
       if (cat === 'civil') {
         const lvl = (emp.salaryLevel || '').toString().trim();
         if (!lvl) return;
+
+        // Auto-exclude if retired by/during the respective year
+        const dob = parseDob(emp.dob);
+        const retireDate = computeRetirementDate(dob);
+        const isCivil = !emp.isRetiredThenContract && !emp.isPartTime;
+
+        let isRetiredPrev = false;
+        let isRetiredTarget = false;
+        if (isCivil && retireDate) {
+          const retYear = retireDate.getFullYear();
+          // Exclude from prevYear column only if retired before prevYear (keep prevYear actual)
+          if (retYear < prevYear) isRetiredPrev = true;
+          // Exclude from targetYear column if retired in or before prevYear
+          if (retYear <= prevYear) isRetiredTarget = true;
+        }
+
         let lvl2025 = lvl;
         let lvl2026 = lvl;
         if (emp.salaryPromotionDate) {
           const promoYear = new Date(emp.salaryPromotionDate).getFullYear();
-          if (promoYear === 2026) {
+          if (promoYear === targetYear) {
             lvl2025 = demoteLevel(lvl);
+          } else if (promoYear === targetYear - 2) {
+            lvl2026 = promoteLevel(lvl);
           }
         }
-        counts2025[lvl2025] = (counts2025[lvl2025] || 0) + 1;
-        counts2026[lvl2026] = (counts2026[lvl2026] || 0) + 1;
+        if (!isRetiredPrev) {
+          counts2025[lvl2025] = (counts2025[lvl2025] || 0) + 1;
+        }
+        if (!isRetiredTarget) {
+          counts2026[lvl2026] = (counts2026[lvl2026] || 0) + 1;
+        }
       } else if (cat === 'contract_state') {
         counts2025['កិច្ចសន្យា'] = (counts2025['កិច្ចសន្យា'] || 0) + 1;
         counts2026['កិច្ចសន្យា'] = (counts2026['កិច្ចសន្យា'] || 0) + 1;
@@ -1253,6 +1338,11 @@ router.get('/export-budget-excel', requirePermission('view:hr'), async (req, res
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile('D:\\Gitdb\\គម្រោងថវិកាឆ្នាំ២០២៦.xlsx');
     const sheet = workbook.getWorksheet('គម្រោងថវិការ');
+
+    // Update dynamic year headers in Excel
+    sheet.getRow(4).getCell(1).value = 'គម្រោងថវិកាឆ្នាំ' + toKhmerDigits(targetYear);
+    sheet.getRow(7).getCell(3).value = 'ឆ្នាំ' + toKhmerDigits(prevYear);
+    sheet.getRow(7).getCell(4).value = 'ឆ្នាំ' + toKhmerDigits(targetYear);
 
     const leafRowMapping = {
       13: 'ក.១.១', 14: 'ក.១.២', 15: 'ក.១.៣', 16: 'ក.១.៤', 17: 'ក.១.៥', 18: 'ក.១.៦',
@@ -1330,7 +1420,7 @@ router.get('/export-budget-excel', requirePermission('view:hr'), async (req, res
     sumRows(9, [10, 58]);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="budget_2026.xlsx"');
+    res.setHeader('Content-Disposition', `attachment; filename="budget_${targetYear}.xlsx"`);
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {
