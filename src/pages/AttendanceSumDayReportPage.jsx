@@ -1344,7 +1344,7 @@ export default function AttendanceSumDayReportPage() {
       const thead = makeEl('thead');
       const trh = makeEl('tr');
       visibleKeysNow.forEach((k) => {
-        const th = makeEl('th', { textAlign: 'center', fontSize: '11px', padding: '4px 3px', border: '1px solid #8f8b8b', background: '#f3f4f6', whiteSpace: 'nowrap' });
+        const th = makeEl('th', { textAlign: 'center', fontSize: '12px', padding: '4px 3px', border: '1px solid #8f8b8b', background: '#f3f4f6', whiteSpace: 'nowrap' });
         th.textContent = columnMeta[k]?.label || k;
         trh.appendChild(th);
       });
@@ -1358,7 +1358,7 @@ export default function AttendanceSumDayReportPage() {
         visibleKeysNow.forEach((k) => {
           const cell = renderCell(k, row);
           const td = makeEl('td', {
-            fontSize: '11px',
+            fontSize: '12px',
             verticalAlign: 'middle',
             textAlign: cell?.style?.textAlign || columnMeta[k]?.align || 'center',
             border: '1px solid #8f8b8b',
@@ -1397,7 +1397,7 @@ export default function AttendanceSumDayReportPage() {
     return <div style={{ padding: 20 }}><p>កំពុងផ្ទុក...</p></div>;
   }
 
-  const rowFontSize = Math.max(10, Math.round(rowHeight * 0.46));
+  const rowFontSize = Math.max(10, Math.round(rowHeight * 0.46)) + 1;
   const bodyPadY = Math.max(1, Math.min(12, Math.round(rowHeight / 6)));
 
   const tdBase = {
@@ -1415,7 +1415,7 @@ export default function AttendanceSumDayReportPage() {
     border: '1px solid #8f8b8b',
     padding: 6,
     textAlign: 'center',
-    fontSize: 12,
+    fontSize: 13,
     userSelect: 'none'
   };
 
