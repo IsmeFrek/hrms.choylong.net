@@ -51,7 +51,6 @@ import AttendancePage from './pages/AttendancePage';
 import AttendanceReportPage from './pages/AttendanceReportPage';
 import WorkCalendarPage from './pages/WorkCalendarPage';
 import WorkSchedulePage from './pages/WorkSchedulePage';
-import WorkSchedule1Page from './pages/WorkSchedule1Page';
 import AttendanceMonthlyDataPage from './pages/AttendanceMonthlyDataPage';
 import AttendancesumDayPage from './pages/AttendancesumDayPage';
 import AttendanceDayAttendanceDataPage from './pages/AttendanceDayAttendanceDataPage';
@@ -208,16 +207,6 @@ function WorkScheduleRoute() {
   return (
     <PermissionGate allow={perms.canViewWorkSchedule || !!perms.user?.department}>
       <WorkSchedulePage />
-    </PermissionGate>
-  );
-}
-
-// Small wrapper for WorkSchedule1Page
-function WorkSchedule1Route() {
-  const perms = usePermission();
-  return (
-    <PermissionGate allow={perms.canViewWorkSchedule}>
-      <WorkSchedule1Page />
     </PermissionGate>
   );
 }
@@ -428,12 +417,6 @@ function ProtectedApp() {
         return (
           <PermissionGate allow={perms.canViewAbsence}>
             <WorkSchedulePage />
-          </PermissionGate>
-        );
-      case 'work-schedule1':
-        return (
-          <PermissionGate allow={perms.canViewAbsence}>
-            <WorkSchedule1Page />
           </PermissionGate>
         );
       case 'group-timetables':
@@ -784,7 +767,6 @@ export default function App() {
           <Route path="/newpage" element={<RequireAuth><NewDocumentPage /></RequireAuth>} />
           <Route path="/work-calendar" element={<RequireAuth><LayoutWrapper section="work-calendar"><WorkCalendarRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/work-schedule" element={<RequireAuth><LayoutWrapper section="work-schedule"><WorkScheduleRoute /></LayoutWrapper></RequireAuth>} />
-          <Route path="/work-schedule1" element={<RequireAuth><LayoutWrapper section="work-schedule1"><WorkSchedule1Route /></LayoutWrapper></RequireAuth>} />
           <Route path="/shifts" element={<RequireAuth><LayoutWrapper section="shifts"><ShiftsRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/shift-groups" element={<RequireAuth><LayoutWrapper section="shift-groups"><ShiftGroupsRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/group-timetables" element={<RequireAuth><LayoutWrapper section="group-timetables"><GroupTimetablesRoute /></LayoutWrapper></RequireAuth>} />

@@ -1814,10 +1814,14 @@ export default function WorkSchedulePage() {
     }
   };
 
-  const handleDeleteHoliday = async (id) => {
-    if (!id || !confirm('តើអ្នកប្រាកដថាចង់លុបថ្ងៃឈប់សម្រាកនេះមែនទេ?')) return;
+  const handleDeleteHoliday = async (h) => {
+    if (!h || !confirm('តើអ្នកប្រាកដថាចង់លុបថ្ងៃឈប់សម្រាកនេះមែនទេ?')) return;
     try {
-      await api.delete(`/holidays/${id}`);
+      if (h._id) {
+        await api.delete(`/holidays/${h._id}`);
+      } else {
+        await api.post('/holidays', { date: h.date, name: 'DELETED', isDeleted: true });
+      }
       fetchHolidaysForMonth();
     } catch (err) {
       alert('Error deleting holiday: ' + err.message);
@@ -2053,7 +2057,7 @@ export default function WorkSchedulePage() {
           shiftTitle: sched.shiftTitle || 'Work',
           shiftStart: sched.shiftStart || '',
           shiftEnd: sched.shiftEnd || '',
-          shiftColor: sched.shiftTitle === 'Day Off' ? '#ff0000' : '#0b74de',
+          shiftColor: sched.shiftTitle === 'Day Off' ? '#000000' : '#0b74de',
           notes: sched.notes || ''
         };
       }).filter(sched => sched.employeeId); // Only include schedules with valid HR ID
@@ -2614,16 +2618,22 @@ export default function WorkSchedulePage() {
                   {holidays.length > 0 ? holidays.map((h, i) => (
                     <span 
                       key={i} 
-                      className={`text-[10px] px-1.5 py-0.5 rounded border whitespace-nowrap flex items-center gap-1 ${
+                      onClick={() => {
+                        if (perms.isAdmin || perms.canEditWorkSchedule) {
+                          setEditingHoliday(h);
+                          setShowHolidayModal(true);
+                        }
+                      }}
+                      className={`text-[10px] px-1.5 py-0.5 rounded border whitespace-nowrap flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity ${
                         h.isManual ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-rose-50 text-rose-700 border-rose-100'
                       }`} 
                       title={h.name}
                     >
                       {h.date.split('-')[2]}: {h.name.length > 15 ? h.name.slice(0, 15) + '...' : h.name}
-                      {h.isManual && (perms.isAdmin || perms.canEditWorkSchedule) && (
+                      {(perms.isAdmin || perms.canEditWorkSchedule) && (
                         <button 
-                          onClick={(e) => { e.stopPropagation(); handleDeleteHoliday(h._id); }}
-                          className="hover:text-red-600 font-bold ml-1"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteHoliday(h); }}
+                          className="hover:text-red-600 font-bold ml-1 px-1 rounded-sm"
                         >×</button>
                       )}
                     </span>
@@ -3142,8 +3152,8 @@ export default function WorkSchedulePage() {
                               <div 
                                 className={`text-[10px] font-bold px-1 py-0.5 rounded-sm inline-block min-w-[32px] shadow-sm ${schedule.isPlanned ? 'opacity-70 border border-dashed border-gray-400' : ''}`} 
                                 style={{ 
-                                  backgroundColor: schedule.shiftColor || (schedule.shiftTitle === 'Day Off' ? '#fee2e2' : '#e0f2fe'),
-                                  color: schedule.shiftTitle === 'Day Off' ? '#dc2626' : getContrastColor(schedule.shiftColor),
+                                  backgroundColor: schedule.shiftColor || (schedule.shiftTitle === 'Day Off' ? '#000000' : '#e0f2fe'),
+                                  color: schedule.shiftTitle === 'Day Off' ? '#ffffff' : getContrastColor(schedule.shiftColor),
                                   border: !schedule.isPlanned && schedule.shiftTitle === 'Day Off' ? '1px solid #fecaca' : undefined
                                 }}
                                 title={schedule.isPlanned ? `Planned from Shift Group: ${schedule.shiftTitle}` : (schedule.notes || schedule.shiftTitle)}

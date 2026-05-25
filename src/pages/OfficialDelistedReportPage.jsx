@@ -1326,8 +1326,9 @@ export default function OfficialDelistedReportPage() {
   };
 
   const handleExportExcel = () => {
-    const rows = derived.rows;
-    const header = [
+    // 1. Export Resigned Employees (Delisted)
+    const resignedRows = derived.rows;
+    const headerResigned = [
       'ល.រ',
       'លេខមន្ត្រីរាជការ',
       'គោត្តនាម និងនាម',
@@ -1342,7 +1343,7 @@ export default function OfficialDelistedReportPage() {
       'ចូលរបាយការណ៍ខែ',
       'ឯកសារយោង'
     ];
-    const data = rows.map((row, idx) => {
+    const dataResigned = resignedRows.map((row, idx) => {
       const delisted = row.hr && row.hr.delisted ? row.hr.delisted : {};
       const meta = computeDelistedMeta(delisted || {});
       return ([
@@ -1362,19 +1363,75 @@ export default function OfficialDelistedReportPage() {
       ]);
     });
 
-    const summary = [[
+    const summaryResigned = [[
       `សរុប: ${derived.total} នាក់ ( ប្រុស: ${derived.male} នាក់ — ស្រី: ${derived.female} នាក់ )`
     ]];
 
-    const ws = XLSX.utils.aoa_to_sheet([header, ...data, [], ...summary]);
-    ws['!cols'] = [
-      { wch: 5 }, { wch: 12 }, { wch: 30 }, { wch: 6 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
-      { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 24 }
+    // 2. Export New Employees (Joined)
+    const joinedRows = (selectedMonthKey === 'all')
+      ? derived.monthlyGroups.reduce((acc, g) => acc.concat(g.newRecords || []), [])
+      : (derived.monthlyGroups.find(g => `${g.year}-${String(g.month).padStart(2, '0')}` === selectedMonthKey)?.newRecords || []);
+
+    const headerJoined = [
+      'ល.រ',
+      'លេខកាត',
+      'គោត្តនាម និងនាម',
+      'ភេទ',
+      'តួនាទី',
+      'ផ្នែក',
+      'ថ្ងៃចូលបម្រើការ',
+      'សាកល្បងដល់ថ្ងៃ',
+      'ស្ថានភាព'
     ];
+
+    const dataJoined = joinedRows.map((row, idx) => {
+      const hr = row.hr;
+      return ([
+        idx + 1,
+        hr.staffId || hr.no || '',
+        hr.khmerName || hr.name || '',
+        hr.gender === 'Male' ? 'ប' : hr.gender === 'Female' ? 'ស' : '',
+        hr.position || hr.role || '',
+        hr.Department_Kh || hr.department || '',
+        fmtShortDate(hr.joinDate),
+        fmtShortDate(hr.probationEndDate || hr.probationEnd),
+        getProbationStatus(hr)
+      ]);
+    });
+    
+    const maleJoined = joinedRows.filter(r => r.hr.gender === 'Male').length;
+    const femaleJoined = joinedRows.filter(r => r.hr.gender === 'Female').length;
+    const summaryJoined = [[
+      `សរុប: ${joinedRows.length} នាក់ ( ប្រុស: ${maleJoined} នាក់ — ស្រី: ${femaleJoined} នាក់ )`
+    ]];
+
+    // Combine data into a single sheet
+    const finalData = [];
+    
+    if (joinedRows.length > 0) {
+      finalData.push([`១. បញ្ជីបុគ្គលិកចូលថ្មី (${joinedRows.length} នាក់)`]);
+      finalData.push(headerJoined);
+      finalData.push(...dataJoined);
+      finalData.push(summaryJoined[0]);
+      finalData.push([]);
+    }
+
+    if (resignedRows.length > 0) {
+      finalData.push([`២. បញ្ជីបុគ្គលិកឈប់ពីការងារ (${resignedRows.length} នាក់)`]);
+      finalData.push(headerResigned);
+      finalData.push(...dataResigned);
+      finalData.push(summaryResigned[0]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(finalData);
+    ws['!cols'] = [
+      { wch: 5 }, { wch: 12 }, { wch: 30 }, { wch: 6 }, { wch: 20 }, { wch: 20 }, { wch: 18 },
+      { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 24 }
+    ];
+
     const wb = XLSX.utils.book_new();
-    const sheetName = `Delisted_${reportYear}`;
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    XLSX.writeFile(wb, `OfficialDelisted_${reportYear}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'របាយការណ៍បម្រែបម្រួល');
+    XLSX.writeFile(wb, `OfficialReport_${reportYear}.xlsx`);
   };
 
   const renderGroupTable = (group, showHeader = true) => {

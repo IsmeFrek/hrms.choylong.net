@@ -19,18 +19,19 @@ router.get('/', async (req, res) => {
 // POST /api/holidays - Add a manual holiday
 router.post('/', async (req, res) => {
   try {
-    const { date, name, description } = req.body;
+    const { date, name, description, isDeleted } = req.body;
     if (!date || !name) return res.status(400).json({ message: 'Date and name are required' });
     
     const existing = await Holiday.findOne({ date });
     if (existing) {
       existing.name = name;
       existing.description = description;
+      if (isDeleted !== undefined) existing.isDeleted = isDeleted;
       await existing.save();
       return res.json(existing);
     }
 
-    const h = new Holiday({ date, name, description });
+    const h = new Holiday({ date, name, description, isDeleted: isDeleted || false });
     await h.save();
     res.status(201).json(h);
   } catch (err) {

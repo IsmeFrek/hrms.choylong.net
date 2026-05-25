@@ -117,9 +117,11 @@ function normSkill(s) {
 
 // Move listColumns definition to top-level (outside of EmployeeReportPage) to ensure it's initialized before use
 const listColumns = [
+  { key: 'staffId', label: 'អត្តលេខកាត់', width: '80px', align: 'center' },
   { key: 'serialOverall', label: 'ស.រ', width: '35px', align: 'center' },
   { key: 'serialDept', label: 'ល.រ', width: '30px', align: 'center' },
   { key: 'name', label: 'គោត្តនាម និងនាម', width: '110px', align: 'left' },
+  { key: 'latinName', label: 'ឈ្មោះឡាតាំង', width: '120px', align: 'left' },
   { key: 'gender', label: 'ភេទ', width: '30px', align: 'center' },
   { key: 'dob', label: 'ថ្ងៃខែឆ្នាំកំណើត', width: '90px', align: 'center' },
   { key: 'salaryLevel', label: 'កាំប្រាក់', width: '55px', align: 'center' },
@@ -127,16 +129,13 @@ const listColumns = [
   { key: 'skill', label: 'ជំនាញ', width: '140px', align: 'left' },
   { key: 'position', label: 'តួនាទី', width: '140px', align: 'left' },
   { key: 'department', label: 'ផ្នែក', width: '140px', align: 'left' },
-  { key: 'staffId', label: 'អត្តលេខកាត់', width: '80px', align: 'center' },
-  { key: 'totalMonthlyAttendance', label: 'សរុបវត្តមានប្រចាំខែ', width: '80px', align: 'center' },
-  { key: 'performanceResult', label: 'លទ្ធផលការងារសម្រេចបាន', width: '120px', align: 'center' },
-  { key: 'otherNotes', label: 'ផ្សេងៗ', width: '120px', align: 'left' },
-  { key: 'latinName', label: 'ឈ្មោះឡាតាំង', width: '120px', align: 'left' },
   { key: 'phone', label: 'លេខទូរស័ព្ទ', width: '110px', align: 'center' },
   { key: 'joinDate', label: 'កាលបរិច្ឆេទចូល', width: '110px', align: 'center' },
   { key: 'birthplace', label: 'ទីកន្លែងកំណើត/បច្ចុប្បន្ន', width: '180px', align: 'left' },
   { key: 'nid', label: 'លេខអត្តសញ្ញាណ', width: '120px', align: 'center' },
+  { key: 'degree', label: 'សញ្ញាប័ត្រ', width: '120px', align: 'left' },
   { key: 'bankAccount', label: 'លេខគណនីធនាគារ', width: '140px', align: 'left' },
+  { key: 'ministrySkill', label: 'ជំនាញក្រសួង', width: '140px', align: 'left' }
 ];
 
 export default function EmployeeReportPage() {
@@ -192,11 +191,11 @@ export default function EmployeeReportPage() {
   const rowFontSize = Math.max(10, Math.round(rowHeight * 0.36));
   // Column visibility controls (persist in sessionStorage)
   const defaultColumns = {
+    staffId: true,
     serialOverall: true,
     serialDept: true,
     name: true,
     latinName: true,
-    staffId: true,
     gender: true,
     dob: true,
     salaryLevel: true,
@@ -207,18 +206,12 @@ export default function EmployeeReportPage() {
     phone: true,
     joinDate: true,
     birthplace: true,
-    totalMonthlyAttendance: true,
-    performanceResult: true,
-    otherNotes: true,
     nid: true,
+    degree: true,
     bankAccount: true,
+    ministrySkill: false
   };
-  if (perms.isAdmin || perms.canEditEmployeeReport) {
-    if (!listColumns.find(c => c.key === 'actions')) {
-      listColumns.push({ key: 'actions', label: 'កែ', width: '60px', align: 'center' });
-    }
-    defaultColumns.actions = true;
-  }
+  // The 'actions' column (កែ) is intentionally removed per user request.
   const [visibleCols, setVisibleCols] = useState(() => {
     try {
       const v = sessionStorage.getItem('employee_report_visible_cols');
@@ -240,6 +233,7 @@ export default function EmployeeReportPage() {
         dob: true,
         salaryLevel: true,
         idOrOfficerType: true,
+        ministrySkill: true,
         skill: true,
         position: true,
       };
@@ -253,6 +247,7 @@ export default function EmployeeReportPage() {
       const evaluationSet = {
         serialDept: true,
         name: true,
+        ministrySkill: true,
         skill: true,
         position: true,
         totalMonthlyAttendance: true,
@@ -274,6 +269,7 @@ export default function EmployeeReportPage() {
         dob: true,
         salaryLevel: true,
         idOrOfficerType: true, // Will show "ប្រភេទមន្ត្រី"
+        ministrySkill: true,
         skill: true,
         position: true,
       };
@@ -1937,7 +1933,7 @@ export default function EmployeeReportPage() {
                   <td style={{ textAlign: 'left' }}>{r.position || ''}</td>
                   <td className="center">{fmtDate(r.dob)}</td>
                   <td style={{ textAlign: 'left' }}>{r.bankAccount || r.bank_account || r.bank || ''}</td>
-                  <td style={{ textAlign: 'left' }}>{r.civilServantRole || r.skill || ''}</td>
+                  <td style={{ textAlign: 'left' }}>{r.skill || ''}</td>
                   <td style={{ textAlign: 'right' }}>{formatCurrencyKhmer(grant)}50 000រៀល</td>
                   <td style={{ textAlign: 'left' }}>{r.department || ''}</td>
                 </tr>
@@ -2005,9 +2001,11 @@ export default function EmployeeReportPage() {
                       const displayVal = isContract ? (r.officerType || '') : (r.civilServantId || r.officerId || r.staffId || r.idCardNumber || r.officerCardNumber || r.cardNumber || '');
                       return <td key={c.key} className="center">{displayVal}</td>;
                     }
+                    if (c.key === 'ministrySkill') {
+                      return <td key={c.key} style={{ textAlign: 'left' }}>{r.civilServantRole || ''}</td>;
+                    }
                     if (c.key === 'skill') {
-                      const skillVal = r.civilServantRole || r.skill || '';
-                      return <td key={c.key} style={{ textAlign: 'left' }}>{skillVal}</td>;
+                      return <td key={c.key} style={{ textAlign: 'left' }}>{r.skill || ''}</td>;
                     }
                     if (c.key === 'position') {
                       return <td key={c.key} style={{ textAlign: 'left' }}>{r.position || ''}</td>;
@@ -2072,6 +2070,9 @@ export default function EmployeeReportPage() {
                     if (c.key === 'nid') {
                       return <td key={c.key} className="center">{r.nid || r.nationalId || r.identityNumber || r.identity || ''}</td>;
                     }
+                    if (c.key === 'degree') {
+                      return <td key={c.key} style={{ textAlign: 'left' }}>{r.degree || r.education || r.certificate || ''}</td>;
+                    }
                     if (c.key === 'bankAccount') {
                       return <td key={c.key} style={{ textAlign: 'left' }}>{r.bankAccount || r.bank_account || r.bank || ''}</td>;
                     }
@@ -2111,9 +2112,11 @@ export default function EmployeeReportPage() {
 
       // 1. Define column structure
       const listColumnsLocal = [
+        { key: 'staffId', label: 'អត្តលេខកាត់', width: 15 },
         { key: 'serialOverall', label: 'ស.រ', width: 5.7 },
         { key: 'serialDept', label: 'ល.រ', width: 4.7 },
         { key: 'name', label: 'គោត្តនាម និងនាម', width: 17.1 },
+        { key: 'latinName', label: 'ឈ្មោះឡាតាំង', width: 20 },
         { key: 'gender', label: 'ភេទ', width: 4.8 },
         { key: 'dob', label: 'ថ្ងៃខែឆ្នាំកំណើត', width: 15.3 },
         { key: 'salaryLevel', label: 'កាំប្រាក់', width: 9.1 },
@@ -2121,16 +2124,13 @@ export default function EmployeeReportPage() {
         { key: 'skill', label: 'ជំនាញ', width: 26.7 },
         { key: 'position', label: 'តួនាទី', width: 26.1 },
         { key: 'department', label: 'ផ្នែក', width: 25 },
-        { key: 'staffId', label: 'អត្តលេខកាត់', width: 15 },
-        { key: 'totalMonthlyAttendance', label: 'សរុបវត្តមានប្រចាំខែ', width: 15 },
-        { key: 'performanceResult', label: 'លទ្ធផលការងារសម្រេចបាន', width: 20 },
-        { key: 'otherNotes', label: 'ផ្សេងៗ', width: 20 },
-        { key: 'latinName', label: 'ឈ្មោះឡាតាំង', width: 20 },
         { key: 'phone', label: 'លេខទូរស័ព្ទ', width: 15 },
         { key: 'joinDate', label: 'កាលបរិច្ឆេទចូល', width: 15 },
         { key: 'birthplace', label: 'ទីកន្លែងកំណើត/បច្ចុប្បន្ន', width: 30 },
         { key: 'nid', label: 'លេខអត្តសញ្ញាណ', width: 15 },
-        { key: 'bankAccount', label: 'លេខគណនីធនាគារ', width: 20 }
+        { key: 'degree', label: 'សញ្ញាប័ត្រ', width: 15 },
+        { key: 'bankAccount', label: 'លេខគណនីធនាគារ', width: 20 },
+        { key: 'ministrySkill', label: 'ជំនាញក្រសួង', width: 20 }
       ];
 
       const civilCols = [
@@ -2263,9 +2263,15 @@ export default function EmployeeReportPage() {
               const isContract = ['state', 'hospital', 'worker', 'hospitalPlus', 'hospitalPartTime', 'retiredThenContract'].includes(reportType);
               return isContract ? (hr.officerType || '') : (hr.civilServantId || hr.officerId || hr.staffId || hr.idCardNumber || hr.officerCardNumber || hr.cardNumber || '');
             }
-            if (k === 'skill') return hr.civilServantRole || hr.skill || '';
+            if (k === 'ministrySkill') return hr.civilServantRole || '';
+            if (k === 'skill') return hr.skill || '';
             if (k === 'position') return hr.position || '';
             if (k === 'department') return hr.Department_Kh || hr.department || hr.unit || '';
+            if (k === 'phone') return hr.phone || hr.mobile || hr.tel || hr.contact || '';
+            if (k === 'joinDate') return fmtDateSlash(hr.joinDate || hr.dateJoinedMinistry || hr.nominationStartDate || hr.startDate || '');
+            if (k === 'birthplace') return hr.placeOfBirth || hr.birthPlace || hr.currentAddress || hr.address || '';
+            if (k === 'nid') return hr.nid || hr.nationalId || hr.identityNumber || hr.identity || '';
+            if (k === 'degree') return hr.degree || hr.education || hr.certificate || '';
             if (k === 'bankAccount') return hr.bankAccount || '';
             if (k === 'grant') {
               const grantVal = hr.grantAmount || hr.bonus || hr.allowance || '';
@@ -2529,12 +2535,12 @@ export default function EmployeeReportPage() {
             <div style={{ position: 'relative' }}>
               <button type="button" onClick={() => setShowColsMenu(v => !v)} style={{ padding: '6px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Columns</button>
               {showColsMenu && (
-                <div style={{ position: 'absolute', right: 0, bottom: '100%', marginBottom: '8px', background: '#fff', border: '1px solid #ddd', padding: '12px', minWidth: '200px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 100, borderRadius: '8px' }}>
+                <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '8px', background: '#fff', border: '1px solid #ddd', padding: '12px', minWidth: '200px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 100, borderRadius: '8px' }}>
                   <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
                     {Object.keys(defaultColumns).map(k => (
                       <label key={k} style={{ display: 'flex', alignItems: 'center', fontSize: '11px', marginBottom: '6px', cursor: 'pointer' }}>
                         <input type="checkbox" checked={!!visibleCols[k]} onChange={() => toggleCol(k)} style={{ marginRight: '8px' }} />
-                        {({ serialOverall: 'ស.រ', serialDept: 'ល.រ', name: 'ឈ្មោះ', staffId: 'អត្តលេខ', gender: 'ភេទ', dob: 'ថ្ងៃកំណើត', salaryLevel: 'កាំប្រាក់', skill: 'ជំនាញ', position: 'តួនាទី', department: 'ផ្នែក', phone: 'ទូរស័ព្ទ' }[k] || k)}
+                        {({ serialOverall: 'ស.រ', serialDept: 'ល.រ', name: 'ឈ្មោះ', latinName: 'ឈ្មោះឡាតាំង', staffId: 'អត្តលេខ', gender: 'ភេទ', dob: 'ថ្ងៃកំណើត', salaryLevel: 'កាំប្រាក់', idOrOfficerType: 'អត្តលេខមន្ត្រី', skill: 'ជំនាញ', position: 'តួនាទី', department: 'ផ្នែក', phone: 'ទូរស័ព្ទ', joinDate: 'កាលបរិច្ឆេទចូល', birthplace: 'ទីកន្លែងកំណើត/បច្ចុប្បន្ន', nid: 'លេខអត្តសញ្ញាណ', degree: 'សញ្ញាប័ត្រ', bankAccount: 'លេខគណនីធនាគារ', ministrySkill: 'ជំនាញក្រសួង' }[k] || k)}
                       </label>
                     ))}
                   </div>

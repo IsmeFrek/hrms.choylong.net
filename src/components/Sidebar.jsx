@@ -157,7 +157,7 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
       documents: 'documents', signatures: 'documents', 'howto-docs': 'documents', 'file-transfer': 'documents', 'file-transfer-outgoing': 'documents', 'file-transfer-stats': 'documents',
       'attendance-scan': 'attendance-scan', 'attendance-scan-qr': 'attendance-scan', 'attendance-scan-face': 'attendance-scan', 'attendance-scan-face-group': 'attendance-scan', 'attendance-face-enroll': 'attendance-scan', 'geo-fence-policies': 'attendance-scan',
       attendance: 'attendance', 'attendance-report': 'attendance', 'attendance-ministry-report': 'attendance',
-      'work-schedule': 'calendar-group', 'work-schedule1': 'calendar-group', shifts: 'calendar-group', 'shift-groups': 'calendar-group',
+      'work-schedule': 'calendar-group', shifts: 'calendar-group', 'shift-groups': 'calendar-group',
       'employee-report': 'reports', 'department-report': 'reports', 'retirement-report': 'reports',
       'employee-id-docs': 'documents',
       'employee-other-docs': 'documents'
@@ -308,7 +308,6 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
       hasSubmenu: true,
       submenu: [
         ...(perms.canViewWorkSchedule ? [{ id: 'work-schedule', label: 'ប្រតិទិនការងារ', icon: Calendar, route: '/work-schedule', path: 'work-schedule' }] : []),
-        ...(perms.canViewWorkSchedule ? [{ id: 'work-schedule1', label: 'ប្រតិទិនការងារ 1', icon: Calendar, route: '/work-schedule1', path: 'work-schedule1' }] : []),
         ...(perms.canViewShifts ? [{ id: 'shifts-att', label: 'Shifts', icon: Calendar, route: '/shifts', path: 'shifts' }] : []),
         ...(perms.canViewShiftGroups ? [{ id: 'shift-groups', label: 'Shift Groups', icon: Calendar, route: '/shift-groups', path: 'shift-groups' }] : []),
         ...(perms.canViewGroupTimetables ? [{ id: 'group-timetables', label: 'គ្រប់គ្រងម៉ោងក្រុម', icon: Clock, route: '/group-timetables', path: 'group-timetables' }] : [])

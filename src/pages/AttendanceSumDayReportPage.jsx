@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import api from '../services/api';
 import usePermission from '../hooks/usePermission';
 import headerBg from '../assets/3.JPG';
@@ -11,7 +13,10 @@ function buildPrintStyleSumDay(orientation) {
 @media print {
   @page {
     size: A4 ${o};
-    margin: 0;
+    margin-top: 5mm;
+    margin-bottom: 5mm;
+    margin-left: 0;
+    margin-right: 0;
   }
   html, body {
     margin: 0 !important;
@@ -1020,7 +1025,7 @@ export default function AttendanceSumDayReportPage() {
     setColOrder(newOrder);
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     // Use the selected month (END month) for file naming
     const [yStr, mStr] = (monthValue || '').split('-');
     const year = yStr || '';
@@ -1028,8 +1033,6 @@ export default function AttendanceSumDayReportPage() {
 
     const visibleKeys = (colOrder || [])
       .filter((k) => columnMeta[k] && (visibleCols?.[k] ?? true));
-
-    const header = visibleKeys.map((k) => columnMeta[k]?.label || k);
 
     const getCellValueLocal = (k, row) => {
       switch (k) {
@@ -1052,19 +1055,128 @@ export default function AttendanceSumDayReportPage() {
         case 'totalAbsent': return row.totalAbsent;
         case 'percentage': return row.percentage;
         case 'overallPercent': return row.overallPercent;
-        // Do not export any value for "ចំនួនអវត្តមានត្រូវកាត់"; keep column but leave cells empty.
         case 'absentToDeduct': return '';
         case 'other': return row.other;
-        case 'totalLeaveComment':
-          // Export the same auto-built comment used on screen
-          return buildCommentText(row);
+        case 'totalLeaveComment': return buildCommentText(row);
         default: return row?.[k];
       }
     };
 
-    const data = derived.rows.map((row) => visibleKeys.map((k) => getCellValueLocal(k, row)));
+    const wb = new ExcelJS.Workbook();
+    const sheetName = `វត្តមាន_${month}_${year}`;
+    const ws = wb.addWorksheet(sheetName.substring(0, 31)); // Excel sheet name limit
 
-    const totalRow = visibleKeys.map((k) => {
+    const colsCount = visibleKeys.length;
+    const midCol = Math.ceil(colsCount / 2);
+
+    // Apply basic font settings to the sheet
+    ws.properties.defaultRowHeight = 20;
+
+    // Define columns
+    ws.columns = visibleKeys.map(k => {
+      let w = Number(colWidths?.[k]) || columnMeta[k]?.width;
+      let wch = typeof w === 'number' ? Math.max(8, Math.round(w / 6.5)) : 12;
+      if (k === 'index') wch = 6;
+      if (k === 'name') wch = 20;
+      if (k === 'position') wch = 25;
+      if (k === 'department') wch = 25;
+      if (k === 'totalLeaveComment') wch = 30;
+      return { key: k, width: wch };
+    });
+
+    // Add UI/UX Headers
+    // Row 1: ព្រះរាជាណាចក្រកម្ពុជា
+    const r1 = ws.addRow([]);
+    const c1 = ws.getCell(1, midCol);
+    c1.value = 'ព្រះរាជាណាចក្រកម្ពុជា';
+    c1.font = { name: 'Khmer OS Muol Light', size: 16 };
+    c1.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.mergeCells(1, Math.max(1, midCol - 1), 1, Math.min(colsCount, midCol + 2));
+
+    // Row 2: ជាតិ សាសនា ព្រះមហាក្សត្រ
+    const r2 = ws.addRow([]);
+    const c2 = ws.getCell(2, midCol);
+    c2.value = 'ជាតិ សាសនា ព្រះមហាក្សត្រ';
+    c2.font = { name: 'Khmer OS Muol Light', size: 16 };
+    c2.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.mergeCells(2, Math.max(1, midCol - 1), 2, Math.min(colsCount, midCol + 2));
+
+    // Empty row
+    ws.addRow([]);
+
+    // Row 4: ក្រសួងសុខាភិបាល
+    const r4 = ws.addRow([]);
+    const c4 = ws.getCell(r4.number, 1);
+    c4.value = 'ក្រសួងសុខាភិបាល';
+    c4.font = { name: 'Khmer OS Muol Light', size: 14 };
+    c4.alignment = { horizontal: 'left', vertical: 'middle' };
+
+    // Row 5: មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត
+    const r5 = ws.addRow([]);
+    const c5 = ws.getCell(r5.number, 1);
+    c5.value = 'មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត';
+    c5.font = { name: 'Khmer OS Muol Light', size: 14 };
+    c5.alignment = { horizontal: 'left', vertical: 'middle' };
+
+    // Row 6: Department
+    if (selectedDept) {
+      const r6 = ws.addRow([]);
+      const c6 = ws.getCell(r6.number, 1);
+      c6.value = `ផ្នែក: ${selectedDept}`;
+      c6.font = { name: 'Khmer OS Muol Light', size: 14 };
+      c6.alignment = { horizontal: 'left', vertical: 'middle' };
+    }
+
+    // Row 7: Title
+    const rTitle = ws.addRow([]);
+    const cTitle = ws.getCell(rTitle.number, 1);
+    cTitle.value = `វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា គិតពី ${fmtKhmerLongDateSumDay(apiFromDate)} ដល់ ${fmtKhmerLongDateSumDay(apiToDate)}`;
+    cTitle.font = { name: 'Khmer OS Siemreap', size: 15, bold: true };
+    cTitle.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.mergeCells(rTitle.number, 1, rTitle.number, colsCount);
+
+    ws.addRow([]); // empty row before table
+
+    // Table Header
+    const headerRow = ws.addRow(visibleKeys.map(k => columnMeta[k]?.label || k));
+    headerRow.height = 30;
+    headerRow.eachCell((cell) => {
+      cell.font = { name: 'Khmer OS Siemreap', size: 11, bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+        left: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+        bottom: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+        right: { style: 'thin', color: { argb: 'FF8F8B8B' } }
+      };
+    });
+
+    // Table Data
+    derived.rows.forEach(row => {
+      const rowData = visibleKeys.map(k => getCellValueLocal(k, row));
+      const excelRow = ws.addRow(rowData);
+      excelRow.eachCell((cell, colNumber) => {
+        const k = visibleKeys[colNumber - 1];
+        cell.font = { name: 'Khmer OS Siemreap', size: 11 };
+        
+        let align = 'center';
+        if (k === 'name' || k === 'position' || k === 'department' || k === 'leaveType' || k === 'other' || k === 'totalLeaveComment') {
+          align = 'left';
+        }
+        
+        cell.alignment = { horizontal: align, vertical: 'middle', wrapText: true };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+          left: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+          bottom: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+          right: { style: 'thin', color: { argb: 'FF8F8B8B' } }
+        };
+      });
+    });
+
+    // Summary Row
+    const totalRow = visibleKeys.map(k => {
       if (k === 'index') return 'សរុប';
       if (k === 'dayWorkCount') return derived.totals?.dayWorkCount;
       if (k === 'attendanceCount') return derived.totals?.attendanceCount;
@@ -1076,25 +1188,29 @@ export default function AttendanceSumDayReportPage() {
       if (k === 'workTime') return derived.totals?.workTime;
       return '';
     });
-
-    const summary = [
-      totalRow,
-      [],
-      ['សរុបបុគ្គលិក', `${derived.total} នាក់`, `(ប្រុស: ${derived.male} នាក់ — ស្រី: ${derived.female} នាក់)`]
-    ];
-
-    const ws = XLSX.utils.aoa_to_sheet([header, ...data, ...summary]);
-    ws['!cols'] = visibleKeys.map((k) => {
-      const w = Number(colWidths?.[k]) || columnMeta[k]?.width;
-      const wch = typeof w === 'number' ? Math.max(6, Math.round(w / 3)) : 10;
-      return { wch };
+    
+    const summaryExcelRow = ws.addRow(totalRow);
+    summaryExcelRow.eachCell((cell, colNumber) => {
+      const k = visibleKeys[colNumber - 1];
+      cell.font = { name: 'Khmer OS Siemreap', size: 11, bold: true };
+      let align = 'center';
+      if (k === 'index') align = 'right';
+      cell.alignment = { horizontal: align, vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+        left: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+        bottom: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+        right: { style: 'thin', color: { argb: 'FF8F8B8B' } }
+      };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
     });
 
-    const wb = XLSX.utils.book_new();
-    const sheetName = `វត្តមាន_${month}_${year}`;
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    ws.addRow([]);
+    ws.addRow(['សរុបបុគ្គលិក', `${derived.total} នាក់`, `(ប្រុស: ${derived.male} នាក់ — ស្រី: ${derived.female} នាក់)`]);
+
     const fileSafe = year && month ? `AttendanceSumDay_${year}_${month}.xlsx` : `AttendanceSumDay_${fromDate}_${toDate}.xlsx`;
-    XLSX.writeFile(wb, fileSafe);
+    const buffer = await wb.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), fileSafe);
   };
 
   const handlePrint = () => {
@@ -1199,14 +1315,24 @@ export default function AttendanceSumDayReportPage() {
       });
       page.className = 'dept-page';
 
-      const header = makeEl('div', { marginBottom: '16px', borderBottom: '2px solid #ddd', paddingBottom: '10px' });
-      header.appendChild(makeText('h1', 'ព្រះរាជាណាចក្រកម្ពុជា', { margin: '0', fontSize: '20px', fontWeight: '400', textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }));
-      header.appendChild(makeText('h1', 'ជាតិ សាសនា ព្រះមហាក្សត្រ', { margin: '0', fontSize: '20px', fontWeight: '400', textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }));
-      header.appendChild(makeText('h1', 'ក្រសួងសុខាភិបាល', { margin: '0', fontSize: '16px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
-      header.appendChild(makeText('h1', 'មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត', { margin: '0', fontSize: '16px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
-      header.appendChild(makeText('h1', 'វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា', { margin: '0', fontSize: '20px', fontWeight: '700', textAlign: 'center' }));
-      header.appendChild(makeText('div', `ផ្នែក: ${deptName}`, { marginTop: '6px', fontSize: '14px', fontWeight: '700', textAlign: 'center' }));
-      header.appendChild(makeText('div', `គិតពី ${fmtKhmerLongDateSumDay(fromDate)} ដល់ ${fmtKhmerLongDateSumDay(toDate)}`, { marginTop: '4px', fontSize: '14px', textAlign: 'center', color: '#141313' }));
+      const header = makeEl('div', { marginBottom: '4px', paddingBottom: '0' });
+      header.appendChild(makeText('h1', 'ព្រះរាជាណាចក្រកម្ពុជា', { margin: '0', fontSize: '16px', fontWeight: '400', textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }));
+      header.appendChild(makeText('h1', 'ជាតិ សាសនា ព្រះមហាក្សត្រ', { margin: '0', fontSize: '16px', fontWeight: '400', textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }));
+      
+      const logoWrapper = makeEl('div', { display: 'flex', justifyContent: 'center', width: '100%', margin: '4px 0' });
+      const logo = makeEl('img');
+      logo.src = headerBg;
+      logo.alt = 'header-symbol';
+      logo.style.height = 'auto';
+      logo.style.maxWidth = '120px';
+      logoWrapper.appendChild(logo);
+      header.appendChild(logoWrapper);
+
+      header.appendChild(makeText('h1', 'ក្រសួងសុខាភិបាល', { margin: '0', marginTop: '-5mm', fontSize: '14px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
+      header.appendChild(makeText('h1', 'មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត', { margin: '0', fontSize: '14px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
+      header.appendChild(makeText('h1', deptName || '', { margin: '0', fontSize: '14px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
+      
+      header.appendChild(makeText('p', `វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា គិតពី ${fmtKhmerLongDateSumDay(fromDate)} ដល់ ${fmtKhmerLongDateSumDay(toDate)}`, { margin: '0', fontSize: '15px', fontWeight: '700', textAlign: 'center', fontFamily: '"Khmer OS Siemreap", "Noto Sans Khmer", sans-serif' }));
       page.appendChild(header);
 
       const male = rows.filter(r => r.gender === 'Male' || r.gender === 'ប្រុស').length;
@@ -1218,7 +1344,7 @@ export default function AttendanceSumDayReportPage() {
       const thead = makeEl('thead');
       const trh = makeEl('tr');
       visibleKeysNow.forEach((k) => {
-        const th = makeEl('th', { textAlign: 'center', fontSize: '11px', padding: '4px 3px', border: '1px solid #8f8b8b', background: '#f3f4f6', wordBreak: 'break-word' });
+        const th = makeEl('th', { textAlign: 'center', fontSize: '11px', padding: '4px 3px', border: '1px solid #8f8b8b', background: '#f3f4f6', whiteSpace: 'nowrap' });
         th.textContent = columnMeta[k]?.label || k;
         trh.appendChild(th);
       });
@@ -1237,7 +1363,7 @@ export default function AttendanceSumDayReportPage() {
             textAlign: cell?.style?.textAlign || columnMeta[k]?.align || 'center',
             border: '1px solid #8f8b8b',
             padding: '3px 4px',
-            wordBreak: 'break-word'
+            whiteSpace: 'nowrap'
           });
           td.textContent = (cell?.value ?? '').toString();
           tbody.appendChild(tr).appendChild(td);
@@ -1278,7 +1404,8 @@ export default function AttendanceSumDayReportPage() {
     border: '1px solid #8f8b8b',
     padding: `${bodyPadY}px 6px`,
     verticalAlign: 'middle',
-    fontSize: rowFontSize
+    fontSize: rowFontSize,
+    whiteSpace: 'nowrap'
   };
 
   const visibleKeys = (colOrder || [])
@@ -1866,18 +1993,17 @@ export default function AttendanceSumDayReportPage() {
           padding: 24
         }}
       >
-        <div style={{ marginBottom: 20, paddingBottom: 10 }}>
-          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 400, textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }}>ព្រះរាជាណាចក្រកម្ពុជា</h1>
-          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 400, textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }}>ជាតិ សាសនា ព្រះមហាក្សត្រ</h1>
+        <div style={{ marginBottom: 4, paddingBottom: 0 }}>
+          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 400, textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }}>ព្រះរាជាណាចក្រកម្ពុជា</h1>
+          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 400, textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }}>ជាតិ សាសនា ព្រះមហាក្សត្រ</h1>
           <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
             <img src={headerBg} alt="header-symbol" style={{ height: 'auto', maxWidth: '120px' }} />
           </div>
-          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 400, textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }}>ក្រសួងសុខាភិបាល</h1>
-          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 400, textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</h1>
+          <h1 style={{ margin: 0, marginTop: '-5mm', fontSize: 14, fontWeight: 400, textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }}>ក្រសួងសុខាភិបាល</h1>
+          <h1 style={{ margin: 0, fontSize: 14, fontWeight: 400, textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</h1>
           <h1 style={{ margin: 0, fontSize: 14, fontWeight: 400, textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }}>{selectedDept || ''}</h1>
-          <p style={{ margin: 0, fontSize: '15px', fontWeight: 700, textAlign: 'center', fontFamily: '"Khmer OS Siemreap", "Noto Sans Khmer", sans-serif' }}>វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា</p>
-          <p style={{ margin: '5px 0 0', fontSize: '15px', fontWeight: 700, textAlign: 'center', fontFamily: '"Khmer OS Siemreap", "Noto Sans Khmer", sans-serif' }}>
-            គិតពី {fmtKhmerLongDateSumDay(apiFromDate)} ដល់ {fmtKhmerLongDateSumDay(apiToDate)}
+          <p style={{ margin: 0, fontSize: '15px', fontWeight: 700, textAlign: 'center', fontFamily: '"Khmer OS Siemreap", "Noto Sans Khmer", sans-serif' }}>
+            វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា គិតពី {fmtKhmerLongDateSumDay(apiFromDate)} ដល់ {fmtKhmerLongDateSumDay(apiToDate)}
           </p>
         </div>
 
