@@ -29,6 +29,7 @@ import holidaysRoutes from './routes/holidays.js';
 import reportSettingsRoutes from './routes/reportSettings.js';
 import departmentUnitRoutes from './routes/departmentUnit.js';
 import meetingRoomRoutes from './routes/meetingRooms.js';
+import payrollRoutes from './routes/payroll.js';
 // Models (for seeding)
 import Role from './models/Role.js';
 import User from './models/User.js';
@@ -283,6 +284,7 @@ app.use('/api/leave-requests', leaveRequestRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/mobile', mobileRoutes);
+app.use('/api/payroll', payrollRoutes);
 // Missions routes (persisted missions)
 app.use('/api/missions', missionsRoutes);
 // expose under legacy namespace as well

@@ -59,7 +59,7 @@ const Layout = ({ children, activeSection, onSectionChange }) => {
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Header (full width) */}
-      <header className="sticky top-0 z-40 bg-blue-300 h-16">
+      <header className="sticky top-0 z-40 bg-blue-300 h-16 print:hidden">
         <div className="h-16 flex items-center justify-center px-4">
           <Sidebar asHeader activeSection={activeSection} onSectionChange={onSectionChange} isCollapsed={sidebarCompact} onToggle={toggleSidebar} />
         </div>
@@ -81,7 +81,7 @@ const Layout = ({ children, activeSection, onSectionChange }) => {
           />
         )}
         <aside
-          className="flex-shrink-0"
+          className="flex-shrink-0 print:hidden"
           style={{
             width: sidebarCompact ? '4.5rem' : '14rem',
             position: 'fixed',
@@ -100,7 +100,7 @@ const Layout = ({ children, activeSection, onSectionChange }) => {
         </aside>
 
         <div
-          className={`flex-1 flex flex-col transition-all duration-200`}
+          className={`flex-1 flex flex-col transition-all duration-200 print:ml-0 print:w-full print:max-w-full`}
           style={{ 
             marginLeft: isMobile ? 0 : (sidebarCompact ? '4.5rem' : '14rem'),
             width: isMobile ? '100%' : (sidebarCompact ? 'calc(100% - 4.5rem)' : 'calc(100% - 14rem)'),
@@ -116,7 +116,7 @@ const Layout = ({ children, activeSection, onSectionChange }) => {
       </div>
 
       {/* Footer (below main content) */}
-      <footer className="fixed bottom-0 left-0 w-full z-50 bg-blue-600 h-8 flex items-center overflow-hidden border-t border-blue-400 shadow-inner">
+      <footer className="fixed bottom-0 left-0 w-full z-50 bg-blue-600 h-8 flex items-center overflow-hidden border-t border-blue-400 shadow-inner print:hidden">
         <div className="w-full relative flex items-center h-full">
           <div 
             className="flex animate-marquee"

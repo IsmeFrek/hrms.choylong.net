@@ -318,6 +318,7 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
     ...(perms.canViewEmployeeReport || perms.canViewAttendance || perms.canViewRetirementReport ?
       [{
         id: 'reports', label: 'របាយការណ៍', icon: FileText, hasSubmenu: true, submenu: [
+          ...(perms.canViewEmployeeReport ? [{ id: 'payroll', label: 'តារាងបៀវត្សន៍', icon: FileSpreadsheet, path: 'payroll' }] : []),
           ...(perms.canViewEmployeeReport ? [{ id: 'employee-report', label: 'បុគ្គលិក', icon: FileText, path: 'employee-report' }] : []),
           ...(perms.canViewDailyReport ? [{ id: 'daily-report', label: 'ប្រចាំថ្ងៃ', icon: FileText, path: 'daily-report' }] : []),
           ...(perms.canViewGroupReport ? [{ id: 'group-report', label: 'ក្រុម', icon: FileText, path: 'group-report' }] : []),

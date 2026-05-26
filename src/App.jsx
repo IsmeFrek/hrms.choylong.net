@@ -114,6 +114,7 @@ import SystemSettingsPage from './pages/SystemSettingsPage.jsx';
 import PublicStaffProfile from './pages/PublicStaffProfile.jsx';
 import EmployeeIDDocsPage from './pages/EmployeeIDDocsPage.jsx';
 import EmployeeOtherDocsPage from './pages/EmployeeOtherDocsPage.jsx';
+import PayrollPage from './pages/PayrollPage.jsx';
 
 function RequireAuth({ children }) {
   const { isAuthenticated } = useAuth();
@@ -436,6 +437,12 @@ function ProtectedApp() {
         return (
           <PermissionGate allow={perms.canViewEmployeeReport}>
             <EmployeeReportPage />
+          </PermissionGate>
+        );
+      case 'payroll':
+        return (
+          <PermissionGate allow={perms.canViewEmployeeReport || perms.isAdmin}>
+            <PayrollPage />
           </PermissionGate>
         );
       case 'employee-id-docs':
@@ -795,6 +802,7 @@ export default function App() {
           <Route path="/kshf_hospital_app/filetransfers-out" element={<RequireAuth><LayoutWrapper section="file-transfer"><FileTransfer1Page /></LayoutWrapper></RequireAuth>} />
           <Route path="/daily-attendance-report" element={<RequireAuth><DailyAttendanceReport /></RequireAuth>} />
           <Route path="/employee-report" element={<RequireAuth><LayoutWrapper section="employee-report"><EmployeeReportPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/payroll" element={<RequireAuth><LayoutWrapper section="payroll"><PayrollPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/evaluation" element={<RequireAuth><LayoutWrapper section="evaluation"><EvaluationReportPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/employee-id-docs" element={<RequireAuth><LayoutWrapper section="employee-id-docs"><EmployeeIDDocsPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/employee-other-docs" element={<RequireAuth><LayoutWrapper section="employee-other-docs"><EmployeeOtherDocsPage /></LayoutWrapper></RequireAuth>} />
