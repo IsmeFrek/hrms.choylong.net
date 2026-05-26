@@ -1165,9 +1165,8 @@ export default function EmployeeReportPage() {
       let hasOthers = false;
       for (const hr of sourceList || []) {
         const hs = hrSkillNormOf(hr);
-        if (!hs) continue;
-        if (processedSkills.has(hs)) continue;
-        if (memberToGroup.has(hs)) continue; // Should have been caught by group loop above
+        if (hs && processedSkills.has(hs)) continue;
+        if (hs && memberToGroup.has(hs)) continue; // Should have been caught by group loop above
 
         hasOthers = true;
         if (isCivil(hr)) otherCivil++; else otherContract++;
@@ -1176,7 +1175,16 @@ export default function EmployeeReportPage() {
       }
 
       if (hasOthers) {
-        rows.push({ name: 'ផ្សេងៗ', male: otherMale, female: otherFemale, total: otherMale + otherFemale, civil: otherCivil, contract: otherContract, isGroup: false });
+        const existingOther = rows.find(r => r.name === 'ផ្សេងៗ');
+        if (existingOther) {
+          existingOther.male += otherMale;
+          existingOther.female += otherFemale;
+          existingOther.total += (otherMale + otherFemale);
+          existingOther.civil += otherCivil;
+          existingOther.contract += otherContract;
+        } else {
+          rows.push({ name: 'ផ្សេងៗ', male: otherMale, female: otherFemale, total: otherMale + otherFemale, civil: otherCivil, contract: otherContract, isGroup: false });
+        }
       }
 
       const totals = rows.reduce((acc, r) => ({
@@ -1243,8 +1251,7 @@ export default function EmployeeReportPage() {
       let hasOthers = false;
       for (const hr of sourceList || []) {
         const hs = hrMinistrySkillNormOf(hr);
-        if (!hs) continue;
-        if (processedSkills.has(hs)) continue;
+        if (hs && processedSkills.has(hs)) continue;
 
         hasOthers = true;
         if (isCivil(hr)) otherCivil++; else otherContract++;
@@ -1253,7 +1260,16 @@ export default function EmployeeReportPage() {
       }
 
       if (hasOthers) {
-        rows.push({ name: 'ផ្សេងៗ', male: otherMale, female: otherFemale, total: otherMale + otherFemale, civil: otherCivil, contract: otherContract, isGroup: false });
+        const existingOther = rows.find(r => r.name === 'ផ្សេងៗ');
+        if (existingOther) {
+          existingOther.male += otherMale;
+          existingOther.female += otherFemale;
+          existingOther.total += (otherMale + otherFemale);
+          existingOther.civil += otherCivil;
+          existingOther.contract += otherContract;
+        } else {
+          rows.push({ name: 'ផ្សេងៗ', male: otherMale, female: otherFemale, total: otherMale + otherFemale, civil: otherCivil, contract: otherContract, isGroup: false });
+        }
       }
       
       const totals = rows.reduce((acc, r) => ({
@@ -1497,6 +1513,30 @@ export default function EmployeeReportPage() {
 
   const handlePrint = () => {
     if (!printRef.current) return;
+
+    // Synchronize input and select values to DOM attributes so innerHTML captures them
+    const inputs = printRef.current.querySelectorAll('input, textarea');
+    inputs.forEach(input => {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        if (input.checked) input.setAttribute('checked', 'checked');
+        else input.removeAttribute('checked');
+      } else {
+        input.setAttribute('value', input.value);
+      }
+    });
+
+    const selects = printRef.current.querySelectorAll('select');
+    selects.forEach(select => {
+      const options = select.querySelectorAll('option');
+      options.forEach(option => {
+        if (option.value === select.value) {
+          option.setAttribute('selected', 'selected');
+        } else {
+          option.removeAttribute('selected');
+        }
+      });
+    });
+
     const w = window.open('', '_blank');
     if (!w) return;
     const pageSize = (orientation === 'landscape') ? 'A4 landscape' : 'A4';
@@ -1525,9 +1565,8 @@ export default function EmployeeReportPage() {
   .a4-portrait { width: 210mm; min-height: 297mm; padding: 10mm; box-sizing: border-box; background: #fff; }
   .a4-landscape { width: 297mm; min-height: 210mm; padding: 10mm; box-sizing: border-box; background: #fff; }
   /* Dynamic row height / padding overrides - allow wrapping for multi-line cells */
-  .print-scope tbody tr { min-height: ${rowHeight}px; }
-  .print-scope tbody tr > td, .print-scope tbody tr > th { vertical-align: middle !important; white-space: normal !important; overflow: visible !important; text-overflow: unset !important; }
-  .print-scope th, .print-scope td { padding: ${Math.max(6, Math.round(rowHeight / 4))}px ${Math.max(4, Math.round(rowHeight / 8))}px !important; line-height: ${Math.max(12, Math.round(rowHeight * 0.6))}px !important; }
+  .print-scope tbody tr:not(.section-row) { height: ${rowHeight}px; }
+  .print-scope tbody td { padding: ${Math.round(rowHeight / 6)}px 2px !important; line-height: ${Math.max(10, Math.round(rowHeight * 0.6))}px !important; }
       </style>
     `;
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"/>${PRINT_STYLES}</head><body>${printRef.current.innerHTML}</body></html>`);
@@ -2529,8 +2568,8 @@ export default function EmployeeReportPage() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '4px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <label style={{ fontSize: '10px', color: '#94a3b8', textAlign: 'center' }}>Row Height</label>
-              <input type="range" min={20} max={60} value={rowHeight} onChange={(e) => setRowHeight(Number(e.target.value))} style={{ width: '80px' }} />
+              <label style={{ fontSize: '10px', color: '#94a3b8', textAlign: 'center' }}>Row Height: {rowHeight}px</label>
+              <input type="range" min={0} max={60} value={rowHeight} onChange={(e) => setRowHeight(Number(e.target.value))} style={{ width: '80px' }} />
             </div>
             <div style={{ position: 'relative' }}>
               <button type="button" onClick={() => setShowColsMenu(v => !v)} style={{ padding: '6px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Columns</button>
@@ -2560,7 +2599,7 @@ export default function EmployeeReportPage() {
         <div ref={printRef} className="bg-white p-4 border rounded print-scope a4-portrait">
           {/* Screen-only style to match print layout */}
           <style dangerouslySetInnerHTML={{ __html: SCREEN_CSS }} />
-          <style>{`.print-scope tbody tr { min-height: ${rowHeight}px; }
+          <style>{`.print-scope tbody tr:not(.section-row) { height: ${rowHeight}px; }
             .print-scope thead tr > th {
               position: sticky;
               top: ${filterHeight - 24}px;
@@ -2579,7 +2618,7 @@ export default function EmployeeReportPage() {
               width: 100%;
               transform-origin: left center;
             }
-            .print-scope th, .print-scope td { padding: ${Math.max(6, Math.round(rowHeight / 4))}px ${Math.max(4, Math.round(rowHeight / 8))}px !important; line-height: ${Math.max(12, Math.round(rowHeight * 0.6))}px !important; }
+            .print-scope tbody td { padding: ${Math.round(rowHeight / 6)}px 2px !important; line-height: ${Math.max(10, Math.round(rowHeight * 0.6))}px !important; }
             `}</style>
           <div className="title">
             <h2 style={{ marginBottom: 0 }}>
@@ -2670,7 +2709,7 @@ export default function EmployeeReportPage() {
                 សំគាល់៖
               </div>
               <div style={{ fontSize: '12px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', paddingLeft: '10px', lineHeight: '1.6' }}>
-                ១. វឌ្ឍនការងារ៖ ល្អ (≥៨៥%-១០០%), ល្អបង្គួរ (≥៦៥%-{"<"}៨៥%), មធ្យម (≥៤៥%-{"<"}៦៥%), ខ្សោយ ({"<"}៤៥%)<br />
+                ១. វត្តមានការងារ៖ ល្អ (≥៨៥%-១០០%), ល្អបង្គួរ (≥៦៥%-{"<"}៨៥%), មធ្យម (≥៤៥%-{"<"}៦៥%), ខ្សោយ ({"<"}៤៥%)<br />
                 ២. ការផ្តល់ប្រាក់លើកទឹកចិត្ត៖ ល្អ (១០០%), ល្អបង្គួរ (៧៥%), មធ្យម (៥០%), ខ្សោយ (០%)
               </div>
             </div>

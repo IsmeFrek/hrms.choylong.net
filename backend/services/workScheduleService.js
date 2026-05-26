@@ -169,6 +169,13 @@ export async function syncShiftGroupsToSchedules({ month, year, shiftGroupId, de
             }
           }
 
+          if (emp.joinDate) {
+            const joinDateUTC = new Date(Date.UTC(emp.joinDate.getUTCFullYear(), emp.joinDate.getUTCMonth(), emp.joinDate.getUTCDate()));
+            if (date < joinDateUTC) {
+              continue;
+            }
+          }
+
           const isoDate = date.toISOString().split('T')[0];
           const dayIndex = day - 1;
           
@@ -242,6 +249,13 @@ export async function syncShiftGroupsToSchedules({ month, year, shiftGroupId, de
           if (isInactive) {
             const endDate = emp.resignationDate || emp.dateRemoved;
             if (endDate && date > endDate) {
+              continue;
+            }
+          }
+
+          if (emp.joinDate) {
+            const joinDateUTC = new Date(Date.UTC(emp.joinDate.getUTCFullYear(), emp.joinDate.getUTCMonth(), emp.joinDate.getUTCDate()));
+            if (date < joinDateUTC) {
               continue;
             }
           }

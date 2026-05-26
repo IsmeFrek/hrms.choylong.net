@@ -741,15 +741,31 @@ export default function AttendanceSumDayReportPage() {
           }
         });
 
+        // Helper to convert Khmer numerals to Arabic and extract the first number
+        const parseNo = (val) => {
+          if (!val) return 0;
+          let s = String(val).trim();
+          // Convert Khmer digits to Arabic digits
+          const khmerMap = { '០': '0', '១': '1', '២': '2', '៣': '3', '៤': '4', '៥': '5', '៦': '6', '៧': '7', '៨': '8', '៩': '9' };
+          s = s.replace(/[០-៩]/g, d => khmerMap[d]);
+          // Extract the first continuous sequence of digits (and optional decimal)
+          const match = s.match(/-?\d+(\.\d+)?/);
+          if (match) {
+            return parseFloat(match[0]);
+          }
+          return 0;
+        };
+
         // 4. Aggregate
         const agg = {};
         hrList.forEach((h, idx) => {
           const sid = (h.staffId || h.no || '').toString().trim();
-          const noNum = Number(h?.no);
-          const sortKey = Number.isFinite(noNum) && noNum > 0 ? noNum : (1_000_000 + idx);
+          const noNum = parseNo(h?.no);
+          const sortKey = noNum === 0 ? (idx / 1000000) : noNum; // use parsed number, if 0 keep relative index order at top
           agg[sid] = {
             staffId: sid,
             hrSortKey: sortKey,
+            hrNo: h.no || '',
             isCivilServant: Boolean(
               !h?.isRetiredThenContract &&
               ((h?.civilServantId || '').toString().trim() || (h?.officerId || '').toString().trim() || (h?.dateJoinedGov || '').toString().trim())
@@ -1239,7 +1255,86 @@ export default function AttendanceSumDayReportPage() {
   };
 
   const handlePrintByDepartment = () => {
-    const rowsSource = selectedDept ? (derived.rows || []) : (derivedAllDepts.rows || []);
+    // Re-filter without selectedDept to get all departments if selectedDept is empty,
+    // otherwise just use derived.rows
+    let rowsSource = derived.rows;
+    if (!selectedDept && attendanceData) {
+      // Re-run derived logic without selectedDept
+      rowsSource = attendanceData.filter(record => {
+        const selectedPosSet = new Set((selectedPositions || []).map(p => (p || '').toString().trim()).filter(Boolean));
+        if (selectedPosSet.size) {
+          const pos = (record.position || '').toString().trim();
+          if (!selectedPosSet.has(pos)) return false;
+        }
+        const selectedLeaveNorm = (selectedLeaveFilter || '').toString().trim();
+        if (selectedLeaveNorm) {
+          const lt = (record.leaveType || '').toString().trim();
+          const comment = (record.totalLeaveComment || '').toString().trim();
+          if (!lt.includes(selectedLeaveNorm) && !comment.includes(selectedLeaveNorm)) return false;
+        }
+        const term = (q || '').toString().trim().toLowerCase();
+        if (term) {
+          const name = (record.khmerName || record.name || '').toString().toLowerCase();
+          const staffId = (record.staffId || record.no || '').toString().toLowerCase();
+          const position = (record.position || '').toString().toLowerCase();
+          const dept = (record.department || '').toString().toLowerCase();
+          if (!(name.includes(term) || staffId.includes(term) || position.includes(term) || dept.includes(term))) return false;
+        }
+        return true;
+      }).map(record => {
+        // We only need the basic mapping for printing
+        const dayWorkCount = Number(record.dayWorkCount) || 0;
+        const attendanceCount = Number(record.attendanceCount) || 0;
+        const leaveCount = Number(record.leaveCount) || 0;
+        const A = Number(record.A) || 0;
+        const checkinLateCount = Number(record.checkinLateCount) || 0;
+        const checkoutEarlyCount = Number(record.checkoutEarlyCount) || 0;
+        const lateEarlyEvents = checkinLateCount + checkoutEarlyCount;
+        const plechEvents = Number(record.plech ?? record.Plech) || 0;
+        const combinedEvents = lateEarlyEvents + plechEvents;
+        let totalAbsent = A + (combinedEvents / 3);
+        totalAbsent = Math.round(totalAbsent * 100) / 100;
+        
+        let overallPercent = 0;
+        if (dayWorkCount > 0) {
+          overallPercent = Math.max(0, Math.min(100, Math.round(((dayWorkCount - (totalAbsent + leaveCount)) / dayWorkCount) * 100)));
+        }
+        
+        let performanceResult = '';
+        if (overallPercent >= 85) performanceResult = 'ល្អ';
+        else if (overallPercent >= 65) performanceResult = 'ល្អបង្គួរ';
+        else if (overallPercent >= 45) performanceResult = 'មធ្យម';
+        else if (overallPercent < 45) performanceResult = 'ខ្សោយ';
+
+        return {
+          ...record,
+          genderShort: fmtGenderShortSumDay(record.gender),
+          lateEarly: combinedEvents,
+          totalAbsent,
+          overallPercent,
+          performanceResult
+        };
+      });
+
+      rowsSource.sort((a, b) => {
+        if (sortByOverallPercent) {
+          const ao = Number(a?.overallPercent);
+          const bo = Number(b?.overallPercent);
+          const aVal = Number.isFinite(ao) ? ao : -1;
+          const bVal = Number.isFinite(bo) ? bo : -1;
+          if (aVal !== bVal) return sortByOverallPercent === 'desc' ? bVal - aVal : aVal - bVal;
+        }
+        const ka = Number(a?.hrSortKey);
+        const kb = Number(b?.hrSortKey);
+        const aKey = Number.isFinite(ka) ? ka : 1_000_000_000;
+        const bKey = Number.isFinite(kb) ? kb : 1_000_000_000;
+        if (aKey !== bKey) return aKey - bKey;
+        const aSid = (a?.staffId || a?.no || '').toString();
+        const bSid = (b?.staffId || b?.no || '').toString();
+        return aSid.localeCompare(bSid);
+      });
+    }
+
     const deptKey = (s) => (s || '').toString().trim() || 'មិនមានផ្នែក';
     const groups = new Map();
     rowsSource.forEach((r) => {

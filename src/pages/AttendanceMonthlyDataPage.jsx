@@ -20,7 +20,7 @@ export default function AttendanceMonthlyDataPage() {
 
   const norm = (id) => {
     if (!id) return '';
-    return String(id).trim().toUpperCase();
+    return String(id).replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toUpperCase();
   };
 
   // Local state and refs (ensure these are defined)

@@ -67,6 +67,18 @@ async function consolidateAndSaveDailyReport(date, records) {
 
   const finalOpsMap = new Map();
   hrListFull.forEach(h => {
+    if (h.joinDate) {
+      const jd = new Date(h.joinDate);
+      const jdStart = new Date(Date.UTC(jd.getFullYear(), jd.getMonth(), jd.getDate()));
+      if (start < jdStart) return; // Haven't joined yet
+    }
+    
+    if (h.resignationDate) {
+      const rd = new Date(h.resignationDate);
+      const rdStart = new Date(Date.UTC(rd.getFullYear(), rd.getMonth(), rd.getDate()));
+      if (start > rdStart) return; // Already resigned
+    }
+
     let category = h.officerType || h.employeeCategory || '';
     const cLower = String(category).toLowerCase();
     if (cLower.includes('មន្ត្រីរាជការ') || cLower.includes('civil')) category = 'មន្ត្រីរាជការ';

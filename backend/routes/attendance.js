@@ -1137,12 +1137,35 @@ router.get('/monthly-data', async (req, res, next) => {
       workHours: 1, checkin1: 1, checkout1: 1, checkin2: 1, checkout2: 1
     }).sort({ date: 1 }).lean();
 
+    const staffIds = Array.from(new Set(dailyReports.map(r => r.staffId).filter(Boolean)));
+    const hrRecords = await mongoose.model('HR').find({ staffId: { $in: staffIds } }, { staffId: 1, joinDate: 1, resignationDate: 1 }).lean();
+    const hrMap = new Map();
+    hrRecords.forEach(hr => hrMap.set(String(hr.staffId).trim().toUpperCase(), hr));
+
     const map = {};
     
     // Populate map with data aggregated from AttendanceDailyReport (Official Daily Logs)
     dailyReports.forEach((rec) => {
       const sid = String(rec.staffId || '').trim().toUpperCase();
       if (!sid) return;
+
+      const hr = hrMap.get(sid);
+      if (hr) {
+        const recDate = new Date(rec.date);
+        const recStart = new Date(Date.UTC(recDate.getFullYear(), recDate.getMonth(), recDate.getDate())).getTime();
+        
+        if (hr.joinDate) {
+          const jd = new Date(hr.joinDate);
+          const jdStart = new Date(Date.UTC(jd.getFullYear(), jd.getMonth(), jd.getDate())).getTime();
+          if (recStart < jdStart) return;
+        }
+        
+        if (hr.resignationDate) {
+          const rd = new Date(hr.resignationDate);
+          const rdStart = new Date(Date.UTC(rd.getFullYear(), rd.getMonth(), rd.getDate())).getTime();
+          if (recStart > rdStart) return;
+        }
+      }
 
       if (!map[sid]) {
         map[sid] = {
@@ -1236,7 +1259,7 @@ router.post('/monthly-data', async (req, res, next) => {
 
     for (const rec of records) {
       if (!rec || !rec.staffId) continue;
-      const staffId = String(rec.staffId).trim().toUpperCase();
+      const staffId = String(rec.staffId).replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toUpperCase();
       if (!staffId) continue;
       const year = Number(rec.year);
       const month = Number(rec.month);
@@ -1372,26 +1395,12 @@ router.get('/summary', async (req, res, next) => {
     }
 
     const rows = await AttendanceSummary.find(filter).lean();
-    // Enrich skill from HR if missing
-    const staffIdsToEnrich = rows.filter(r => !r.skill).map(r => r.staffId);
-    if (staffIdsToEnrich.length > 0) {
-      const hrs = await HR.find({ staffId: { $in: staffIdsToEnrich } }).lean();
-      const hrMap = new Map(hrs.map(hr => [hr.staffId, hr.skill || '']));
-      rows.forEach(r => {
-        if (!r.skill && hrMap.has(r.staffId)) {
-          r.skill = hrMap.get(r.staffId);
-        }
-      });
-    }
-    if (!rows || rows.length === 0) {
-      return res.json(rows || []);
-    }
+    
+    // Find all unique staff IDs
+    const allStaffIds = Array.from(new Set(rows.map(r => r.staffId).filter(Boolean)));
+    const hrs = await HR.find({ staffId: { $in: allStaffIds } }, { staffId: 1, skill: 1, joinDate: 1, resignationDate: 1 }).lean();
+    const hrMap = new Map(hrs.map(hr => [String(hr.staffId).trim().toUpperCase(), hr]));
 
-    // Enrich with leave-requests Type information as totalLeaveComment.
-    // For the requested range, gather all leave-requests per staff and
-    // concatenate unique `type` values.
-
-    // Support enrich totalLeaveComment for both from/to and year/month
     let fromDate, toDate;
     if (from && to) {
       const pf = parseYMD(from);
@@ -1402,15 +1411,88 @@ router.get('/summary', async (req, res, next) => {
         toDate.setHours(23, 59, 59, 999);
       }
     } else if (year && month) {
-      // Use business logic: 22nd of previous month to 21st of selected month
       const y = Number(year);
       const m = Number(month);
       if (y && m) {
-        fromDate = new Date(y, m - 2, 22); // previous month 22nd
-        toDate = new Date(y, m - 1, 21);   // selected month 21st
+        fromDate = new Date(y, m - 2, 22); 
+        toDate = new Date(y, m - 1, 21);   
         toDate.setHours(23, 59, 59, 999);
       }
     }
+
+    if (fromDate && toDate && allStaffIds.length > 0) {
+      // Fetch daily reports in the range to determine how many auto-generated absent days are invalid
+      const invalidDailyReports = await mongoose.model('AttendanceDailyReport').find({
+        date: { $gte: fromDate, $lte: toDate },
+        staffId: { $in: allStaffIds }
+      }).lean();
+
+      const invalidCounts = {};
+      invalidDailyReports.forEach(dr => {
+         const sid = String(dr.staffId).trim().toUpperCase();
+         const hr = hrMap.get(sid);
+         if (!hr) return;
+         
+         const rawDate = new Date(dr.date);
+         const drDate = new Date(Date.UTC(rawDate.getFullYear(), rawDate.getMonth(), rawDate.getDate())).getTime();
+         let isInvalid = false;
+         
+         if (hr.joinDate) {
+           const jd = new Date(hr.joinDate);
+           const jdStart = new Date(Date.UTC(jd.getFullYear(), jd.getMonth(), jd.getDate())).getTime();
+           if (drDate < jdStart) isInvalid = true;
+         }
+         if (hr.resignationDate && !isInvalid) {
+           const rd = new Date(hr.resignationDate);
+           const rdStart = new Date(Date.UTC(rd.getFullYear(), rd.getMonth(), rd.getDate())).getTime();
+           if (drDate > rdStart) isInvalid = true;
+         }
+
+         if (isInvalid) {
+           if (!invalidCounts[sid]) invalidCounts[sid] = { dayWorkCount: 0, absentCount: 0, A: 0 };
+           
+           const status = (dr.status || '').toLowerCase();
+           if (status !== 'rest' && status !== 'dayoff' && status !== 'holiday') {
+             invalidCounts[sid].dayWorkCount += 1;
+           }
+           if (status === 'absent') {
+             invalidCounts[sid].absentCount += 1;
+             invalidCounts[sid].A += 1;
+           }
+         }
+      });
+
+      rows.forEach(r => {
+        const sid = String(r.staffId).trim().toUpperCase();
+        const hr = hrMap.get(sid);
+        if (hr && !r.skill) r.skill = hr.skill || '';
+
+        const toSubtract = invalidCounts[sid];
+        if (toSubtract) {
+          r.dayWorkCount = Math.max(0, (r.dayWorkCount || 0) - toSubtract.dayWorkCount);
+          r.absentCount = Math.max(0, (r.absentCount || 0) - toSubtract.absentCount);
+          r.A = Math.max(0, (r.A || 0) - toSubtract.A);
+        }
+      });
+    } else {
+      // Just enrich skill if no fromDate/toDate
+      rows.forEach(r => {
+        const sid = String(r.staffId).trim().toUpperCase();
+        const hr = hrMap.get(sid);
+        if (hr && !r.skill) r.skill = hr.skill || '';
+      });
+    }
+
+    if (!rows || rows.length === 0) {
+      return res.json(rows || []);
+    }
+
+    // Enrich with leave-requests Type information as totalLeaveComment.
+    // For the requested range, gather all leave-requests per staff and
+    // concatenate unique `type` values.
+
+    // Support enrich totalLeaveComment for both from/to and year/month
+    // fromDate and toDate are already calculated above
 
     if (fromDate && toDate) {
       const staffIds = Array.from(new Set(
@@ -1519,7 +1601,7 @@ router.post('/summary', async (req, res, next) => {
 
     for (const rec of records) {
       if (!rec || !rec.staffId) continue;
-      const staffId = String(rec.staffId).trim();
+      const staffId = String(rec.staffId).replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
       if (!staffId) continue;
 
       // Use year/month from payload (required)
@@ -1846,7 +1928,7 @@ router.post('/day-data', async (req, res, next) => {
         if (!dateObj || isNaN(dateObj.getTime())) continue;
 
         const dateOnly = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
-        const staffId = String(rec.staffId).trim().toUpperCase();
+        const staffId = String(rec.staffId).replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toUpperCase();
         if (!staffId) continue;
 
         const filter = { staffId, date: dateOnly };
