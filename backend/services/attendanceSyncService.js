@@ -27,11 +27,19 @@ function calculateDuration(in1, out1, in2, out2) {
   const tOut2 = timeToDecimal(out2);
 
   if (tIn1 > 0 && tOut1 > 0) {
-    if (tOut1 >= tIn1) total += (tOut1 - tIn1);
+    if (tOut1 >= tIn1) {
+      const diff = tOut1 - tIn1;
+      if (diff < 4.0) total += (24 + diff);
+      else total += diff;
+    }
     else total += (24 - tIn1) + tOut1;
   }
   if (tIn2 > 0 && tOut2 > 0) {
-    if (tOut2 >= tIn2) total += (tOut2 - tIn2);
+    if (tOut2 >= tIn2) {
+      const diff = tOut2 - tIn2;
+      if (diff < 4.0) total += (24 + diff);
+      else total += diff;
+    }
     else total += (24 - tIn2) + tOut2;
   }
   return parseFloat(total.toFixed(2));

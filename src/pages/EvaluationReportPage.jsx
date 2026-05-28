@@ -5,6 +5,7 @@ import api from '../services/api';
 import { departmentAPI } from '../services/departmentAPI';
 import usePermission from '../hooks/usePermission';
 import { isExplicitlyRemoved as _isExplicitlyRemoved, hasResignData as _hasResignData, isPreparedForDeletion as _isPreparedForDeletion, isCountedActive as _isCountedActive } from '../utils/hrFilters';
+import { calculateAttendanceData } from '../utils/attendanceCalculator';
 import { Printer, FileSpreadsheet, Plus, Search, Edit2, Trash2, X, Settings2, SlidersHorizontal, ChevronDown, ShieldCheck } from 'lucide-react';
 
 function toKhmerDigits(n) {
@@ -281,15 +282,14 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
       const endD = new Date(endStr);
 
       try {
-        const [hrRes, attRes, leaveRes, evalRes] = await Promise.all([
+        const [hrRes, leaveRes, evalRes] = await Promise.all([
           api.get('/hr'),
-          api.get('/attendance/summary', { params: { from: startStr, to: endStr, year: yStr, month: mStr } }),
           api.get('/leave-requests', { params: { from: startStr, to: endStr } }),
           api.get('/evaluation-records', { params: { yearMonth: selectedMonth } })
         ]);
         if (!mounted) return;
         const hrData = hrRes.data;
-        const attData = attRes.data;
+        const attData = await calculateAttendanceData(api, startStr, endStr, hrData, []);
         const leaveData = (Array.isArray(leaveRes.data) ? leaveRes.data : []).filter(lv => {
           const s = (lv.status || '').toLowerCase();
           return s === 'approved' || s === 'pending';
@@ -347,9 +347,11 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
             const dayWorkCount = Number(row.dayWorkCount || 0);
             const A = Number(row.A || 0);
             const lateEarlyEvents = Number(row.checkinLateCount || 0) + Number(row.checkoutEarlyCount || 0);
+            const plechEvents = Number(row.plech ?? row.Plech) || 0;
+            const combinedEvents = lateEarlyEvents + plechEvents;
             
             // Must round totalAbsent first to match Sum-Day Report logic
-            let totalAbsent = A + (lateEarlyEvents / 3);
+            let totalAbsent = A + (combinedEvents / 3);
             totalAbsent = Math.round(totalAbsent * 100) / 100;
             
             const clamp = (v) => Math.max(0, Math.min(100, Number.isFinite(v) ? v : 0));
@@ -774,8 +776,26 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
                         {visibleCols.name && <td className="left" style={{ paddingLeft: '2px' }}>{r.khmerName || r.name}</td>}
                         {visibleCols.skill && <td className="left" style={{ fontSize: getFontSize(r.skill || r.technicalRole), whiteSpace: 'nowrap', paddingLeft: '2px' }}>{r.skill || r.technicalRole || ''}</td>}
                         {visibleCols.position && <td className="left" style={{ fontSize: getFontSize(r.position), whiteSpace: 'nowrap', paddingLeft: '2px' }}>{r.position || ''}</td>}
-                        {visibleCols.attendancePercentage && <td className="center">{r.attendancePercentage || ''}</td>}
-                        {visibleCols.totalMonthlyAttendance && <td className="center">{r.totalMonthlyAttendance || ''}</td>}
+                        {visibleCols.attendancePercentage && (
+                          <td className="center" style={{ padding: 0 }}>
+                            <input
+                              className="no-print-border"
+                              style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', textAlign: 'center', outline: 'none', minHeight: '0px', padding: 0 }}
+                              value={r.attendancePercentage || ''}
+                              onChange={(e) => handleEditEvaluation(r.staffId || r.no, 'attendancePercentage', e.target.value)}
+                            />
+                          </td>
+                        )}
+                        {visibleCols.totalMonthlyAttendance && (
+                          <td className="center" style={{ padding: 0 }}>
+                            <input
+                              className="no-print-border"
+                              style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', textAlign: 'center', outline: 'none', minHeight: '0px', padding: 0 }}
+                              value={r.totalMonthlyAttendance || ''}
+                              onChange={(e) => handleEditEvaluation(r.staffId || r.no, 'totalMonthlyAttendance', e.target.value)}
+                            />
+                          </td>
+                        )}
                         {(visibleCols.performanceResult && visibleCols.otherNotes && r.hasSpecialLeave) ? (
                           <td colSpan={2} className="center" style={{ padding: 0 }}>
                             <input

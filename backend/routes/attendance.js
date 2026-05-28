@@ -82,7 +82,12 @@ function calculateDuration(in1, out1, in2, out2, scheduledRange) {
 
   if (tIn1 > 0 && tOut1 > 0) {
     if (tOut1 >= tIn1) {
-      total += (tOut1 - tIn1);
+      const diff = tOut1 - tIn1;
+      if (diff < 4.0) {
+        total += (24 + diff);
+      } else {
+        total += diff;
+      }
     } else {
       // Overnight
       total += (24 - tIn1) + tOut1;
@@ -90,7 +95,12 @@ function calculateDuration(in1, out1, in2, out2, scheduledRange) {
   }
   if (tIn2 > 0 && tOut2 > 0) {
     if (tOut2 >= tIn2) {
-      total += (tOut2 - tIn2);
+      const diff = tOut2 - tIn2;
+      if (diff < 4.0) {
+        total += (24 + diff);
+      } else {
+        total += diff;
+      }
     } else {
       total += (24 - tIn2) + tOut2;
     }
@@ -1120,13 +1130,22 @@ router.post('/save-remarks', authRequired, async (req, res) => {
 // Get monthly data
 router.get('/monthly-data', async (req, res, next) => {
   try {
-    const { year, month } = req.query;
-    if (!year || !month) return res.status(400).json({ message: 'year and month required' });
-    const y = Number(year);
-    const mo = Number(month);
+    const { year, month, from, to } = req.query;
     
-    const startDate = new Date(Date.UTC(y, mo - 1, 1, 0, 0, 0));
-    const endDate = new Date(Date.UTC(y, mo, 0, 23, 59, 59, 999));
+    let startDate, endDate;
+    if (year && month) {
+      const y = Number(year);
+      const mo = Number(month);
+      startDate = new Date(Date.UTC(y, mo - 1, 1, 0, 0, 0));
+      endDate = new Date(Date.UTC(y, mo, 0, 23, 59, 59, 999));
+    } else if (from && to) {
+      const fromParts = from.split('-');
+      const toParts = to.split('-');
+      startDate = new Date(Date.UTC(Number(fromParts[0]), Number(fromParts[1]) - 1, Number(fromParts[2]), 0, 0, 0));
+      endDate = new Date(Date.UTC(Number(toParts[0]), Number(toParts[1]) - 1, Number(toParts[2]), 23, 59, 59, 999));
+    } else {
+      return res.status(400).json({ message: 'year and month or from and to required' });
+    }
 
     // Fetch ONLY official daily reports
     const dailyReports = await AttendanceDailyReport.find({
@@ -1186,8 +1205,8 @@ router.get('/monthly-data', async (req, res, next) => {
           leaveType: '',
           other: '',
           totalLeaveComment: '',
-          year: y,
-          month: mo,
+          year: startDate.getFullYear(),
+          month: startDate.getMonth() + 1,
           A: 0
         };
       }
@@ -2041,7 +2060,11 @@ router.post('/day-data', async (req, res, next) => {
             const outMin = parseHM(doc.checkOut);
             if (inMin !== null && outMin !== null) {
               let diff = outMin - inMin;
-              if (diff < 0) diff += 24 * 60;
+              if (diff < 0) {
+                diff += 24 * 60;
+              } else if (diff < 4 * 60) {
+                diff += 24 * 60;
+              }
               if (diff < 0) diff = 0;
               doc.clockMinutes = diff;
               if (!doc.clockCount || doc.clockCount === 0) doc.clockCount = (doc.checkIn ? 1 : 0) + (doc.checkOut ? 1 : 0);
@@ -2052,7 +2075,11 @@ router.post('/day-data', async (req, res, next) => {
             const outMin = parseHM(doc.checkOut);
             if (inMin !== null && outMin !== null) {
               let diff = outMin - inMin;
-              if (diff < 0) diff += 24 * 60;
+              if (diff < 0) {
+                diff += 24 * 60;
+              } else if (diff < 4 * 60) {
+                diff += 24 * 60;
+              }
               if (diff < 0) diff = 0;
               doc.workTime = diff;
             }

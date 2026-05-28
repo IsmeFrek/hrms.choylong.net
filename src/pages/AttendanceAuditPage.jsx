@@ -801,7 +801,11 @@ export default function AttendanceAuditPage() {
             const outMin = parseHMToMinutes(co);
             if (inMin !== null && outMin !== null) {
               let diff = outMin - inMin;
-              if (diff < 0) diff += 24 * 60;
+              if (diff < 0) {
+                diff += 24 * 60;
+              } else if (diff < 4 * 60) {
+                diff += 24 * 60;
+              }
               if (diff > 0) res.workTime += diff;
             }
 

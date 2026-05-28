@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import api from '../services/api';
+import { calculateAttendanceData, norm } from '../utils/attendanceCalculator';
 import usePermission from '../hooks/usePermission';
 import headerBg from '../assets/3.JPG';
 
@@ -177,47 +178,70 @@ export default function AttendanceSumDayReportPage() {
   const perms = usePermission();
   const navigate = useNavigate();
   const [attendanceData, setAttendanceData] = useState([]);
-  const [q, setQ] = useState('');
-  const [selectedDept, setSelectedDept] = useState('');
+  const [q, setQ] = useState(() => { try { return localStorage.getItem('attendanceSumDayReportQ') || ''; } catch { return ''; } });
+  const [selectedDept, setSelectedDept] = useState(() => { try { return localStorage.getItem('attendanceSumDayReportDept') || ''; } catch { return ''; } });
   const [departments, setDepartments] = useState([]);
   const [positions, setPositions] = useState([]);
-  const [selectedPositions, setSelectedPositions] = useState([]);
-  const [selectedLeaveFilter, setSelectedLeaveFilter] = useState('');
+  const [selectedPositions, setSelectedPositions] = useState(() => { try { return JSON.parse(localStorage.getItem('attendanceSumDayReportPositions') || '[]'); } catch { return []; } });
+  const [selectedLeaveFilter, setSelectedLeaveFilter] = useState(() => { try { return localStorage.getItem('attendanceSumDayReportLeaveFilter') || ''; } catch { return ''; } });
   const [leaveFilterOptions, setLeaveFilterOptions] = useState([]);
   const today = new Date();
-  // Default period = full current month (same logic as AttendancesumDayPage)
   const periodYear = today.getFullYear();
-  const periodMonthIndex = today.getMonth(); // 0-based (current month is the END month)
-  const defaultMonthValue = `${periodYear}-${String(periodMonthIndex + 1).padStart(2, '0')}`;
-  // Default range: from 22nd of previous month to 21st of current month
+  const periodMonthIndex = today.getMonth(); // 0-based
+  const initialMonthValue = `${periodYear}-${String(periodMonthIndex + 1).padStart(2, '0')}`;
+  const [monthValue, setMonthValue] = useState(() => { try { return localStorage.getItem('attendanceSumDayReportMonth') || initialMonthValue; } catch { return initialMonthValue; } });
+  
   const defaultFromDate = (() => {
-    const [yStr, mStr] = defaultMonthValue.split('-');
+    const [yStr, mStr] = monthValue.split('-');
     const y = Number(yStr);
     const m = Number(mStr);
     if (!y || !m) return toLocalYmdStringSumDay(new Date(periodYear, periodMonthIndex, 1));
     return toLocalYmdStringSumDay(new Date(y, m - 2, 22));
   })();
   const defaultToDate = (() => {
-    const [yStr, mStr] = defaultMonthValue.split('-');
+    const [yStr, mStr] = monthValue.split('-');
     const y = Number(yStr);
     const m = Number(mStr);
     if (!y || !m) return toLocalYmdStringSumDay(new Date(periodYear, periodMonthIndex + 1, 0));
     return toLocalYmdStringSumDay(new Date(y, m - 1, 21));
   })();
+  
   const [fromDate, setFromDate] = useState(defaultFromDate);
   const [toDate, setToDate] = useState(defaultToDate);
-  // Internal range used for API calls (always tied to selected month)
   const [apiFromDate, setApiFromDate] = useState(defaultFromDate);
   const [apiToDate, setApiToDate] = useState(defaultToDate);
-  const [monthValue, setMonthValue] = useState(defaultMonthValue);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [rowHeight, setRowHeight] = useState(28);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('attendanceSumDayReportQ', q);
+      localStorage.setItem('attendanceSumDayReportPositions', JSON.stringify(selectedPositions));
+      localStorage.setItem('attendanceSumDayReportLeaveFilter', selectedLeaveFilter);
+      localStorage.setItem('attendanceSumDayReportMonth', monthValue);
+    } catch { void 0; }
+  }, [q, selectedPositions, selectedLeaveFilter, monthValue]);
+
+  useEffect(() => {
+    if (selectedDept) {
+      try { localStorage.setItem('attendanceSumDayReportDept', selectedDept); } catch { void 0; }
+    }
+  }, [selectedDept]);
   const [showColsMenu, setShowColsMenu] = useState(false);
   const [showPositionMenu, setShowPositionMenu] = useState(false);
   const [sortByOverallPercent, setSortByOverallPercent] = useState(null); // null=default, 'desc', 'asc'
   const printRef = useRef();
   const [syncing, setSyncing] = useState(false);
+
+  const handleEditCell = (staffId, key, value) => {
+    setAttendanceData(prev => prev.map(row => {
+      if ((row.staffId || row.no || '').toString() === staffId.toString()) {
+        return { ...row, [`edited_${key}`]: value };
+      }
+      return row;
+    }));
+  };
 
   const mergeText = (a, b) => {
     const left = (a || '').toString().trim();
@@ -667,6 +691,9 @@ export default function AttendanceSumDayReportPage() {
           if (key) {
             sidToLookup.set(sid, key);
             sidToLookup.set(pNo, key);
+            // Also store lowercase mapping for calculated data lookup
+            sidToLookup.set(norm(sid), key);
+            sidToLookup.set(norm(pNo), key);
             hrMap.set(key, h);
           }
         });
@@ -700,14 +727,15 @@ export default function AttendanceSumDayReportPage() {
           }
         }
 
-        // Fetch data from Attendance Summary (the source of truth for /attendance-sum-day)
-        const [summaryRes, leaveRes, schedRes] = await Promise.all([
-          api.get('/attendance/summary', { params: summaryParams }).catch(() => ({ data: [] })),
+        // We now dynamically calculate attendance data using the shared utility to exactly match /attendance-sum-day
+        const calculatedData = await calculateAttendanceData(api, startStr, endStr, hrList, []);
+        
+        const [leaveRes, schedRes] = await Promise.all([
           api.get('/leave-requests', { params: { from: startStr, to: endStr } }).catch(() => ({ data: [] })),
           api.get('/work-schedules', { params: { startDate: startStr, endDate: endStr } }).catch(() => ({ data: [] }))
         ]);
 
-        const summaryRows = Array.isArray(summaryRes.data) ? summaryRes.data : [];
+        const summaryRows = calculatedData;
         const leaveList = (Array.isArray(leaveRes.data) ? leaveRes.data : []).filter(lv => {
           const s = (lv.status || '').toLowerCase();
           return s === 'approved' || s === 'pending';
@@ -806,7 +834,7 @@ export default function AttendanceSumDayReportPage() {
           target.absentCount = Number(row.absentCount || 0);
           target.checkinLateCount = Number(row.checkinLateCount || 0);
           target.checkoutEarlyCount = Number(row.checkoutEarlyCount || 0);
-          target.plech = Number(row.plech || 0);
+          target.plech = Number((row.plech ?? row.Plech) || 0);
           target.workTimeMinutes = Number(row.workTime || 0);
           target.totalLeaveComment = row.totalLeaveComment || '';
           if (row.skill) target.skill = row.skill;
@@ -895,11 +923,13 @@ export default function AttendanceSumDayReportPage() {
           if (!lt.includes(selectedLeaveNorm) && !comment.includes(selectedLeaveNorm)) return false;
         }
         if (!term) return true;
+        const terms = term.split(',').map(t => t.trim()).filter(Boolean);
+        if (terms.length === 0) return true;
         const name = (record.khmerName || record.name || '').toString().toLowerCase();
         const staffId = (record.staffId || record.no || '').toString().toLowerCase();
         const position = (record.position || '').toString().toLowerCase();
         const dept = (record.department || '').toString().toLowerCase();
-        return name.includes(term) || staffId.includes(term) || position.includes(term) || dept.includes(term);
+        return terms.some(t => name.includes(t) || staffId.includes(t) || position.includes(t) || dept.includes(t));
       })
       .map((record) => {
         const dayWorkCount = Number(record.dayWorkCount) || 0;
@@ -951,19 +981,19 @@ export default function AttendanceSumDayReportPage() {
           department: record.department || record.Department_Kh || '',
           genderShort: fmtGenderShortSumDay(record.gender),
           isCivilServant: Boolean(record.isCivilServant),
-          dayWorkCount,
-          attendanceCount,
-          leaveCount,
-          leaveType,
-          A,
-          workTime,
-          lateEarly: combinedEvents,
-          plech: missionCount,
-          totalAbsent,
-          percentage,
-          plechPercent,
-          lateEarlyPercent,
-          overallPercent,
+          dayWorkCount: record.edited_dayWorkCount !== undefined ? record.edited_dayWorkCount : dayWorkCount,
+          attendanceCount: record.edited_attendanceCount !== undefined ? record.edited_attendanceCount : attendanceCount,
+          leaveCount: record.edited_leaveCount !== undefined ? record.edited_leaveCount : leaveCount,
+          leaveType: record.edited_leaveType !== undefined ? record.edited_leaveType : leaveType,
+          A: record.edited_A !== undefined ? record.edited_A : A,
+          workTime: record.edited_workTime !== undefined ? record.edited_workTime : workTime,
+          lateEarly: record.edited_lateEarly !== undefined ? record.edited_lateEarly : combinedEvents,
+          plech: record.edited_plech !== undefined ? record.edited_plech : missionCount,
+          totalAbsent: record.edited_totalAbsent !== undefined ? record.edited_totalAbsent : totalAbsent,
+          percentage: record.edited_percentage !== undefined ? record.edited_percentage : percentage,
+          plechPercent: record.edited_plechPercent !== undefined ? record.edited_plechPercent : plechPercent,
+          lateEarlyPercent: record.edited_lateEarlyPercent !== undefined ? record.edited_lateEarlyPercent : lateEarlyPercent,
+          overallPercent: record.edited_overallPercent !== undefined ? record.edited_overallPercent : overallPercent,
           absentToDeduct,
           other,
           totalLeaveComment,
@@ -1582,42 +1612,42 @@ export default function AttendanceSumDayReportPage() {
       case 'department':
         return { value: row.department || row.Department_Kh, style: { textAlign: 'left', width: columnMeta.department.width, fontSize: Math.max(9, rowFontSize - 1) } };
       case 'dayWorkCount':
-        return { value: maybeHideZero(row.dayWorkCount, true), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.dayWorkCount, true)} onChange={e => handleEditCell(row.staffId || row.no, 'dayWorkCount', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'attendanceCount':
-        return { value: maybeHideZero(row.attendanceCount, true), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.attendanceCount, true)} onChange={e => handleEditCell(row.staffId || row.no, 'attendanceCount', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'leaveCount':
-        return { value: maybeHideZero(row.leaveCount), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.leaveCount)} onChange={e => handleEditCell(row.staffId || row.no, 'leaveCount', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'leaveType':
-        return { value: row.leaveType || '', style: { textAlign: 'left', fontSize: Math.max(8, rowFontSize - 2) } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'left', outline:'none', padding:'0 4px', fontSize:'inherit' }} value={row.leaveType || ''} onChange={e => handleEditCell(row.staffId || row.no, 'leaveType', e.target.value)} />, style: { textAlign: 'left', fontSize: Math.max(8, rowFontSize - 2), padding: 0 } };
       case 'A':
-        return { value: maybeHideZero(row.A), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.A)} onChange={e => handleEditCell(row.staffId || row.no, 'A', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'workTime':
-        return { value: row.workTime, style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={row.workTime || ''} onChange={e => handleEditCell(row.staffId || row.no, 'workTime', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'lateEarly':
-        return { value: maybeHideZero(row.lateEarly), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.lateEarly)} onChange={e => handleEditCell(row.staffId || row.no, 'lateEarly', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'plech':
-        return { value: maybeHideZero(row.plech), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.plech)} onChange={e => handleEditCell(row.staffId || row.no, 'plech', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'plechPercent':
         return {
-          value: (Number(row.plechPercent) && Number(row.plechPercent) > 0) ? `${row.plechPercent}%` : (Number.isFinite(Number(row.plechPercent)) ? '0%' : ''),
-          style: { textAlign: 'center' }
+          value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={(Number(row.plechPercent) && Number(row.plechPercent) > 0) ? `${row.plechPercent}%` : (Number.isFinite(Number(row.plechPercent)) ? '0%' : (row.plechPercent || ''))} onChange={e => handleEditCell(row.staffId || row.no, 'plechPercent', e.target.value)} />,
+          style: { textAlign: 'center', padding: 0 }
         };
       case 'totalAbsent':
-        return { value: maybeHideZero(row.totalAbsent), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.totalAbsent)} onChange={e => handleEditCell(row.staffId || row.no, 'totalAbsent', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'percentage':
         return {
-          value: Number.isFinite(Number(row.percentage)) ? `${Number(row.percentage)}%` : '',
-          style: { textAlign: 'center' }
+          value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={Number.isFinite(Number(row.percentage)) ? `${Number(row.percentage)}%` : (row.percentage || '')} onChange={e => handleEditCell(row.staffId || row.no, 'percentage', e.target.value)} />,
+          style: { textAlign: 'center', padding: 0 }
         };
       case 'lateEarlyPercent':
         return {
-          value: (Number(row.lateEarlyPercent) && Number(row.lateEarlyPercent) > 0) ? `${row.lateEarlyPercent}%` : (Number.isFinite(Number(row.lateEarlyPercent)) ? '0%' : ''),
-          style: { textAlign: 'center' }
+          value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={(Number(row.lateEarlyPercent) && Number(row.lateEarlyPercent) > 0) ? `${row.lateEarlyPercent}%` : (Number.isFinite(Number(row.lateEarlyPercent)) ? '0%' : (row.lateEarlyPercent || ''))} onChange={e => handleEditCell(row.staffId || row.no, 'lateEarlyPercent', e.target.value)} />,
+          style: { textAlign: 'center', padding: 0 }
         };
       case 'overallPercent':
         return {
-          value: Number.isFinite(Number(row.overallPercent)) ? `${Number(row.overallPercent)}%` : '',
-          style: { textAlign: 'center' }
+          value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={Number.isFinite(Number(row.overallPercent)) ? `${Number(row.overallPercent)}%` : (row.overallPercent || '')} onChange={e => handleEditCell(row.staffId || row.no, 'overallPercent', e.target.value)} />,
+          style: { textAlign: 'center', padding: 0 }
         };
       case 'absentToDeduct':
         // Field "ចំនួនអវត្តមានត្រូវកាត់" should not display any data for now.
@@ -1806,7 +1836,7 @@ export default function AttendanceSumDayReportPage() {
             <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#718096' }}>🔍</span>
             <input
               type="text"
-              placeholder="ស្វែងរកបុគ្គលិក (ឈ្មោះ, អត្តលេខ, តួនាទី, ផ្នែក...)"
+              placeholder="ស្វែងរកបុគ្គលិក (ប្រើសញ្ញាក្បៀស ',' ដើម្បីស្វែងរកច្រើននាក់ក្នុងពេលតែមួយ)"
               value={q}
               onChange={e => setQ(e.target.value)}
               style={{

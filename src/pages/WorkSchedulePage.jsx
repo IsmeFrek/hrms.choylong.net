@@ -341,21 +341,6 @@ export default function WorkSchedulePage() {
   console.log('HR lookup keys:', Object.keys(hrLookup));
   console.log('Employees count:', employees.length);
 
-  // Performance Optimization: Index schedules for O(1) lookup
-  const scheduleMap = React.useMemo(() => {
-    const map = new Map();
-    schedules.forEach(s => {
-      const eid = s.employeeId?._id || s.employeeId;
-      if (!eid || !s.date) return;
-      try {
-        const d = new Date(s.date);
-        const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        map.set(`${String(eid)}_${dateKey}`, s);
-      } catch (e) {}
-    });
-    return map;
-  }, [schedules]);
-
   const hrMap = React.useMemo(() => {
     const map = new Map();
     hrData.forEach(hr => {
@@ -373,6 +358,54 @@ export default function WorkSchedulePage() {
     });
     return map;
   }, [employees]);
+
+  // Performance Optimization: Index schedules for O(1) lookup
+  const scheduleMap = React.useMemo(() => {
+    const map = new Map();
+    schedules.forEach(s => {
+      const eid = s.employeeId?._id || s.employeeId;
+      if (!eid || !s.date) return;
+      try {
+        const d = new Date(s.date);
+        const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        map.set(`${String(eid)}_${dateKey}`, s);
+      } catch (e) {}
+    });
+
+    // Auto-assign "Day Off" for days before employee's join date
+    employees.forEach(emp => {
+      const eid = String(emp._id);
+      const staffId = String(emp.staffId || emp.cardNumber || '');
+      const hr = hrMap.get(staffId);
+      
+      if (hr && hr.joinDate) {
+        try {
+          const jd = new Date(hr.joinDate);
+          if (!isNaN(jd.getTime())) {
+            const joinDateStr = `${jd.getFullYear()}-${String(jd.getMonth() + 1).padStart(2, '0')}-${String(jd.getDate()).padStart(2, '0')}`;
+            datesInRange.forEach(dateStr => {
+              if (dateStr < joinDateStr) {
+                const key = `${eid}_${dateStr}`;
+                if (!map.has(key) || map.get(key).shiftTitle !== 'មិនទាន់ចូលធ្វើការ') {
+                  map.set(key, {
+                    date: dateStr,
+                    employeeId: eid,
+                    shiftTitle: 'មិនទាន់ចូលធ្វើការ',
+                    shiftStart: '',
+                    shiftEnd: '',
+                    shiftColor: '#e5e7eb',
+                    isAutoDayOff: true
+                  });
+                }
+              }
+            });
+          }
+        } catch (e) {}
+      }
+    });
+
+    return map;
+  }, [schedules, employees, hrMap, datesInRange]);
 
   // Create a Set of employee IDs that have at least one schedule this month for fast filtering
   const employeesWithSchedule = React.useMemo(() => {
@@ -597,6 +630,8 @@ export default function WorkSchedulePage() {
     schedules.forEach(item => {
       if (item.shiftTitle === 'Day Off') {
         s.totalDayOffs++;
+      } else if (item.shiftTitle === 'មិនទាន់ចូលធ្វើការ') {
+        // Do not count
       } else {
         s.totalWorkDays++;
         if (!item.shiftStart || !item.shiftEnd) return;
@@ -647,6 +682,8 @@ export default function WorkSchedulePage() {
 
       if (s.shiftTitle === 'Day Off') {
         ds.dayOffToday++;
+      } else if (s.shiftTitle === 'មិនទាន់ចូលធ្វើការ') {
+        // do not count as working
       } else {
         ds.workingToday++;
         if (!s.shiftStart || !s.shiftEnd) return;
