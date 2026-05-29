@@ -555,6 +555,17 @@ export default function SchedulePreview({
     const isSaturday = dow === 6;
 
     if (isHoliday) {
+      try {
+        if (row.group && row.group.customPattern && row.group.customPattern.holidayRotation === 'alternate') {
+          const holidaysArr = Array.from(normalizedHolidaySet || []).sort();
+          const hIdx = holidaysArr.indexOf(iso);
+          if (hIdx >= 0) {
+            const empPos = Math.max(0, typeof row.groupIndex === 'number' ? row.groupIndex : 0);
+            if (hIdx % 2 === empPos % 2) return dayOffShift;
+          }
+        }
+      } catch (e) {}
+
       if (baseShift && ((baseShift.title || '').toLowerCase().includes('day off') || (!baseShift.start && !baseShift.end))) return baseShift;
       if (baseShift && baseShift.holidayWork) return baseShift;
       return dayOffShift;
@@ -562,6 +573,22 @@ export default function SchedulePreview({
 
     if (isWeekend) {
       try {
+        // 1. Check explicit customPattern rotation from SubgroupEditModal
+        if (row.group && row.group.customPattern && row.group.customPattern.weekendRotation && row.group.customPattern.weekendRotation !== 'none') {
+           const wrm = row.group.customPattern.weekendRotation;
+           const empPos = Math.max(0, typeof row.groupIndex === 'number' ? row.groupIndex : 0);
+           if (wrm === 'alternateDays') {
+             if (isSaturday) return (empPos % 2 === 0) ? baseShift : dayOffShift;
+             if (isSunday) return (empPos % 2 === 1) ? baseShift : dayOffShift;
+           } else if (wrm === 'alternateWeeks') {
+             const dClone = new Date(date);
+             const diffToMon = dClone.getDay() === 0 ? -6 : 1 - dClone.getDay();
+             dClone.setDate(dClone.getDate() + diffToMon);
+             const weekIndex = Math.floor(dClone.getTime() / (86400000 * 7));
+             return (weekIndex % 2 === empPos % 2) ? dayOffShift : baseShift;
+           }
+        }
+
         const groupKey = (() => {
           try {
             const nm = String(row.groupName || row.category || '').trim();
