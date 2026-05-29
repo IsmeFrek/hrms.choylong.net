@@ -6,8 +6,8 @@ const employeeSchema = new mongoose.Schema({
   
   // Basic Personal Information
   staffId: { type: String, unique: true },
-  khmerName: { type: String },
-  name: { type: String },
+  khmerName: { type: String, index: true },
+  name: { type: String, index: true },
   gender: { type: String, enum: ['Male', 'Female'] },
   dob: { type: Date },
   maritalStatus: { type: String, enum: ['Single', 'Married', 'Divorced', 'Widowed'] },
