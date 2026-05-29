@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import api from '../services/api';
+import { calculateAttendanceData, norm } from '../utils/attendanceCalculator';
 import usePermission from '../hooks/usePermission';
 import headerBg from '../assets/3.JPG';
 
@@ -11,7 +14,10 @@ function buildPrintStyleSumDay(orientation) {
 @media print {
   @page {
     size: A4 ${o};
-    margin: 0;
+    margin-top: 5mm;
+    margin-bottom: 5mm;
+    margin-left: 0;
+    margin-right: 0;
   }
   html, body {
     margin: 0 !important;
@@ -159,7 +165,7 @@ export default function AttendanceSumDayReportPage() {
       const v = localStorage.getItem('attendanceSumDayReportPrintOrientation');
       if (v === 'landscape' || v === 'portrait') return v;
     } catch { void 0; }
-    return 'portrait';
+    return 'landscape';
   });
 
   useEffect(() => {
@@ -172,47 +178,70 @@ export default function AttendanceSumDayReportPage() {
   const perms = usePermission();
   const navigate = useNavigate();
   const [attendanceData, setAttendanceData] = useState([]);
-  const [q, setQ] = useState('');
-  const [selectedDept, setSelectedDept] = useState('');
+  const [q, setQ] = useState(() => { try { return localStorage.getItem('attendanceSumDayReportQ') || ''; } catch { return ''; } });
+  const [selectedDept, setSelectedDept] = useState(() => { try { return localStorage.getItem('attendanceSumDayReportDept') || ''; } catch { return ''; } });
   const [departments, setDepartments] = useState([]);
   const [positions, setPositions] = useState([]);
-  const [selectedPositions, setSelectedPositions] = useState([]);
-  const [selectedLeaveFilter, setSelectedLeaveFilter] = useState('');
+  const [selectedPositions, setSelectedPositions] = useState(() => { try { return JSON.parse(localStorage.getItem('attendanceSumDayReportPositions') || '[]'); } catch { return []; } });
+  const [selectedLeaveFilter, setSelectedLeaveFilter] = useState(() => { try { return localStorage.getItem('attendanceSumDayReportLeaveFilter') || ''; } catch { return ''; } });
   const [leaveFilterOptions, setLeaveFilterOptions] = useState([]);
   const today = new Date();
-  // Default period = full current month (same logic as AttendancesumDayPage)
   const periodYear = today.getFullYear();
-  const periodMonthIndex = today.getMonth(); // 0-based (current month is the END month)
-  const defaultMonthValue = `${periodYear}-${String(periodMonthIndex + 1).padStart(2, '0')}`;
-  // Default range: from 22nd of previous month to 21st of current month
+  const periodMonthIndex = today.getMonth(); // 0-based
+  const initialMonthValue = `${periodYear}-${String(periodMonthIndex + 1).padStart(2, '0')}`;
+  const [monthValue, setMonthValue] = useState(() => { try { return localStorage.getItem('attendanceSumDayReportMonth') || initialMonthValue; } catch { return initialMonthValue; } });
+  
   const defaultFromDate = (() => {
-    const [yStr, mStr] = defaultMonthValue.split('-');
+    const [yStr, mStr] = monthValue.split('-');
     const y = Number(yStr);
     const m = Number(mStr);
     if (!y || !m) return toLocalYmdStringSumDay(new Date(periodYear, periodMonthIndex, 1));
     return toLocalYmdStringSumDay(new Date(y, m - 2, 22));
   })();
   const defaultToDate = (() => {
-    const [yStr, mStr] = defaultMonthValue.split('-');
+    const [yStr, mStr] = monthValue.split('-');
     const y = Number(yStr);
     const m = Number(mStr);
     if (!y || !m) return toLocalYmdStringSumDay(new Date(periodYear, periodMonthIndex + 1, 0));
     return toLocalYmdStringSumDay(new Date(y, m - 1, 21));
   })();
+  
   const [fromDate, setFromDate] = useState(defaultFromDate);
   const [toDate, setToDate] = useState(defaultToDate);
-  // Internal range used for API calls (always tied to selected month)
   const [apiFromDate, setApiFromDate] = useState(defaultFromDate);
   const [apiToDate, setApiToDate] = useState(defaultToDate);
-  const [monthValue, setMonthValue] = useState(defaultMonthValue);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [rowHeight, setRowHeight] = useState(28);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('attendanceSumDayReportQ', q);
+      localStorage.setItem('attendanceSumDayReportPositions', JSON.stringify(selectedPositions));
+      localStorage.setItem('attendanceSumDayReportLeaveFilter', selectedLeaveFilter);
+      localStorage.setItem('attendanceSumDayReportMonth', monthValue);
+    } catch { void 0; }
+  }, [q, selectedPositions, selectedLeaveFilter, monthValue]);
+
+  useEffect(() => {
+    if (selectedDept) {
+      try { localStorage.setItem('attendanceSumDayReportDept', selectedDept); } catch { void 0; }
+    }
+  }, [selectedDept]);
   const [showColsMenu, setShowColsMenu] = useState(false);
   const [showPositionMenu, setShowPositionMenu] = useState(false);
   const [sortByOverallPercent, setSortByOverallPercent] = useState(null); // null=default, 'desc', 'asc'
   const printRef = useRef();
   const [syncing, setSyncing] = useState(false);
+
+  const handleEditCell = (staffId, key, value) => {
+    setAttendanceData(prev => prev.map(row => {
+      if ((row.staffId || row.no || '').toString() === staffId.toString()) {
+        return { ...row, [`edited_${key}`]: value };
+      }
+      return row;
+    }));
+  };
 
   const mergeText = (a, b) => {
     const left = (a || '').toString().trim();
@@ -662,6 +691,9 @@ export default function AttendanceSumDayReportPage() {
           if (key) {
             sidToLookup.set(sid, key);
             sidToLookup.set(pNo, key);
+            // Also store lowercase mapping for calculated data lookup
+            sidToLookup.set(norm(sid), key);
+            sidToLookup.set(norm(pNo), key);
             hrMap.set(key, h);
           }
         });
@@ -695,14 +727,15 @@ export default function AttendanceSumDayReportPage() {
           }
         }
 
-        // Fetch data from Attendance Summary (the source of truth for /attendance-sum-day)
-        const [summaryRes, leaveRes, schedRes] = await Promise.all([
-          api.get('/attendance/summary', { params: summaryParams }).catch(() => ({ data: [] })),
+        // We now dynamically calculate attendance data using the shared utility to exactly match /attendance-sum-day
+        const calculatedData = await calculateAttendanceData(api, startStr, endStr, hrList, []);
+        
+        const [leaveRes, schedRes] = await Promise.all([
           api.get('/leave-requests', { params: { from: startStr, to: endStr } }).catch(() => ({ data: [] })),
           api.get('/work-schedules', { params: { startDate: startStr, endDate: endStr } }).catch(() => ({ data: [] }))
         ]);
 
-        const summaryRows = Array.isArray(summaryRes.data) ? summaryRes.data : [];
+        const summaryRows = calculatedData;
         const leaveList = (Array.isArray(leaveRes.data) ? leaveRes.data : []).filter(lv => {
           const s = (lv.status || '').toLowerCase();
           return s === 'approved' || s === 'pending';
@@ -736,15 +769,31 @@ export default function AttendanceSumDayReportPage() {
           }
         });
 
+        // Helper to convert Khmer numerals to Arabic and extract the first number
+        const parseNo = (val) => {
+          if (!val) return 0;
+          let s = String(val).trim();
+          // Convert Khmer digits to Arabic digits
+          const khmerMap = { '០': '0', '១': '1', '២': '2', '៣': '3', '៤': '4', '៥': '5', '៦': '6', '៧': '7', '៨': '8', '៩': '9' };
+          s = s.replace(/[០-៩]/g, d => khmerMap[d]);
+          // Extract the first continuous sequence of digits (and optional decimal)
+          const match = s.match(/-?\d+(\.\d+)?/);
+          if (match) {
+            return parseFloat(match[0]);
+          }
+          return 0;
+        };
+
         // 4. Aggregate
         const agg = {};
         hrList.forEach((h, idx) => {
           const sid = (h.staffId || h.no || '').toString().trim();
-          const noNum = Number(h?.no);
-          const sortKey = Number.isFinite(noNum) && noNum > 0 ? noNum : (1_000_000 + idx);
+          const noNum = parseNo(h?.no);
+          const sortKey = noNum === 0 ? (idx / 1000000) : noNum; // use parsed number, if 0 keep relative index order at top
           agg[sid] = {
             staffId: sid,
             hrSortKey: sortKey,
+            hrNo: h.no || '',
             isCivilServant: Boolean(
               !h?.isRetiredThenContract &&
               ((h?.civilServantId || '').toString().trim() || (h?.officerId || '').toString().trim() || (h?.dateJoinedGov || '').toString().trim())
@@ -785,7 +834,7 @@ export default function AttendanceSumDayReportPage() {
           target.absentCount = Number(row.absentCount || 0);
           target.checkinLateCount = Number(row.checkinLateCount || 0);
           target.checkoutEarlyCount = Number(row.checkoutEarlyCount || 0);
-          target.plech = Number(row.plech || 0);
+          target.plech = Number((row.plech ?? row.Plech) || 0);
           target.workTimeMinutes = Number(row.workTime || 0);
           target.totalLeaveComment = row.totalLeaveComment || '';
           if (row.skill) target.skill = row.skill;
@@ -874,11 +923,13 @@ export default function AttendanceSumDayReportPage() {
           if (!lt.includes(selectedLeaveNorm) && !comment.includes(selectedLeaveNorm)) return false;
         }
         if (!term) return true;
+        const terms = term.split(',').map(t => t.trim()).filter(Boolean);
+        if (terms.length === 0) return true;
         const name = (record.khmerName || record.name || '').toString().toLowerCase();
         const staffId = (record.staffId || record.no || '').toString().toLowerCase();
         const position = (record.position || '').toString().toLowerCase();
         const dept = (record.department || '').toString().toLowerCase();
-        return name.includes(term) || staffId.includes(term) || position.includes(term) || dept.includes(term);
+        return terms.some(t => name.includes(t) || staffId.includes(t) || position.includes(t) || dept.includes(t));
       })
       .map((record) => {
         const dayWorkCount = Number(record.dayWorkCount) || 0;
@@ -930,19 +981,19 @@ export default function AttendanceSumDayReportPage() {
           department: record.department || record.Department_Kh || '',
           genderShort: fmtGenderShortSumDay(record.gender),
           isCivilServant: Boolean(record.isCivilServant),
-          dayWorkCount,
-          attendanceCount,
-          leaveCount,
-          leaveType,
-          A,
-          workTime,
-          lateEarly: combinedEvents,
-          plech: missionCount,
-          totalAbsent,
-          percentage,
-          plechPercent,
-          lateEarlyPercent,
-          overallPercent,
+          dayWorkCount: record.edited_dayWorkCount !== undefined ? record.edited_dayWorkCount : dayWorkCount,
+          attendanceCount: record.edited_attendanceCount !== undefined ? record.edited_attendanceCount : attendanceCount,
+          leaveCount: record.edited_leaveCount !== undefined ? record.edited_leaveCount : leaveCount,
+          leaveType: record.edited_leaveType !== undefined ? record.edited_leaveType : leaveType,
+          A: record.edited_A !== undefined ? record.edited_A : A,
+          workTime: record.edited_workTime !== undefined ? record.edited_workTime : workTime,
+          lateEarly: record.edited_lateEarly !== undefined ? record.edited_lateEarly : combinedEvents,
+          plech: record.edited_plech !== undefined ? record.edited_plech : missionCount,
+          totalAbsent: record.edited_totalAbsent !== undefined ? record.edited_totalAbsent : totalAbsent,
+          percentage: record.edited_percentage !== undefined ? record.edited_percentage : percentage,
+          plechPercent: record.edited_plechPercent !== undefined ? record.edited_plechPercent : plechPercent,
+          lateEarlyPercent: record.edited_lateEarlyPercent !== undefined ? record.edited_lateEarlyPercent : lateEarlyPercent,
+          overallPercent: record.edited_overallPercent !== undefined ? record.edited_overallPercent : overallPercent,
           absentToDeduct,
           other,
           totalLeaveComment,
@@ -1020,7 +1071,7 @@ export default function AttendanceSumDayReportPage() {
     setColOrder(newOrder);
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     // Use the selected month (END month) for file naming
     const [yStr, mStr] = (monthValue || '').split('-');
     const year = yStr || '';
@@ -1028,8 +1079,6 @@ export default function AttendanceSumDayReportPage() {
 
     const visibleKeys = (colOrder || [])
       .filter((k) => columnMeta[k] && (visibleCols?.[k] ?? true));
-
-    const header = visibleKeys.map((k) => columnMeta[k]?.label || k);
 
     const getCellValueLocal = (k, row) => {
       switch (k) {
@@ -1052,19 +1101,128 @@ export default function AttendanceSumDayReportPage() {
         case 'totalAbsent': return row.totalAbsent;
         case 'percentage': return row.percentage;
         case 'overallPercent': return row.overallPercent;
-        // Do not export any value for "ចំនួនអវត្តមានត្រូវកាត់"; keep column but leave cells empty.
         case 'absentToDeduct': return '';
         case 'other': return row.other;
-        case 'totalLeaveComment':
-          // Export the same auto-built comment used on screen
-          return buildCommentText(row);
+        case 'totalLeaveComment': return buildCommentText(row);
         default: return row?.[k];
       }
     };
 
-    const data = derived.rows.map((row) => visibleKeys.map((k) => getCellValueLocal(k, row)));
+    const wb = new ExcelJS.Workbook();
+    const sheetName = `វត្តមាន_${month}_${year}`;
+    const ws = wb.addWorksheet(sheetName.substring(0, 31)); // Excel sheet name limit
 
-    const totalRow = visibleKeys.map((k) => {
+    const colsCount = visibleKeys.length;
+    const midCol = Math.ceil(colsCount / 2);
+
+    // Apply basic font settings to the sheet
+    ws.properties.defaultRowHeight = 20;
+
+    // Define columns
+    ws.columns = visibleKeys.map(k => {
+      let w = Number(colWidths?.[k]) || columnMeta[k]?.width;
+      let wch = typeof w === 'number' ? Math.max(8, Math.round(w / 6.5)) : 12;
+      if (k === 'index') wch = 6;
+      if (k === 'name') wch = 20;
+      if (k === 'position') wch = 25;
+      if (k === 'department') wch = 25;
+      if (k === 'totalLeaveComment') wch = 30;
+      return { key: k, width: wch };
+    });
+
+    // Add UI/UX Headers
+    // Row 1: ព្រះរាជាណាចក្រកម្ពុជា
+    const r1 = ws.addRow([]);
+    const c1 = ws.getCell(1, midCol);
+    c1.value = 'ព្រះរាជាណាចក្រកម្ពុជា';
+    c1.font = { name: 'Khmer OS Muol Light', size: 16 };
+    c1.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.mergeCells(1, Math.max(1, midCol - 1), 1, Math.min(colsCount, midCol + 2));
+
+    // Row 2: ជាតិ សាសនា ព្រះមហាក្សត្រ
+    const r2 = ws.addRow([]);
+    const c2 = ws.getCell(2, midCol);
+    c2.value = 'ជាតិ សាសនា ព្រះមហាក្សត្រ';
+    c2.font = { name: 'Khmer OS Muol Light', size: 16 };
+    c2.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.mergeCells(2, Math.max(1, midCol - 1), 2, Math.min(colsCount, midCol + 2));
+
+    // Empty row
+    ws.addRow([]);
+
+    // Row 4: ក្រសួងសុខាភិបាល
+    const r4 = ws.addRow([]);
+    const c4 = ws.getCell(r4.number, 1);
+    c4.value = 'ក្រសួងសុខាភិបាល';
+    c4.font = { name: 'Khmer OS Muol Light', size: 14 };
+    c4.alignment = { horizontal: 'left', vertical: 'middle' };
+
+    // Row 5: មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត
+    const r5 = ws.addRow([]);
+    const c5 = ws.getCell(r5.number, 1);
+    c5.value = 'មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត';
+    c5.font = { name: 'Khmer OS Muol Light', size: 14 };
+    c5.alignment = { horizontal: 'left', vertical: 'middle' };
+
+    // Row 6: Department
+    if (selectedDept) {
+      const r6 = ws.addRow([]);
+      const c6 = ws.getCell(r6.number, 1);
+      c6.value = `ផ្នែក: ${selectedDept}`;
+      c6.font = { name: 'Khmer OS Muol Light', size: 14 };
+      c6.alignment = { horizontal: 'left', vertical: 'middle' };
+    }
+
+    // Row 7: Title
+    const rTitle = ws.addRow([]);
+    const cTitle = ws.getCell(rTitle.number, 1);
+    cTitle.value = `វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា គិតពី ${fmtKhmerLongDateSumDay(apiFromDate)} ដល់ ${fmtKhmerLongDateSumDay(apiToDate)}`;
+    cTitle.font = { name: 'Khmer OS Siemreap', size: 15, bold: true };
+    cTitle.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.mergeCells(rTitle.number, 1, rTitle.number, colsCount);
+
+    ws.addRow([]); // empty row before table
+
+    // Table Header
+    const headerRow = ws.addRow(visibleKeys.map(k => columnMeta[k]?.label || k));
+    headerRow.height = 30;
+    headerRow.eachCell((cell) => {
+      cell.font = { name: 'Khmer OS Siemreap', size: 11, bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+        left: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+        bottom: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+        right: { style: 'thin', color: { argb: 'FF8F8B8B' } }
+      };
+    });
+
+    // Table Data
+    derived.rows.forEach(row => {
+      const rowData = visibleKeys.map(k => getCellValueLocal(k, row));
+      const excelRow = ws.addRow(rowData);
+      excelRow.eachCell((cell, colNumber) => {
+        const k = visibleKeys[colNumber - 1];
+        cell.font = { name: 'Khmer OS Siemreap', size: 11 };
+        
+        let align = 'center';
+        if (k === 'name' || k === 'position' || k === 'department' || k === 'leaveType' || k === 'other' || k === 'totalLeaveComment') {
+          align = 'left';
+        }
+        
+        cell.alignment = { horizontal: align, vertical: 'middle', wrapText: true };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+          left: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+          bottom: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+          right: { style: 'thin', color: { argb: 'FF8F8B8B' } }
+        };
+      });
+    });
+
+    // Summary Row
+    const totalRow = visibleKeys.map(k => {
       if (k === 'index') return 'សរុប';
       if (k === 'dayWorkCount') return derived.totals?.dayWorkCount;
       if (k === 'attendanceCount') return derived.totals?.attendanceCount;
@@ -1076,25 +1234,29 @@ export default function AttendanceSumDayReportPage() {
       if (k === 'workTime') return derived.totals?.workTime;
       return '';
     });
-
-    const summary = [
-      totalRow,
-      [],
-      ['សរុបបុគ្គលិក', `${derived.total} នាក់`, `(ប្រុស: ${derived.male} នាក់ — ស្រី: ${derived.female} នាក់)`]
-    ];
-
-    const ws = XLSX.utils.aoa_to_sheet([header, ...data, ...summary]);
-    ws['!cols'] = visibleKeys.map((k) => {
-      const w = Number(colWidths?.[k]) || columnMeta[k]?.width;
-      const wch = typeof w === 'number' ? Math.max(6, Math.round(w / 3)) : 10;
-      return { wch };
+    
+    const summaryExcelRow = ws.addRow(totalRow);
+    summaryExcelRow.eachCell((cell, colNumber) => {
+      const k = visibleKeys[colNumber - 1];
+      cell.font = { name: 'Khmer OS Siemreap', size: 11, bold: true };
+      let align = 'center';
+      if (k === 'index') align = 'right';
+      cell.alignment = { horizontal: align, vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+        left: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+        bottom: { style: 'thin', color: { argb: 'FF8F8B8B' } },
+        right: { style: 'thin', color: { argb: 'FF8F8B8B' } }
+      };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
     });
 
-    const wb = XLSX.utils.book_new();
-    const sheetName = `វត្តមាន_${month}_${year}`;
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    ws.addRow([]);
+    ws.addRow(['សរុបបុគ្គលិក', `${derived.total} នាក់`, `(ប្រុស: ${derived.male} នាក់ — ស្រី: ${derived.female} នាក់)`]);
+
     const fileSafe = year && month ? `AttendanceSumDay_${year}_${month}.xlsx` : `AttendanceSumDay_${fromDate}_${toDate}.xlsx`;
-    XLSX.writeFile(wb, fileSafe);
+    const buffer = await wb.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), fileSafe);
   };
 
   const handlePrint = () => {
@@ -1123,7 +1285,86 @@ export default function AttendanceSumDayReportPage() {
   };
 
   const handlePrintByDepartment = () => {
-    const rowsSource = selectedDept ? (derived.rows || []) : (derivedAllDepts.rows || []);
+    // Re-filter without selectedDept to get all departments if selectedDept is empty,
+    // otherwise just use derived.rows
+    let rowsSource = derived.rows;
+    if (!selectedDept && attendanceData) {
+      // Re-run derived logic without selectedDept
+      rowsSource = attendanceData.filter(record => {
+        const selectedPosSet = new Set((selectedPositions || []).map(p => (p || '').toString().trim()).filter(Boolean));
+        if (selectedPosSet.size) {
+          const pos = (record.position || '').toString().trim();
+          if (!selectedPosSet.has(pos)) return false;
+        }
+        const selectedLeaveNorm = (selectedLeaveFilter || '').toString().trim();
+        if (selectedLeaveNorm) {
+          const lt = (record.leaveType || '').toString().trim();
+          const comment = (record.totalLeaveComment || '').toString().trim();
+          if (!lt.includes(selectedLeaveNorm) && !comment.includes(selectedLeaveNorm)) return false;
+        }
+        const term = (q || '').toString().trim().toLowerCase();
+        if (term) {
+          const name = (record.khmerName || record.name || '').toString().toLowerCase();
+          const staffId = (record.staffId || record.no || '').toString().toLowerCase();
+          const position = (record.position || '').toString().toLowerCase();
+          const dept = (record.department || '').toString().toLowerCase();
+          if (!(name.includes(term) || staffId.includes(term) || position.includes(term) || dept.includes(term))) return false;
+        }
+        return true;
+      }).map(record => {
+        // We only need the basic mapping for printing
+        const dayWorkCount = Number(record.dayWorkCount) || 0;
+        const attendanceCount = Number(record.attendanceCount) || 0;
+        const leaveCount = Number(record.leaveCount) || 0;
+        const A = Number(record.A) || 0;
+        const checkinLateCount = Number(record.checkinLateCount) || 0;
+        const checkoutEarlyCount = Number(record.checkoutEarlyCount) || 0;
+        const lateEarlyEvents = checkinLateCount + checkoutEarlyCount;
+        const plechEvents = Number(record.plech ?? record.Plech) || 0;
+        const combinedEvents = lateEarlyEvents + plechEvents;
+        let totalAbsent = A + (combinedEvents / 3);
+        totalAbsent = Math.round(totalAbsent * 100) / 100;
+        
+        let overallPercent = 0;
+        if (dayWorkCount > 0) {
+          overallPercent = Math.max(0, Math.min(100, Math.round(((dayWorkCount - (totalAbsent + leaveCount)) / dayWorkCount) * 100)));
+        }
+        
+        let performanceResult = '';
+        if (overallPercent >= 85) performanceResult = 'ល្អ';
+        else if (overallPercent >= 65) performanceResult = 'ល្អបង្គួរ';
+        else if (overallPercent >= 45) performanceResult = 'មធ្យម';
+        else if (overallPercent < 45) performanceResult = 'ខ្សោយ';
+
+        return {
+          ...record,
+          genderShort: fmtGenderShortSumDay(record.gender),
+          lateEarly: combinedEvents,
+          totalAbsent,
+          overallPercent,
+          performanceResult
+        };
+      });
+
+      rowsSource.sort((a, b) => {
+        if (sortByOverallPercent) {
+          const ao = Number(a?.overallPercent);
+          const bo = Number(b?.overallPercent);
+          const aVal = Number.isFinite(ao) ? ao : -1;
+          const bVal = Number.isFinite(bo) ? bo : -1;
+          if (aVal !== bVal) return sortByOverallPercent === 'desc' ? bVal - aVal : aVal - bVal;
+        }
+        const ka = Number(a?.hrSortKey);
+        const kb = Number(b?.hrSortKey);
+        const aKey = Number.isFinite(ka) ? ka : 1_000_000_000;
+        const bKey = Number.isFinite(kb) ? kb : 1_000_000_000;
+        if (aKey !== bKey) return aKey - bKey;
+        const aSid = (a?.staffId || a?.no || '').toString();
+        const bSid = (b?.staffId || b?.no || '').toString();
+        return aSid.localeCompare(bSid);
+      });
+    }
+
     const deptKey = (s) => (s || '').toString().trim() || 'មិនមានផ្នែក';
     const groups = new Map();
     rowsSource.forEach((r) => {
@@ -1199,14 +1440,24 @@ export default function AttendanceSumDayReportPage() {
       });
       page.className = 'dept-page';
 
-      const header = makeEl('div', { marginBottom: '16px', borderBottom: '2px solid #ddd', paddingBottom: '10px' });
-      header.appendChild(makeText('h1', 'ព្រះរាជាណាចក្រកម្ពុជា', { margin: '0', fontSize: '20px', fontWeight: '400', textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }));
-      header.appendChild(makeText('h1', 'ជាតិ សាសនា ព្រះមហាក្សត្រ', { margin: '0', fontSize: '20px', fontWeight: '400', textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }));
-      header.appendChild(makeText('h1', 'ក្រសួងសុខាភិបាល', { margin: '0', fontSize: '16px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
-      header.appendChild(makeText('h1', 'មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត', { margin: '0', fontSize: '16px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
-      header.appendChild(makeText('h1', 'វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា', { margin: '0', fontSize: '20px', fontWeight: '700', textAlign: 'center' }));
-      header.appendChild(makeText('div', `ផ្នែក: ${deptName}`, { marginTop: '6px', fontSize: '14px', fontWeight: '700', textAlign: 'center' }));
-      header.appendChild(makeText('div', `គិតពី ${fmtKhmerLongDateSumDay(fromDate)} ដល់ ${fmtKhmerLongDateSumDay(toDate)}`, { marginTop: '4px', fontSize: '14px', textAlign: 'center', color: '#141313' }));
+      const header = makeEl('div', { marginBottom: '4px', paddingBottom: '0' });
+      header.appendChild(makeText('h1', 'ព្រះរាជាណាចក្រកម្ពុជា', { margin: '0', fontSize: '16px', fontWeight: '400', textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }));
+      header.appendChild(makeText('h1', 'ជាតិ សាសនា ព្រះមហាក្សត្រ', { margin: '0', fontSize: '16px', fontWeight: '400', textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }));
+      
+      const logoWrapper = makeEl('div', { display: 'flex', justifyContent: 'center', width: '100%', margin: '4px 0' });
+      const logo = makeEl('img');
+      logo.src = headerBg;
+      logo.alt = 'header-symbol';
+      logo.style.height = 'auto';
+      logo.style.maxWidth = '120px';
+      logoWrapper.appendChild(logo);
+      header.appendChild(logoWrapper);
+
+      header.appendChild(makeText('h1', 'ក្រសួងសុខាភិបាល', { margin: '0', marginTop: '-5mm', fontSize: '14px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
+      header.appendChild(makeText('h1', 'មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត', { margin: '0', fontSize: '14px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
+      header.appendChild(makeText('h1', deptName || '', { margin: '0', fontSize: '14px', fontWeight: '400', textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }));
+      
+      header.appendChild(makeText('p', `វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា គិតពី ${fmtKhmerLongDateSumDay(fromDate)} ដល់ ${fmtKhmerLongDateSumDay(toDate)}`, { margin: '0', fontSize: '15px', fontWeight: '700', textAlign: 'center', fontFamily: '"Khmer OS Siemreap", "Noto Sans Khmer", sans-serif' }));
       page.appendChild(header);
 
       const male = rows.filter(r => r.gender === 'Male' || r.gender === 'ប្រុស').length;
@@ -1218,7 +1469,7 @@ export default function AttendanceSumDayReportPage() {
       const thead = makeEl('thead');
       const trh = makeEl('tr');
       visibleKeysNow.forEach((k) => {
-        const th = makeEl('th', { textAlign: 'center', fontSize: '11px', padding: '4px 3px', border: '1px solid #8f8b8b', background: '#f3f4f6', wordBreak: 'break-word' });
+        const th = makeEl('th', { textAlign: 'center', fontSize: '12px', padding: '4px 3px', border: '1px solid #8f8b8b', background: '#f3f4f6', whiteSpace: 'nowrap' });
         th.textContent = columnMeta[k]?.label || k;
         trh.appendChild(th);
       });
@@ -1232,12 +1483,12 @@ export default function AttendanceSumDayReportPage() {
         visibleKeysNow.forEach((k) => {
           const cell = renderCell(k, row);
           const td = makeEl('td', {
-            fontSize: '11px',
+            fontSize: '12px',
             verticalAlign: 'middle',
             textAlign: cell?.style?.textAlign || columnMeta[k]?.align || 'center',
             border: '1px solid #8f8b8b',
             padding: '3px 4px',
-            wordBreak: 'break-word'
+            whiteSpace: 'nowrap'
           });
           td.textContent = (cell?.value ?? '').toString();
           tbody.appendChild(tr).appendChild(td);
@@ -1271,14 +1522,15 @@ export default function AttendanceSumDayReportPage() {
     return <div style={{ padding: 20 }}><p>កំពុងផ្ទុក...</p></div>;
   }
 
-  const rowFontSize = Math.max(10, Math.round(rowHeight * 0.46));
+  const rowFontSize = Math.max(10, Math.round(rowHeight * 0.46)) + 1;
   const bodyPadY = Math.max(1, Math.min(12, Math.round(rowHeight / 6)));
 
   const tdBase = {
     border: '1px solid #8f8b8b',
     padding: `${bodyPadY}px 6px`,
     verticalAlign: 'middle',
-    fontSize: rowFontSize
+    fontSize: rowFontSize,
+    whiteSpace: 'nowrap'
   };
 
   const visibleKeys = (colOrder || [])
@@ -1288,7 +1540,7 @@ export default function AttendanceSumDayReportPage() {
     border: '1px solid #8f8b8b',
     padding: 6,
     textAlign: 'center',
-    fontSize: 12,
+    fontSize: 13,
     userSelect: 'none'
   };
 
@@ -1360,42 +1612,42 @@ export default function AttendanceSumDayReportPage() {
       case 'department':
         return { value: row.department || row.Department_Kh, style: { textAlign: 'left', width: columnMeta.department.width, fontSize: Math.max(9, rowFontSize - 1) } };
       case 'dayWorkCount':
-        return { value: maybeHideZero(row.dayWorkCount, true), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.dayWorkCount, true)} onChange={e => handleEditCell(row.staffId || row.no, 'dayWorkCount', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'attendanceCount':
-        return { value: maybeHideZero(row.attendanceCount, true), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.attendanceCount, true)} onChange={e => handleEditCell(row.staffId || row.no, 'attendanceCount', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'leaveCount':
-        return { value: maybeHideZero(row.leaveCount), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.leaveCount)} onChange={e => handleEditCell(row.staffId || row.no, 'leaveCount', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'leaveType':
-        return { value: row.leaveType || '', style: { textAlign: 'left', fontSize: Math.max(8, rowFontSize - 2) } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'left', outline:'none', padding:'0 4px', fontSize:'inherit' }} value={row.leaveType || ''} onChange={e => handleEditCell(row.staffId || row.no, 'leaveType', e.target.value)} />, style: { textAlign: 'left', fontSize: Math.max(8, rowFontSize - 2), padding: 0 } };
       case 'A':
-        return { value: maybeHideZero(row.A), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.A)} onChange={e => handleEditCell(row.staffId || row.no, 'A', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'workTime':
-        return { value: row.workTime, style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={row.workTime || ''} onChange={e => handleEditCell(row.staffId || row.no, 'workTime', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'lateEarly':
-        return { value: maybeHideZero(row.lateEarly), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.lateEarly)} onChange={e => handleEditCell(row.staffId || row.no, 'lateEarly', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'plech':
-        return { value: maybeHideZero(row.plech), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.plech)} onChange={e => handleEditCell(row.staffId || row.no, 'plech', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'plechPercent':
         return {
-          value: (Number(row.plechPercent) && Number(row.plechPercent) > 0) ? `${row.plechPercent}%` : (Number.isFinite(Number(row.plechPercent)) ? '0%' : ''),
-          style: { textAlign: 'center' }
+          value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={(Number(row.plechPercent) && Number(row.plechPercent) > 0) ? `${row.plechPercent}%` : (Number.isFinite(Number(row.plechPercent)) ? '0%' : (row.plechPercent || ''))} onChange={e => handleEditCell(row.staffId || row.no, 'plechPercent', e.target.value)} />,
+          style: { textAlign: 'center', padding: 0 }
         };
       case 'totalAbsent':
-        return { value: maybeHideZero(row.totalAbsent), style: { textAlign: 'center' } };
+        return { value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={maybeHideZero(row.totalAbsent)} onChange={e => handleEditCell(row.staffId || row.no, 'totalAbsent', e.target.value)} />, style: { textAlign: 'center', padding: 0 } };
       case 'percentage':
         return {
-          value: Number.isFinite(Number(row.percentage)) ? `${Number(row.percentage)}%` : '',
-          style: { textAlign: 'center' }
+          value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={Number.isFinite(Number(row.percentage)) ? `${Number(row.percentage)}%` : (row.percentage || '')} onChange={e => handleEditCell(row.staffId || row.no, 'percentage', e.target.value)} />,
+          style: { textAlign: 'center', padding: 0 }
         };
       case 'lateEarlyPercent':
         return {
-          value: (Number(row.lateEarlyPercent) && Number(row.lateEarlyPercent) > 0) ? `${row.lateEarlyPercent}%` : (Number.isFinite(Number(row.lateEarlyPercent)) ? '0%' : ''),
-          style: { textAlign: 'center' }
+          value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={(Number(row.lateEarlyPercent) && Number(row.lateEarlyPercent) > 0) ? `${row.lateEarlyPercent}%` : (Number.isFinite(Number(row.lateEarlyPercent)) ? '0%' : (row.lateEarlyPercent || ''))} onChange={e => handleEditCell(row.staffId || row.no, 'lateEarlyPercent', e.target.value)} />,
+          style: { textAlign: 'center', padding: 0 }
         };
       case 'overallPercent':
         return {
-          value: Number.isFinite(Number(row.overallPercent)) ? `${Number(row.overallPercent)}%` : '',
-          style: { textAlign: 'center' }
+          value: <input className="no-print-border" style={{ width:'100%', border:'none', background:'transparent', textAlign:'center', outline:'none', padding:0, fontSize:'inherit' }} value={Number.isFinite(Number(row.overallPercent)) ? `${Number(row.overallPercent)}%` : (row.overallPercent || '')} onChange={e => handleEditCell(row.staffId || row.no, 'overallPercent', e.target.value)} />,
+          style: { textAlign: 'center', padding: 0 }
         };
       case 'absentToDeduct':
         // Field "ចំនួនអវត្តមានត្រូវកាត់" should not display any data for now.
@@ -1584,7 +1836,7 @@ export default function AttendanceSumDayReportPage() {
             <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#718096' }}>🔍</span>
             <input
               type="text"
-              placeholder="ស្វែងរកបុគ្គលិក (ឈ្មោះ, អត្តលេខ, តួនាទី, ផ្នែក...)"
+              placeholder="ស្វែងរកបុគ្គលិក (ប្រើសញ្ញាក្បៀស ',' ដើម្បីស្វែងរកច្រើននាក់ក្នុងពេលតែមួយ)"
               value={q}
               onChange={e => setQ(e.target.value)}
               style={{
@@ -1630,7 +1882,7 @@ export default function AttendanceSumDayReportPage() {
         </div>
 
         {/* Bottom Row: Filters */}
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #f1f5f9', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569' }}>ប្រចាំខែ:</label>
             <input
@@ -1866,18 +2118,17 @@ export default function AttendanceSumDayReportPage() {
           padding: 24
         }}
       >
-        <div style={{ marginBottom: 20, paddingBottom: 10 }}>
-          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 400, textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }}>ព្រះរាជាណាចក្រកម្ពុជា</h1>
-          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 400, textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }}>ជាតិ សាសនា ព្រះមហាក្សត្រ</h1>
+        <div style={{ marginBottom: 4, paddingBottom: 0 }}>
+          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 400, textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }}>ព្រះរាជាណាចក្រកម្ពុជា</h1>
+          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 400, textAlign: 'center', fontFamily: 'Khmer OS Muol Light' }}>ជាតិ សាសនា ព្រះមហាក្សត្រ</h1>
           <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
             <img src={headerBg} alt="header-symbol" style={{ height: 'auto', maxWidth: '120px' }} />
           </div>
-          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 400, textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }}>ក្រសួងសុខាភិបាល</h1>
-          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 400, textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</h1>
+          <h1 style={{ margin: 0, marginTop: '-5mm', fontSize: 14, fontWeight: 400, textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }}>ក្រសួងសុខាភិបាល</h1>
+          <h1 style={{ margin: 0, fontSize: 14, fontWeight: 400, textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }}>មន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត</h1>
           <h1 style={{ margin: 0, fontSize: 14, fontWeight: 400, textAlign: 'left', fontFamily: 'Khmer OS Muol Light' }}>{selectedDept || ''}</h1>
-          <p style={{ margin: 0, fontSize: '15px', fontWeight: 700, textAlign: 'center', fontFamily: '"Khmer OS Siemreap", "Noto Sans Khmer", sans-serif' }}>វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា</p>
-          <p style={{ margin: '5px 0 0', fontSize: '15px', fontWeight: 700, textAlign: 'center', fontFamily: '"Khmer OS Siemreap", "Noto Sans Khmer", sans-serif' }}>
-            គិតពី {fmtKhmerLongDateSumDay(apiFromDate)} ដល់ {fmtKhmerLongDateSumDay(apiToDate)}
+          <p style={{ margin: 0, fontSize: '15px', fontWeight: 700, textAlign: 'center', fontFamily: '"Khmer OS Siemreap", "Noto Sans Khmer", sans-serif' }}>
+            វត្តមានប្រចាំខែរបស់មន្រ្តីរាជការ និងមន្រ្តីកិច្ចសន្យា គិតពី {fmtKhmerLongDateSumDay(apiFromDate)} ដល់ {fmtKhmerLongDateSumDay(apiToDate)}
           </p>
         </div>
 

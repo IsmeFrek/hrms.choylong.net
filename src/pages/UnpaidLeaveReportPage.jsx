@@ -1099,169 +1099,177 @@ export default function RetirementReportPage() {
       return <col key={c.key || i} style={{ width: w }} />;
     });
     return (
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+      <div style={{ marginBottom: 20 }} className="w-full">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           {(() => {
             const totalN = rows.length || 0;
             const maleN = rows.filter(r => r.hr && r.hr.gender === 'Male').length;
             const femaleN = rows.filter(r => r.hr && r.hr.gender === 'Female').length;
             return (
-              <h4 style={{ fontSize: 12, fontWeight: 700, margin: 0 }}>{title} — {toKhmerDigits(totalN)} នាក់ ( ប្រុស: {toKhmerDigits(maleN)} — ស្រី: {toKhmerDigits(femaleN)} )</h4>
+              <h4 style={{ fontSize: 13, fontWeight: 700, margin: 0, color: '#374151' }} className="font-khmer">
+                {title} — <span style={{ color: '#2563eb' }}>{toKhmerDigits(totalN)}</span> នាក់ ( ប្រុស: <span style={{ color: '#4b5563' }}>{toKhmerDigits(maleN)}</span> — ស្រី: <span style={{ color: '#4b5563' }}>{toKhmerDigits(femaleN)}</span> )
+              </h4>
             );
           })()}
         </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed' }}>
-          <colgroup>
-            {colElems}
-          </colgroup>
-          {showHeader && (
-            <thead>
-              <tr>
-                {orderedDefs.map(col => (
-                  <th
-                    key={col.key}
-                    draggable
-                    onDragStart={(e) => { draggingKeyRef.current = col.key; e.dataTransfer?.setData('text/plain', col.key); }}
-                    onDragOver={(e) => { e.preventDefault(); }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const from = draggingKeyRef.current || e.dataTransfer?.getData('text/plain');
-                      const to = col.key;
-                      if (!from || from === to) return;
-                      setColOrder(prev => {
-                        const next = (prev || defaultCols).slice();
-                        const fi = next.indexOf(from);
-                        const ti = next.indexOf(to);
-                        if (fi === -1 || ti === -1) return prev;
-                        next.splice(fi, 1);
-                        next.splice(ti, 0, from);
-                        return next;
-                      });
-                      draggingKeyRef.current = null;
-                    }}
-                    style={{ border: '1px solid #d1cfcf', padding: '6px', cursor: 'grab', userSelect: 'none', textAlign: 'center' }}
-                    className="center"
-                  >
-                    {col.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-          )}
-          <tbody>
-            {rows.map((row, idx) => {
-              const staffId = row.hr.staffId || row.hr.cardNumber || row.hr.cardNo || row.hr.no || null;
-              const civilId = row.hr.civilServantId || row.hr.officerId || row.hr.staffId || row.hr.no || null;
-              const fullName = row.hr.khmerName || row.hr.name || null;
-              const gender = row.hr.gender === 'Male' ? 'ប' : row.hr.gender === 'Female' ? 'ស' : null;
-              const role = row.hr.civilServantRole || row.hr.role || row.hr.title || row.hr.position || null;
-              const position = row.hr.position || row.hr.role || row.hr.title || null;
-              const deptName = row.hr.Department_Kh || row.hr.department || null;
-              const unpaid = row.hr && row.hr.unpaid ? row.hr.unpaid : {};
-              return (
-                <tr key={row.hr._id || idx}>
-                  {orderedDefs.map((col) => {
-                    const k = col.key;
-                    if (k === 'index') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }} className="center">{toKhmerDigits(idx + 1)}</td>);
-                    if (k === 'staffId') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{staffId ? staffId : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'civilId') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }} className="center">{civilId ? civilId : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'name') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }}>{fullName ? fullName : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'gender') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }} className="center">{gender ? gender : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'dob') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{(row.hr && (row.hr.birthDate || row.hr.dob || row.hr.BirthDate)) ? fmtShortDate(row.hr.birthDate || row.hr.dob || row.hr.BirthDate) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'role') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }}>{role ? role : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'position') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }}>{position ? position : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'dept') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, wordBreak: 'break-word', overflowWrap: 'break-word' }}>{deptName ? deptName : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'number') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{unpaid && unpaid.number ? unpaid.number : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'reason') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }}>{unpaid && (unpaid.Reason || unpaid.reason) ? (unpaid.Reason || unpaid.reason) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'validity') {
-                      const meta = computeUnpaidMeta(unpaid || {}, row.hr);
-                      let validityDisplay = null;
-                      if (meta && (meta.validityDays !== null && typeof meta.validityDays !== 'undefined')) validityDisplay = toKhmerDigits(meta.validityDays);
-                      else if (meta && meta.validityLabel) validityDisplay = meta.validityLabel;
-                      else if (unpaid && unpaid.validity) validityDisplay = unpaid.validity;
-                      return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{validityDisplay || (<span className="text-gray-400">-</span>)}</td>);
-                    }
-                    if (k === 'status') {
-                      const meta = computeUnpaidMeta(unpaid || {}, row.hr);
-                      const rawStatus = (unpaid && (typeof unpaid.status !== 'undefined' && unpaid.status !== null)) ? String(unpaid.status).trim() : '';
-                      const statusToShow = (meta && meta.statusLabel) ? meta.statusLabel : (rawStatus !== '' ? rawStatus : null);
-                      return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{statusToShow ? renderStatusBadge(statusToShow) : (unpaid && unpaid.status ? renderStatusBadge(unpaid.status) : (<span className="text-gray-400">-</span>))}</td>);
-                    }
-                    if (k === 'duration') {
-                      const meta = computeUnpaidMeta(unpaid || {}, row.hr);
-                      return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{(meta && meta.durationLabel) ? meta.durationLabel : ((unpaid && unpaid.duration) ? unpaid.duration : (<span className="text-gray-400">-</span>))}</td>);
-                    }
-                    if (k === 'other') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }}>{(unpaid && unpaid.other) ? unpaid.other : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'Start') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{(unpaid && (unpaid.Start || unpaid.start)) ? fmtShortDate(unpaid.Start || unpaid.start) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'End') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }} className="center">{(unpaid && (unpaid.End || unpaid.end)) ? fmtShortDate(unpaid.End || unpaid.end) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'image') return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }}>{unpaid && unpaid.image ? (<a href={unpaid.image} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>) : (<span className="text-gray-400">-</span>)}</td>);
-                    if (k === 'action') {
-                      const unpaidObj = row.hr && row.hr.unpaid ? row.hr.unpaid : {};
-                      let hasUnpaid = false;
-                      try { hasUnpaid = Object.keys(unpaidObj || {}).some(uk => { const v = unpaidObj[uk]; return v !== null && typeof v !== 'undefined' && String(v).trim() !== ''; }); } catch { }
-                      return (
-                        <td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6, verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="center">
-                          <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={() => openEdit(row.hr)}
-                              title="កែប្រែ"
-                              aria-label="Edit unpaid"
-                              style={{
-                                background: '#f59e0b',
-                                width: 32,
-                                height: 32,
-                                borderRadius: 6,
-                                border: '1px solid #d4af2b',
-                                color: '#fff',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: 0
-                              }}
-                              className="text-xs"
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" fill="currentColor">
-                                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" />
-                                <path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
-                              </svg>
-                            </button>
-                            {hasUnpaid && (
+        <div style={{ width: '100%', overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', WebkitOverflowScrolling: 'touch' }} className="no-print-scrollbar">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed', minWidth: '1200px' }}>
+            <colgroup>
+              {colElems}
+            </colgroup>
+            {showHeader && (
+              <thead>
+                <tr style={{ backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                  {orderedDefs.map(col => (
+                    <th
+                      key={col.key}
+                      draggable
+                      onDragStart={(e) => { draggingKeyRef.current = col.key; e.dataTransfer?.setData('text/plain', col.key); }}
+                      onDragOver={(e) => { e.preventDefault(); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const from = draggingKeyRef.current || e.dataTransfer?.getData('text/plain');
+                        const to = col.key;
+                        if (!from || from === to) return;
+                        setColOrder(prev => {
+                          const next = (prev || defaultCols).slice();
+                          const fi = next.indexOf(from);
+                          const ti = next.indexOf(to);
+                          if (fi === -1 || ti === -1) return prev;
+                          next.splice(fi, 1);
+                          next.splice(ti, 0, from);
+                          return next;
+                        });
+                        draggingKeyRef.current = null;
+                      }}
+                      style={{ borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb', padding: '10px 8px', cursor: 'grab', userSelect: 'none', textAlign: 'center', fontWeight: 'bold', color: '#374151' }}
+                      className="center font-khmer"
+                    >
+                      {col.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            )}
+            <tbody>
+              {rows.map((row, idx) => {
+                const staffId = row.hr.staffId || row.hr.cardNumber || row.hr.cardNo || row.hr.no || null;
+                const civilId = row.hr.civilServantId || row.hr.officerId || row.hr.staffId || row.hr.no || null;
+                const fullName = row.hr.khmerName || row.hr.name || null;
+                const gender = row.hr.gender === 'Male' ? 'ប' : row.hr.gender === 'Female' ? 'ស' : null;
+                const role = row.hr.civilServantRole || row.hr.role || row.hr.title || row.hr.position || null;
+                const position = row.hr.position || row.hr.role || row.hr.title || null;
+                const deptName = row.hr.Department_Kh || row.hr.department || null;
+                const unpaid = row.hr && row.hr.unpaid ? row.hr.unpaid : {};
+                const rowBg = idx % 2 === 0 ? '#ffffff' : '#f9fafb';
+                return (
+                  <tr key={row.hr._id || idx} style={{ backgroundColor: rowBg, borderBottom: '1px solid #f3f4f6' }} className="hover:bg-gray-50 transition-colors">
+                    {orderedDefs.map((col) => {
+                      const k = col.key;
+                      const cellStyle = { borderRight: '1px solid #e5e7eb', padding: '10px 8px', wordBreak: 'break-word', overflowWrap: 'break-word', color: '#4b5563' };
+                      if (k === 'index') return (<td key={k} style={{ ...cellStyle, textAlign: 'center' }} className="center">{toKhmerDigits(idx + 1)}</td>);
+                      if (k === 'staffId') return (<td key={k} style={{ ...cellStyle, textAlign: 'center' }} className="center">{staffId ? staffId : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'civilId') return (<td key={k} style={{ ...cellStyle, textAlign: 'center' }} className="center">{civilId ? civilId : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'name') return (<td key={k} style={{ ...cellStyle, fontWeight: '500', color: '#1f2937' }}>{fullName ? fullName : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'gender') return (<td key={k} style={{ ...cellStyle, textAlign: 'center' }} className="center">{gender ? gender : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'dob') return (<td key={k} style={{ ...cellStyle, textAlign: 'center' }} className="center">{(row.hr && (row.hr.birthDate || row.hr.dob || row.hr.BirthDate)) ? fmtShortDate(row.hr.birthDate || row.hr.dob || row.hr.BirthDate) : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'role') return (<td key={k} style={cellStyle}>{role ? role : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'position') return (<td key={k} style={cellStyle}>{position ? position : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'dept') return (<td key={k} style={cellStyle}>{deptName ? deptName : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'number') return (<td key={k} style={{ ...cellStyle, textAlign: 'center' }} className="center">{unpaid && unpaid.number ? unpaid.number : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'reason') return (<td key={k} style={cellStyle}>{unpaid && (unpaid.Reason || unpaid.reason) ? (unpaid.Reason || unpaid.reason) : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'validity') {
+                        const meta = computeUnpaidMeta(unpaid || {}, row.hr);
+                        let validityDisplay = null;
+                        if (meta && (meta.validityDays !== null && typeof meta.validityDays !== 'undefined')) validityDisplay = toKhmerDigits(meta.validityDays);
+                        else if (meta && meta.validityLabel) validityDisplay = meta.validityLabel;
+                        else if (unpaid && unpaid.validity) validityDisplay = unpaid.validity;
+                        return (<td key={k} style={{ ...cellStyle, textAlign: 'center' }} className="center">{validityDisplay || (<span className="text-gray-400">-</span>)}</td>);
+                      }
+                      if (k === 'status') {
+                        const meta = computeUnpaidMeta(unpaid || {}, row.hr);
+                        const rawStatus = (unpaid && (typeof unpaid.status !== 'undefined' && unpaid.status !== null)) ? String(unpaid.status).trim() : '';
+                        const statusToShow = (meta && meta.statusLabel) ? meta.statusLabel : (rawStatus !== '' ? rawStatus : null);
+                        return (<td key={k} style={{ ...cellStyle, textAlign: 'center' }} className="center">{statusToShow ? renderStatusBadge(statusToShow) : (unpaid && unpaid.status ? renderStatusBadge(unpaid.status) : (<span className="text-gray-400">-</span>))}</td>);
+                      }
+                      if (k === 'duration') {
+                        const meta = computeUnpaidMeta(unpaid || {}, row.hr);
+                        return (<td key={k} style={{ ...cellStyle, textAlign: 'center' }} className="center">{(meta && meta.durationLabel) ? meta.durationLabel : ((unpaid && unpaid.duration) ? unpaid.duration : (<span className="text-gray-400">-</span>))}</td>);
+                      }
+                      if (k === 'other') return (<td key={k} style={cellStyle}>{(unpaid && unpaid.other) ? unpaid.other : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'Start') return (<td key={k} style={{ ...cellStyle, textAlign: 'center' }} className="center">{(unpaid && (unpaid.Start || unpaid.start)) ? fmtShortDate(unpaid.Start || unpaid.start) : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'End') return (<td key={k} style={{ ...cellStyle, textAlign: 'center' }} className="center">{(unpaid && (unpaid.End || unpaid.end)) ? fmtShortDate(unpaid.End || unpaid.end) : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'image') return (<td key={k} style={{ ...cellStyle, textAlign: 'center' }} className="center">{unpaid && unpaid.image ? (<a href={unpaid.image} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 underline font-medium">View</a>) : (<span className="text-gray-400">-</span>)}</td>);
+                      if (k === 'action') {
+                        const unpaidObj = row.hr && row.hr.unpaid ? row.hr.unpaid : {};
+                        let hasUnpaid = false;
+                        try { hasUnpaid = Object.keys(unpaidObj || {}).some(uk => { const v = unpaidObj[uk]; return v !== null && typeof v !== 'undefined' && String(v).trim() !== ''; }); } catch { }
+                        return (
+                          <td key={k} style={{ ...cellStyle, textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }} className="center">
+                            <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
                               <button
                                 type="button"
-                                onClick={() => handleDeleteUnpaid(row.hr)}
-                                title="លុបទិន្នន័យ"
-                                aria-label="Delete unpaid"
+                                onClick={() => openEdit(row.hr)}
+                                title="កែប្រែ"
+                                aria-label="Edit unpaid"
                                 style={{
-                                  background: '#fa0404',
+                                  background: '#f59e0b',
                                   width: 32,
                                   height: 32,
                                   borderRadius: 6,
+                                  border: '1px solid #d4af2b',
+                                  color: '#fff',
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  border: '2px solid #f30303',
-                                  color: '#ffffff',
-                                  padding: 0
+                                  padding: 0,
+                                  cursor: 'pointer'
                                 }}
-                                className="text-xs"
+                                className="text-xs hover:bg-amber-600 transition-colors shadow-sm"
                               >
                                 <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" fill="currentColor">
-                                  <path d="M9 3v1H15V3H9zM7 7v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7H7zm3 3h2v8H10V10zm4 0h2v8h-2V10z" />
+                                  <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" />
+                                  <path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
                                 </svg>
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      );
-                    }
-                    return (<td key={k} style={{ border: '1px solid #e6dbdbff', padding: 6 }}>-</td>);
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                              {hasUnpaid && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteUnpaid(row.hr)}
+                                  title="លុបទិន្នន័យ"
+                                  aria-label="Delete unpaid"
+                                  style={{
+                                    background: '#fa0404',
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 6,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    border: '1px solid #fa0404',
+                                    color: '#ffffff',
+                                    padding: 0,
+                                    cursor: 'pointer'
+                                  }}
+                                  className="text-xs hover:bg-red-700 transition-colors shadow-sm"
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" fill="currentColor">
+                                    <path d="M9 3v1H15V3H9zM7 7v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7H7zm3 3h2v8H10V10zm4 0h2v8h-2V10z" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      }
+                      return (<td key={k} style={cellStyle}>-</td>);
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
@@ -1276,94 +1284,127 @@ export default function RetirementReportPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <h3 className="text-xl font-semibold text-gray-900">របាយការណ៍ ទំនេរគ្មានបៀវត្ស</h3>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <label className="text-sm">ស្វែងរក (ID ឬ ឈ្មោះ):</label>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <input
-              type="text"
-              className="rounded-md bg-gray-50 px-3 py-2 w-56 text-sm placeholder-gray-400 border border-gray-200"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { doImmediateSearch(q); } }}
-              placeholder="វាយលេខកាត ឬ ឈ្មោះ: S0015 ឬ ឈ្មោះ"
-            />
+    <div className="p-3 md:p-6 bg-gray-50 min-h-screen">
+      <div className="bg-white w-full border border-gray-200 rounded-xl shadow-sm p-4 md:p-6 mb-6 no-print">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-5 pb-4 border-b border-gray-100">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800 font-khmer">របាយការណ៍ ទំនេរគ្មានបៀវត្ស</h3>
+            <p className="text-xs text-gray-500 font-khmer mt-0.5">គ្រប់គ្រង និងស្វែងរកបញ្ជីឈ្មោះមន្ត្រីទំនេរគ្មានបៀវត្ស</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-start lg:justify-end">
+            <button 
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white transition-all font-khmer shadow-sm ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"}`} 
+              onClick={handleExportExcel} 
+              disabled={loading}
+            >
+              Export Excel
+            </button>
             <button
               type="button"
-              className="ml-1 border rounded px-2 py-1 text-sm bg-white text-gray-700"
-              onClick={() => setQ('')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white transition-all font-khmer shadow-sm ${importing || loading ? "bg-gray-400 cursor-not-allowed" : "bg-orange-500 hover:bg-orange-600"}`}
+              disabled={importing || loading}
+              onClick={() => importFileRef.current && importFileRef.current.click()}
             >
-              Clear
+              Import Excel
+            </button>
+            <input
+              ref={importFileRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files && e.target.files[0];
+                if (file) handleImportExcel(file);
+              }}
+            />
+            <div style={{ position: 'relative' }}>
+              <button 
+                type="button" 
+                onClick={() => setShowColsPanel(s => !s)} 
+                title="ជ្រើសជួរឈរ" 
+                className="px-3.5 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-all font-khmer"
+              >
+                Columns
+              </button>
+              {showColsPanel && (
+                <div style={{ position: 'absolute', right: 0, top: '38px', background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 6px 12px rgba(0,0,0,0.08)', padding: 10, zIndex: 1200, minWidth: 220 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <strong>បង្ហាញជួរឈរ</strong>
+                    <button type="button" onClick={() => setShowColsPanel(false)} style={{ border: 'none', background: 'transparent' }}>×</button>
+                  </div>
+                  <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                    {(defaultCols || []).map(k => (
+                      <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <input type="checkbox" checked={!!visibleCols[k]} onChange={() => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }))} />
+                        <span>{colLabels[k] || k}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+                    <button type="button" onClick={() => setVisibleCols(() => { const o = {}; defaultCols.forEach(k => o[k] = true); return o; })} className="border rounded px-2 py-1 text-sm">Select all</button>
+                    <button type="button" onClick={() => setVisibleCols(() => { const o = {}; defaultCols.forEach(k => o[k] = false); return o; })} className="border rounded px-2 py-1 text-sm">Clear</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button 
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white transition-all font-khmer shadow-sm ${(!lunarText.trim() || loading) ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`} 
+              onClick={handlePrint} 
+              disabled={!lunarText.trim() || loading}
+            >
+              បោះពុម្ព
             </button>
           </div>
+        </div>
 
-          <label className="text-sm">ចន្ទគតិ*:</label>
-          <input
-            type="text"
-            className="border rounded px-2 py-1 w-72"
-            placeholder="ឧ. ថ្ងៃសុក្រ ១៣កើត ខែភទ្របទ ឆ្នាំម្សាញ់ សប្តស័ក ព.ស. ២៥៦៩"
-            value={lunarText}
-            onChange={(e) => setLunarText(e.target.value)}
-          />
-          <label className="text-sm">ថ្ងៃខែឆ្នាំ:</label>
-          <input
-            type="date"
-            className="border rounded px-2 py-1"
-            value={footerDate}
-            onChange={(e) => setFooterDate(e.target.value)}
-          />
-
-          {/* inline warnings */}
-          {(!lunarText.trim()) && <span className="text-red-600 text-xs">សូមបំពេញចន្ទគតិ</span>}
-          <button className={`border px-2 py-1 rounded ${loading ? 'bg-gray-100 text-gray-300' : 'bg-green-600 text-white border-green-600'}`} onClick={handleExportExcel} disabled={loading}>Export Excel</button>
-          <button
-            type="button"
-            className={`border px-2 py-1 rounded ml-2 ${importing || loading ? 'bg-gray-100 text-gray-300' : 'bg-orange-500 text-white border-orange-500'}`}
-            disabled={importing || loading}
-            onClick={() => importFileRef.current && importFileRef.current.click()}
-          >
-            Import Excel
-          </button>
-          <input
-            ref={importFileRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files && e.target.files[0];
-              if (file) handleImportExcel(file);
-            }}
-          />
-          <div style={{ position: 'relative' }}>
-            <button type="button" onClick={() => setShowColsPanel(s => !s)} title="ជ្រើសជួរឈរ" className="border px-2 py-1 rounded bg-white text-gray-700">Columns</button>
-            {showColsPanel && (
-              <div style={{ position: 'absolute', right: 0, top: '38px', background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 6px 12px rgba(0,0,0,0.08)', padding: 10, zIndex: 1200, minWidth: 220 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <strong>បង្ហាញជួរឈរ</strong>
-                  <button type="button" onClick={() => setShowColsPanel(false)} style={{ border: 'none', background: 'transparent' }}>×</button>
-                </div>
-                <div style={{ maxHeight: 260, overflowY: 'auto' }}>
-                  {(defaultCols || []).map(k => (
-                    <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <input type="checkbox" checked={!!visibleCols[k]} onChange={() => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }))} />
-                      <span>{colLabels[k] || k}</span>
-                    </label>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-                  <button type="button" onClick={() => setVisibleCols(() => { const o = {}; defaultCols.forEach(k => o[k] = true); return o; })} className="border rounded px-2 py-1 text-sm">Select all</button>
-                  <button type="button" onClick={() => setVisibleCols(() => { const o = {}; defaultCols.forEach(k => o[k] = false); return o; })} className="border rounded px-2 py-1 text-sm">Clear</button>
-                </div>
-              </div>
-            )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-gray-600 font-khmer">ស្វែងរក (ID ឬ ឈ្មោះ):</label>
+            <div className="relative flex gap-2">
+              <input
+                type="text"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-khmer"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { doImmediateSearch(q); } }}
+                placeholder="S0015 ឬ ឈ្មោះ"
+              />
+              <button
+                type="button"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-all font-khmer animate-none"
+                onClick={() => setQ('')}
+              >
+                Clear
+              </button>
+            </div>
           </div>
-          <button className={`border px-2 py-1 rounded ${(!lunarText.trim() || loading) ? 'bg-gray-100 text-gray-300' : 'bg-blue-600 text-white border-blue-600'}`} onClick={handlePrint} disabled={!lunarText.trim() || loading}>បោះពុម្ព</button>
+
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-gray-600 font-khmer">ចន្ទគតិ*:</label>
+              {!lunarText.trim() && <span className="text-red-500 text-[10px] font-khmer">សូមបំពេញចន្ទគតិ</span>}
+            </div>
+            <input
+              type="text"
+              className={`w-full rounded-lg border px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-khmer ${!lunarText.trim() ? "border-red-300 bg-red-50/20" : "border-gray-300"}`}
+              placeholder="ឧ. ថ្ងៃសុក្រ ១៣កើត ខែភទ្របទ ឆ្នាំម្សាញ់..."
+              value={lunarText}
+              onChange={(e) => setLunarText(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-gray-600 font-khmer">ថ្ងៃខែឆ្នាំ:</label>
+            <input
+              type="date"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              value={footerDate}
+              onChange={(e) => setFooterDate(e.target.value)}
+            />
+          </div>
         </div>
       </div>
+
 
       {error && <div className="mb-2 text-red-600 text-sm">{error}</div>}
 
@@ -1512,92 +1553,79 @@ export default function RetirementReportPage() {
         {/* Edit modal removed — this page is read-only */}
         {/* Edit modal for unpaid fields */}
         {showEdit && (
-          <div className="no-print" style={{ position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-            <div style={{ width: 720, background: '#fff', borderRadius: 6, padding: 16, maxHeight: '90vh', overflow: 'auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <h4 style={{ margin: 0 }}>កែប្រែ ទំនេរគ្មានបៀវត្ស</h4>
-                <button onClick={closeEdit} className="text-gray-600">បិទ</button>
+          <div className="no-print fixed inset-0 bg-black/45 flex items-center justify-center p-4 z-[9999]">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto font-khmer flex flex-col">
+              <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100">
+                <h4 className="text-base font-bold text-gray-800">កែប្រែ ទំនេរគ្មានបៀវត្ស</h4>
+                <button onClick={closeEdit} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
               </div>
 
-              {/* Two-column layout like the screenshot — always show the common unpaid fields */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label className="text-sm">ចំនួនទំនេរ</label>
-                  <input type="number" value={editingUnpaid.number || ''} onChange={(e) => handleEditChange('number', e.target.value)} className="w-full border rounded px-2 py-1" />
+              <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-gray-600">ចំនួនទំនេរ</label>
+                  <input type="number" value={editingUnpaid.number || ''} onChange={(e) => handleEditChange('number', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" />
                 </div>
 
-                <div>
-                  <label className="text-sm">ស្ថានភាព</label>
-                  <input type="text" value={editingUnpaid.status || ''} onChange={(e) => handleEditChange('status', e.target.value)} className="w-full border rounded px-2 py-1" />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-gray-600">ស្ថានភាព</label>
+                  <input type="text" value={editingUnpaid.status || ''} onChange={(e) => handleEditChange('status', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" />
                 </div>
 
-                <div>
-                  <label className="text-sm">មូលហេតុ</label>
-                  <input type="text" value={editingUnpaid.Reason || editingUnpaid.reason || ''} onChange={(e) => handleEditChange('Reason', e.target.value)} className="w-full border rounded px-2 py-1" />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-gray-600">មូលហេតុ</label>
+                  <input type="text" value={editingUnpaid.Reason || editingUnpaid.reason || ''} onChange={(e) => handleEditChange('Reason', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" />
                 </div>
 
-                <div>
-                  <label className="text-sm">សុពលភាព (ថ្ងៃ)</label>
-                  <input type="number" value={editingUnpaid.validity || ''} onChange={(e) => handleEditChange('validity', e.target.value)} className="w-full border rounded px-2 py-1" />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-gray-600">សុពលភាព (ថ្ងៃ)</label>
+                  <input type="number" value={editingUnpaid.validity || ''} onChange={(e) => handleEditChange('validity', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" />
                 </div>
 
-                <div>
-                  <label className="text-sm">រយៈពេល</label>
-                  <input type="text" value={editingUnpaid.duration || ''} onChange={(e) => handleEditChange('duration', e.target.value)} className="w-full border rounded px-2 py-1" />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-gray-600">រយៈពេល</label>
+                  <input type="text" value={editingUnpaid.duration || ''} onChange={(e) => handleEditChange('duration', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" />
                 </div>
 
-                <div>
-                  <label className="text-sm">ផ្សេងៗ</label>
-                  <input type="text" value={editingUnpaid.other || ''} onChange={(e) => handleEditChange('other', e.target.value)} className="w-full border rounded px-2 py-1" />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-gray-600">ផ្សេងៗ</label>
+                  <input type="text" value={editingUnpaid.other || ''} onChange={(e) => handleEditChange('other', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" />
                 </div>
 
-                <div>
-                  <label className="text-sm">ថ្ងៃចាប់ផ្ដើម</label>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-gray-600">ថ្ងៃចាប់ផ្ដើម</label>
                   <input
                     type="date"
                     value={toDateInputValue(editingUnpaid.Start || editingUnpaid.start || '')}
                     onChange={(e) => handleEditChange('Start', e.target.value)}
-                    className="w-full border rounded px-2 py-1"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                   />
                 </div>
 
-                <div>
-                  <label className="text-sm">ថ្ងៃបញ្ចប់</label>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-gray-600">ថ្ងៃបញ្ចប់</label>
                   <input
                     type="date"
                     value={toDateInputValue(editingUnpaid.End || editingUnpaid.end || '')}
                     onChange={(e) => handleEditChange('End', e.target.value)}
-                    className="w-full border rounded px-2 py-1"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                   />
                 </div>
 
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label className="text-sm">ឯកសារយោង (image/pdf)</label>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input ref={fileInputRef} type="file" onChange={(e) => handleFileSelect(e.target.files && e.target.files[0])} />
-                    {selectedPreviewUrl && <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">Preview</a>}
-                    {!selectedPreviewUrl && editingUnpaid.image && <a href={editingUnpaid.image} target="_blank" rel="noreferrer" className="text-blue-600 underline">Current file</a>}
+                <div className="sm:col-span-2 flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-gray-600">ឯកសារយោង (image/pdf)</label>
+                  <div className="flex flex-wrap gap-3 items-center">
+                    <input ref={fileInputRef} type="file" onChange={(e) => handleFileSelect(e.target.files && e.target.files[0])} className="text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all" />
+                    {selectedPreviewUrl && <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 underline text-xs font-medium">Preview</a>}
+                    {!selectedPreviewUrl && editingUnpaid.image && <a href={editingUnpaid.image} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 underline text-xs font-medium">Current file</a>}
                     {editingUnpaid.image && (
                       <button
                         type="button"
                         onClick={handleDeleteReference}
                         title="លុបឯកសារ"
                         aria-label="Delete file"
-                        style={{
-                          background: '#ef4444',
-                          width: 28,
-                          height: 28,
-                          borderRadius: 6,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '1px solid #ef4444',
-                          color: '#fff',
-                          padding: 0
-                        }}
-                        className="text-sm"
+                        className="w-7 h-7 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-sm transition-all"
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" fill="currentColor">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M9 3v1H15V3H9zM7 7v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7H7zm3 3h2v8H10V10zm4 0h2v8h-2V10z" />
                         </svg>
                       </button>
@@ -1606,17 +1634,17 @@ export default function RetirementReportPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                <button type="button" onClick={closeEdit} className="border rounded px-3 py-1">បោះបង់</button>
-                <button type="button" onClick={handleSaveEdit} className="border rounded px-3 py-1 bg-green-600 text-white" disabled={saving || uploadingFile}>{saving ? 'កំពុងរក្សាទុក...' : 'រក្សាទុក'}</button>
+              <div className="flex justify-end gap-2 px-6 py-4 bg-gray-50 border-t border-gray-100 rounded-b-xl">
+                <button type="button" onClick={closeEdit} className="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-all">បោះបង់</button>
+                <button type="button" onClick={handleSaveEdit} className="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-green-600 hover:bg-green-700 transition-all shadow-sm" disabled={saving || uploadingFile}>{saving ? 'កំពុងរក្សាទុក...' : 'រក្សាទុក'}</button>
               </div>
             </div>
           </div>
         )}
         {/* footer/signature area */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', fontSize: '12px' }}>
-          <div style={{ width: '33%' }}>
-            <div className="no-print">
+        <div className="flex flex-col md:flex-row print:flex-row print:justify-between justify-between gap-6 md:gap-4 mt-8 text-xs text-gray-800">
+          <div className="w-full md:w-[30%] print:w-[30%] flex flex-col items-center text-center">
+            <div className="no-print self-start mb-4 text-xs font-semibold text-gray-600 bg-gray-50 border border-gray-200 rounded px-2.5 py-1">
               {(() => {
                 const totalN = (Number.isFinite(derived.total) ? derived.total : (derived.rows ? derived.rows.length : 0));
                 const maleN = (Number.isFinite(derived.male) ? derived.male : 0);
@@ -1624,28 +1652,28 @@ export default function RetirementReportPage() {
                 return `សរុប: ${toKhmerDigits(totalN)} នាក់ ( ប្រុស: ${toKhmerDigits(maleN)} នាក់ — ស្រី: ${toKhmerDigits(femaleN)} នាក់ )`;
               })()}
             </div>
-            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>បានឃើញ</div>
-            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>នាយកមន្ទីរពេទ្យ</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px' }}>បានឃើញ</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', fontWeight: 'bold' }}>នាយកមន្ទីរពេទ្យ</div>
             <div style={{ height: '64px' }}></div>
             <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
-          <div style={{ width: '33%', textAlign: 'center' }}>
-            <div style={{ marginTop: '16px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>បានពិនិត្យត្រឹមត្រូវ</div>
-            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក</div>
-            <div style={{ height: '82px' }}></div>
+          <div className="w-full md:w-[30%] print:w-[30%] flex flex-col items-center text-center">
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px' }}>បានពិនិត្យត្រឹមត្រូវ</div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', fontWeight: 'bold' }}>ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក</div>
+            <div style={{ height: '64px' }}></div>
             <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
-          <div style={{ width: '33%', textAlign: 'right' }}>
-            <div style={{ marginTop: '12px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>
+          <div className="w-full md:w-[30%] print:w-[30%] flex flex-col items-center text-center">
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px' }}>
               {lunarText && lunarText.trim()
                 ? lunarText
                 : `ថ្ងៃ${khWeekday(new Date())}  ព.ស. ${toKhmerDigits(buddhistEraYear(new Date()))}`}
             </div>
-            <div style={{ marginTop: '2px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}>
+            <div style={{ marginTop: '2px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontSize: '12px' }}>
               រាជធានីភ្នំពេញ {fmtKhmerLongDate(footerDate)}
             </div>
-            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', textAlign: 'center' }}> អ្នកធ្វើតារាង</div>
-            <div style={{ height: '82px' }}></div>
+            <div style={{ marginTop: '1px', fontFamily: '"Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif', fontSize: '12px', fontWeight: 'bold' }}> អ្នកធ្វើតារាង</div>
+            <div style={{ height: '64px' }}></div>
             <div style={{ textDecoration: 'underline', visibility: 'hidden' }}>............................</div>
           </div>
         </div>

@@ -51,7 +51,6 @@ import AttendancePage from './pages/AttendancePage';
 import AttendanceReportPage from './pages/AttendanceReportPage';
 import WorkCalendarPage from './pages/WorkCalendarPage';
 import WorkSchedulePage from './pages/WorkSchedulePage';
-import WorkSchedule1Page from './pages/WorkSchedule1Page';
 import AttendanceMonthlyDataPage from './pages/AttendanceMonthlyDataPage';
 import AttendancesumDayPage from './pages/AttendancesumDayPage';
 import AttendanceDayAttendanceDataPage from './pages/AttendanceDayAttendanceDataPage';
@@ -106,6 +105,7 @@ import MobileScanPage from './pages/MobileScanPage.jsx';
 import MobileFaceEnrollPage from './pages/MobileFaceEnrollPage.jsx';
 import GeoFencePoliciesPage from './pages/GeoFencePoliciesPage.jsx';
 import KamprakPage from './pages/KamprakPage.jsx';
+import BudgetReportPage from './pages/BudgetReportPage.jsx';
 import StaffBiographyPage from './pages/StaffBiographyPage.jsx';
 import TelegramPage from './pages/TelegramPage.jsx';
 import TelegramMiniApp from './pages/TelegramMiniApp.jsx';
@@ -114,6 +114,7 @@ import SystemSettingsPage from './pages/SystemSettingsPage.jsx';
 import PublicStaffProfile from './pages/PublicStaffProfile.jsx';
 import EmployeeIDDocsPage from './pages/EmployeeIDDocsPage.jsx';
 import EmployeeOtherDocsPage from './pages/EmployeeOtherDocsPage.jsx';
+import PayrollPage from './pages/PayrollPage.jsx';
 
 function RequireAuth({ children }) {
   const { isAuthenticated } = useAuth();
@@ -208,16 +209,6 @@ function WorkScheduleRoute() {
   return (
     <PermissionGate allow={perms.canViewWorkSchedule || !!perms.user?.department}>
       <WorkSchedulePage />
-    </PermissionGate>
-  );
-}
-
-// Small wrapper for WorkSchedule1Page
-function WorkSchedule1Route() {
-  const perms = usePermission();
-  return (
-    <PermissionGate allow={perms.canViewWorkSchedule}>
-      <WorkSchedule1Page />
     </PermissionGate>
   );
 }
@@ -430,12 +421,6 @@ function ProtectedApp() {
             <WorkSchedulePage />
           </PermissionGate>
         );
-      case 'work-schedule1':
-        return (
-          <PermissionGate allow={perms.canViewAbsence}>
-            <WorkSchedule1Page />
-          </PermissionGate>
-        );
       case 'group-timetables':
         return (
           <PermissionGate allow={perms.canViewWorkSchedule}>
@@ -452,6 +437,12 @@ function ProtectedApp() {
         return (
           <PermissionGate allow={perms.canViewEmployeeReport}>
             <EmployeeReportPage />
+          </PermissionGate>
+        );
+      case 'payroll':
+        return (
+          <PermissionGate allow={perms.canViewEmployeeReport || perms.isAdmin}>
+            <PayrollPage />
           </PermissionGate>
         );
       case 'employee-id-docs':
@@ -784,7 +775,6 @@ export default function App() {
           <Route path="/newpage" element={<RequireAuth><NewDocumentPage /></RequireAuth>} />
           <Route path="/work-calendar" element={<RequireAuth><LayoutWrapper section="work-calendar"><WorkCalendarRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/work-schedule" element={<RequireAuth><LayoutWrapper section="work-schedule"><WorkScheduleRoute /></LayoutWrapper></RequireAuth>} />
-          <Route path="/work-schedule1" element={<RequireAuth><LayoutWrapper section="work-schedule1"><WorkSchedule1Route /></LayoutWrapper></RequireAuth>} />
           <Route path="/shifts" element={<RequireAuth><LayoutWrapper section="shifts"><ShiftsRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/shift-groups" element={<RequireAuth><LayoutWrapper section="shift-groups"><ShiftGroupsRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/group-timetables" element={<RequireAuth><LayoutWrapper section="group-timetables"><GroupTimetablesRoute /></LayoutWrapper></RequireAuth>} />
@@ -801,6 +791,7 @@ export default function App() {
           <Route path="/file-transfer-outgoing" element={<RequireAuth><LayoutWrapper section="file-transfer-outgoing"><FileTransferPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/missions" element={<RequireAuth><LayoutWrapper section="missions"><MissionsRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/kamprak" element={<RequireAuth><LayoutWrapper section="kamprak"><KamprakPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/budget-report" element={<RequireAuth><LayoutWrapper section="budget-report"><BudgetReportPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/staff-biography" element={<RequireAuth><LayoutWrapper section="staff-biography"><StaffBiographyRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/staff-biography/:id" element={<RequireAuth><LayoutWrapper section="staff-biography"><StaffBiographyRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/file-transfer-stats" element={<RequireAuth><LayoutWrapper section="file-transfer-stats"><FileTransferStats /></LayoutWrapper></RequireAuth>} />
@@ -811,6 +802,7 @@ export default function App() {
           <Route path="/kshf_hospital_app/filetransfers-out" element={<RequireAuth><LayoutWrapper section="file-transfer"><FileTransfer1Page /></LayoutWrapper></RequireAuth>} />
           <Route path="/daily-attendance-report" element={<RequireAuth><DailyAttendanceReport /></RequireAuth>} />
           <Route path="/employee-report" element={<RequireAuth><LayoutWrapper section="employee-report"><EmployeeReportPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/payroll" element={<RequireAuth><LayoutWrapper section="payroll"><PayrollPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/evaluation" element={<RequireAuth><LayoutWrapper section="evaluation"><EvaluationReportPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/employee-id-docs" element={<RequireAuth><LayoutWrapper section="employee-id-docs"><EmployeeIDDocsPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/employee-other-docs" element={<RequireAuth><LayoutWrapper section="employee-other-docs"><EmployeeOtherDocsPage /></LayoutWrapper></RequireAuth>} />

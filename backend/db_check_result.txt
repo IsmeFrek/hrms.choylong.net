@@ -1,14 +1,14 @@
 === DIAGNOSTIC REPORT FOR HR IMAGES ===
-Run Time: 2026-05-22T08:53:15.165Z
+Run Time: 2026-05-29T03:39:38.006Z
 
 Employee D0001 (ងី ម៉េង):
   - Object ID: 69702d2dcf31e0e23b472a25
   - staffId: D0001
   - status: Active
   - image type: string
-  - image value: "/Uploads/D0001-1779169459502.jpg"
-  - image length: 32
-  - image startsWith: /Uploads/D0001-1779169459502.jpg
+  - image value: "/Uploads/D0001.jpg"
+  - image length: 18
+  - image startsWith: /Uploads/D0001.jpg
 
 Employee D0002 (ចាន់ វិចិត្រ):
   - Object ID: 69702d2dcf31e0e23b472a26

@@ -66,7 +66,21 @@ export async function syncShiftGroupsToSchedules({ month, year, shiftGroupId, de
 
   // 4. Determine which employees to process
   const inactiveStatuses = ['Resigned', 'Deleted', 'resigned', 'deleted'];
-  const hrFilter = { status: { $nin: inactiveStatuses } };
+  const targetMonthStart = new Date(Date.UTC(year, month - 1, 1));
+  
+  const hrFilter = {
+    $or: [
+      { status: { $nin: inactiveStatuses } },
+      {
+        status: { $in: inactiveStatuses },
+        $or: [
+          { resignationDate: { $gte: targetMonthStart } },
+          { dateRemoved: { $gte: targetMonthStart } }
+        ]
+      }
+    ]
+  };
+  
   if (department) hrFilter.Department_Kh = department;
 
   const employees = await HR.find(hrFilter);
@@ -146,6 +160,22 @@ export async function syncShiftGroupsToSchedules({ month, year, shiftGroupId, de
 
         for (let day = 1; day <= daysInMonth; day++) {
           const date = new Date(Date.UTC(year, month - 1, day));
+          
+          const isInactive = ['Resigned', 'Deleted', 'resigned', 'deleted'].includes(emp.status);
+          if (isInactive) {
+            const endDate = emp.resignationDate || emp.dateRemoved;
+            if (endDate && date > endDate) {
+              continue;
+            }
+          }
+
+          if (emp.joinDate) {
+            const joinDateUTC = new Date(Date.UTC(emp.joinDate.getUTCFullYear(), emp.joinDate.getUTCMonth(), emp.joinDate.getUTCDate()));
+            if (date < joinDateUTC) {
+              continue;
+            }
+          }
+
           const isoDate = date.toISOString().split('T')[0];
           const dayIndex = day - 1;
           
@@ -214,6 +244,22 @@ export async function syncShiftGroupsToSchedules({ month, year, shiftGroupId, de
         
         for (let day = 1; day <= daysInMonth; day++) {
           const date = new Date(Date.UTC(year, month - 1, day));
+          
+          const isInactive = ['Resigned', 'Deleted', 'resigned', 'deleted'].includes(emp.status);
+          if (isInactive) {
+            const endDate = emp.resignationDate || emp.dateRemoved;
+            if (endDate && date > endDate) {
+              continue;
+            }
+          }
+
+          if (emp.joinDate) {
+            const joinDateUTC = new Date(Date.UTC(emp.joinDate.getUTCFullYear(), emp.joinDate.getUTCMonth(), emp.joinDate.getUTCDate()));
+            if (date < joinDateUTC) {
+              continue;
+            }
+          }
+
           const utcDay = date.getUTCDay();
           const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
           const dayOfWeek = weekdays[utcDay];

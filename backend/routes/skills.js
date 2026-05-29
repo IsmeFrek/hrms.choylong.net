@@ -34,6 +34,11 @@ router.post('/', requirePermission('edit:skills'), async (req, res) => {
     const final_ID_skills = ID_skills || skills_Id;
     const final_Other = Other || other;
     
+    const existing = await Skill.findOne({ ID_skills: final_ID_skills });
+    if (existing) {
+      return res.status(400).json({ error: `លេខសម្គាល់ ${final_ID_skills} មានរួចហើយនៅក្នុងប្រព័ន្ធ` });
+    }
+
     const skill = new Skill({ 
       ID_skills: final_ID_skills, 
       skills_Kh, 

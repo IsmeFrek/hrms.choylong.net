@@ -170,6 +170,30 @@ router.post('/group/leave-sync', authRequired, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/report-settings/employee-skill-groups
+router.get('/employee-skill-groups', async (req, res, next) => {
+  try {
+    const groupName = (req.query.groupName || 'global');
+    const doc = await ReportSetting.findOne({ key: 'employee_skill_groups', groupName }).lean();
+    return res.json({ ok: true, prefs: doc && doc.value ? doc.value : { groups: [] } });
+  } catch (err) { next(err); }
+});
+
+// POST /api/report-settings/employee-skill-groups
+router.post('/employee-skill-groups', async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const groupName = (body.groupName || 'global');
+    const prefs = { groups: Array.isArray(body.groups) ? body.groups : [] };
+    const updated = await ReportSetting.findOneAndUpdate(
+      { key: 'employee_skill_groups', groupName },
+      { $set: { value: prefs } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    ).lean();
+    return res.json({ ok: true, prefs: updated ? updated.value : prefs });
+  } catch (err) { next(err); }
+});
+
 // GET /api/report-settings/hr-skill-groups?groupName=... - returns { prefs: { groups, tableOrder } }
 router.get('/hr-skill-groups', async (req, res, next) => {
   try {

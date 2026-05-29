@@ -134,7 +134,7 @@ export default function StaffLoginPage() {
               </div>
               <input
                 type="tel"
-                value={form.phone}
+                value={form.phone || ''}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                 placeholder="Staff ID ឬ លេខទូរស័ព្ទ"
                 spellCheck="false"
@@ -164,7 +164,7 @@ export default function StaffLoginPage() {
               </div>
               <input
                 type={showPw ? 'text' : 'password'}
-                value={form.password}
+                value={form.password || ''}
                 onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                 placeholder="••••••••"
                 spellCheck="false"

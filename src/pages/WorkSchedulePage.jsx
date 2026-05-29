@@ -341,21 +341,6 @@ export default function WorkSchedulePage() {
   console.log('HR lookup keys:', Object.keys(hrLookup));
   console.log('Employees count:', employees.length);
 
-  // Performance Optimization: Index schedules for O(1) lookup
-  const scheduleMap = React.useMemo(() => {
-    const map = new Map();
-    schedules.forEach(s => {
-      const eid = s.employeeId?._id || s.employeeId;
-      if (!eid || !s.date) return;
-      try {
-        const d = new Date(s.date);
-        const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        map.set(`${String(eid)}_${dateKey}`, s);
-      } catch (e) {}
-    });
-    return map;
-  }, [schedules]);
-
   const hrMap = React.useMemo(() => {
     const map = new Map();
     hrData.forEach(hr => {
@@ -373,6 +358,54 @@ export default function WorkSchedulePage() {
     });
     return map;
   }, [employees]);
+
+  // Performance Optimization: Index schedules for O(1) lookup
+  const scheduleMap = React.useMemo(() => {
+    const map = new Map();
+    schedules.forEach(s => {
+      const eid = s.employeeId?._id || s.employeeId;
+      if (!eid || !s.date) return;
+      try {
+        const d = new Date(s.date);
+        const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        map.set(`${String(eid)}_${dateKey}`, s);
+      } catch (e) {}
+    });
+
+    // Auto-assign "Day Off" for days before employee's join date
+    employees.forEach(emp => {
+      const eid = String(emp._id);
+      const staffId = String(emp.staffId || emp.cardNumber || '');
+      const hr = hrMap.get(staffId);
+      
+      if (hr && hr.joinDate) {
+        try {
+          const jd = new Date(hr.joinDate);
+          if (!isNaN(jd.getTime())) {
+            const joinDateStr = `${jd.getFullYear()}-${String(jd.getMonth() + 1).padStart(2, '0')}-${String(jd.getDate()).padStart(2, '0')}`;
+            datesInRange.forEach(dateStr => {
+              if (dateStr < joinDateStr) {
+                const key = `${eid}_${dateStr}`;
+                if (!map.has(key) || map.get(key).shiftTitle !== 'មិនទាន់ចូលធ្វើការ') {
+                  map.set(key, {
+                    date: dateStr,
+                    employeeId: eid,
+                    shiftTitle: 'មិនទាន់ចូលធ្វើការ',
+                    shiftStart: '',
+                    shiftEnd: '',
+                    shiftColor: '#e5e7eb',
+                    isAutoDayOff: true
+                  });
+                }
+              }
+            });
+          }
+        } catch (e) {}
+      }
+    });
+
+    return map;
+  }, [schedules, employees, hrMap, datesInRange]);
 
   // Create a Set of employee IDs that have at least one schedule this month for fast filtering
   const employeesWithSchedule = React.useMemo(() => {
@@ -597,6 +630,8 @@ export default function WorkSchedulePage() {
     schedules.forEach(item => {
       if (item.shiftTitle === 'Day Off') {
         s.totalDayOffs++;
+      } else if (item.shiftTitle === 'មិនទាន់ចូលធ្វើការ') {
+        // Do not count
       } else {
         s.totalWorkDays++;
         if (!item.shiftStart || !item.shiftEnd) return;
@@ -647,6 +682,8 @@ export default function WorkSchedulePage() {
 
       if (s.shiftTitle === 'Day Off') {
         ds.dayOffToday++;
+      } else if (s.shiftTitle === 'មិនទាន់ចូលធ្វើការ') {
+        // do not count as working
       } else {
         ds.workingToday++;
         if (!s.shiftStart || !s.shiftEnd) return;
@@ -1814,10 +1851,14 @@ export default function WorkSchedulePage() {
     }
   };
 
-  const handleDeleteHoliday = async (id) => {
-    if (!id || !confirm('តើអ្នកប្រាកដថាចង់លុបថ្ងៃឈប់សម្រាកនេះមែនទេ?')) return;
+  const handleDeleteHoliday = async (h) => {
+    if (!h || !confirm('តើអ្នកប្រាកដថាចង់លុបថ្ងៃឈប់សម្រាកនេះមែនទេ?')) return;
     try {
-      await api.delete(`/holidays/${id}`);
+      if (h._id) {
+        await api.delete(`/holidays/${h._id}`);
+      } else {
+        await api.post('/holidays', { date: h.date, name: 'DELETED', isDeleted: true });
+      }
       fetchHolidaysForMonth();
     } catch (err) {
       alert('Error deleting holiday: ' + err.message);
@@ -2053,7 +2094,7 @@ export default function WorkSchedulePage() {
           shiftTitle: sched.shiftTitle || 'Work',
           shiftStart: sched.shiftStart || '',
           shiftEnd: sched.shiftEnd || '',
-          shiftColor: sched.shiftTitle === 'Day Off' ? '#ff0000' : '#0b74de',
+          shiftColor: sched.shiftTitle === 'Day Off' ? '#000000' : '#0b74de',
           notes: sched.notes || ''
         };
       }).filter(sched => sched.employeeId); // Only include schedules with valid HR ID
@@ -2614,16 +2655,22 @@ export default function WorkSchedulePage() {
                   {holidays.length > 0 ? holidays.map((h, i) => (
                     <span 
                       key={i} 
-                      className={`text-[10px] px-1.5 py-0.5 rounded border whitespace-nowrap flex items-center gap-1 ${
+                      onClick={() => {
+                        if (perms.isAdmin || perms.canEditWorkSchedule) {
+                          setEditingHoliday(h);
+                          setShowHolidayModal(true);
+                        }
+                      }}
+                      className={`text-[10px] px-1.5 py-0.5 rounded border whitespace-nowrap flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity ${
                         h.isManual ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-rose-50 text-rose-700 border-rose-100'
                       }`} 
                       title={h.name}
                     >
                       {h.date.split('-')[2]}: {h.name.length > 15 ? h.name.slice(0, 15) + '...' : h.name}
-                      {h.isManual && (perms.isAdmin || perms.canEditWorkSchedule) && (
+                      {(perms.isAdmin || perms.canEditWorkSchedule) && (
                         <button 
-                          onClick={(e) => { e.stopPropagation(); handleDeleteHoliday(h._id); }}
-                          className="hover:text-red-600 font-bold ml-1"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteHoliday(h); }}
+                          className="hover:text-red-600 font-bold ml-1 px-1 rounded-sm"
                         >×</button>
                       )}
                     </span>
@@ -3142,8 +3189,8 @@ export default function WorkSchedulePage() {
                               <div 
                                 className={`text-[10px] font-bold px-1 py-0.5 rounded-sm inline-block min-w-[32px] shadow-sm ${schedule.isPlanned ? 'opacity-70 border border-dashed border-gray-400' : ''}`} 
                                 style={{ 
-                                  backgroundColor: schedule.shiftColor || (schedule.shiftTitle === 'Day Off' ? '#fee2e2' : '#e0f2fe'),
-                                  color: schedule.shiftTitle === 'Day Off' ? '#dc2626' : getContrastColor(schedule.shiftColor),
+                                  backgroundColor: schedule.shiftColor || (schedule.shiftTitle === 'Day Off' ? '#000000' : '#e0f2fe'),
+                                  color: schedule.shiftTitle === 'Day Off' ? '#ffffff' : getContrastColor(schedule.shiftColor),
                                   border: !schedule.isPlanned && schedule.shiftTitle === 'Day Off' ? '1px solid #fecaca' : undefined
                                 }}
                                 title={schedule.isPlanned ? `Planned from Shift Group: ${schedule.shiftTitle}` : (schedule.notes || schedule.shiftTitle)}

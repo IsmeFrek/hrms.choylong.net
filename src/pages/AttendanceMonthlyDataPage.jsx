@@ -20,7 +20,7 @@ export default function AttendanceMonthlyDataPage() {
 
   const norm = (id) => {
     if (!id) return '';
-    return String(id).trim().toUpperCase();
+    return String(id).replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toUpperCase();
   };
 
   // Local state and refs (ensure these are defined)
@@ -431,7 +431,9 @@ export default function AttendanceMonthlyDataPage() {
           khmerName: hr.khmerName || '',
           department: (hr.Department_Kh || hr.department || '').trim(),
           year: fromObj.getFullYear(),
-          month: fromObj.getMonth() + 1
+          month: fromObj.getMonth() + 1,
+          joinDate: joined,
+          removedDate: removed
         });
       });
 
@@ -528,6 +530,17 @@ export default function AttendanceMonthlyDataPage() {
 
         const finalDaily = [];
         for (const { iso: dayISO, isWeekend } of datesInRange) {
+          const dayObj = new Date(dayISO);
+          
+          if (base.joinDate && dayObj < base.joinDate) {
+            finalDaily.push({ date: dayISO, status: 'not_joined' });
+            continue;
+          }
+          if (base.removedDate && dayObj > base.removedDate) {
+            finalDaily.push({ date: dayISO, status: 'removed' });
+            continue;
+          }
+
           const entry = dMap.get(dayISO) || { date: dayISO };
 
           let ci = entry.checkIn || entry.inTime || entry.checkin1 || '';
@@ -575,7 +588,11 @@ export default function AttendanceMonthlyDataPage() {
           const outMin = parseHMToMinutes(co);
           if (inMin !== null && outMin !== null) {
             let diff = outMin - inMin;
-            if (diff < 0) diff += 24 * 60;
+            if (diff < 0) {
+              diff += 24 * 60;
+            } else if (diff < 4 * 60) {
+              diff += 24 * 60;
+            }
             if (diff > 0) {
               rec.workTime += diff;
               rec.clock += diff;

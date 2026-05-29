@@ -124,6 +124,12 @@ function mergeHolidays(standard, db) {
   const result = [...standard];
   db.forEach(d => {
     const existingIdx = result.findIndex(r => r.date === d.date);
+    if (d.isDeleted || d.name === 'DELETED') {
+      if (existingIdx >= 0) {
+        result.splice(existingIdx, 1);
+      }
+      return;
+    }
     if (existingIdx >= 0) {
       result[existingIdx] = {
         date: d.date,
