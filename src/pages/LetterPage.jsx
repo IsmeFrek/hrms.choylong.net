@@ -435,22 +435,60 @@ export default function LetterPage() {
     // use innerHTML so wrapper provides the exact A4 panel (avoid nested A4 sizing)
     const content = previewEl.innerHTML;
 
-    const win = window.open('', '_blank', 'toolbar=0,location=0,menubar=0,width=900,height=800');
+    let printFrame = document.getElementById('print-iframe-letter');
+    if (!printFrame) {
+      printFrame = document.createElement('iframe');
+      printFrame.id = 'print-iframe-letter';
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      document.body.appendChild(printFrame);
+    }
+    const win = printFrame.contentWindow;
+
     if (win) {
       try {
         win.document.open();
         win.document.write(a4Wrapper(content));
         win.document.close();
-        win.focus();
-        // allow render then print
-        setTimeout(() => {
-          try { win.print(); } catch (e) { console.error('print error', e); }
-          try { win.close(); } catch (_) { }
-        }, 300);
+        const doPrint = () => {
+          try {
+            win.focus();
+            win.print();
+          } catch (e) {
+            console.error('Print error:', e);
+          }
+        };
+
+        try {
+          const start = Date.now();
+          const poll = setInterval(() => {
+            try {
+              if (!win || win.closed) return clearInterval(poll);
+              if (Date.now() - start > 5000) {
+                clearInterval(poll);
+                return doPrint();
+              }
+              const imgs = Array.from(win.document.images || []);
+              const allLoaded = imgs.every(img => img.complete && img.naturalWidth > 0);
+              if (allLoaded) {
+                clearInterval(poll);
+                setTimeout(doPrint, 200);
+              }
+            } catch (e) {
+              clearInterval(poll);
+              doPrint();
+            }
+          }, 150);
+        } catch (e) {
+          doPrint();
+        }
         return;
       } catch (e) {
         console.error('Popup print failed', e);
-        try { win.close(); } catch (_) { }
       }
     }
 

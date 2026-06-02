@@ -78,13 +78,19 @@ export default function ReplayfilePage() {
         setIsPrinting(false);
         return printPage();
       }
-
-      const newWin = window.open('', '_blank');
-      if (!newWin) {
-        setIsPrinting(false);
-        return printPage();
+      let printFrame = document.getElementById('print-iframe-v1');
+      if (!printFrame) {
+        printFrame = document.createElement('iframe');
+        printFrame.id = 'print-iframe-v1';
+        printFrame.style.position = 'fixed';
+        printFrame.style.right = '0';
+        printFrame.style.bottom = '0';
+        printFrame.style.width = '0';
+        printFrame.style.height = '0';
+        printFrame.style.border = '0';
+        document.body.appendChild(printFrame);
       }
-
+      const newWin = printFrame.contentWindow;
       // Collect current stylesheet/link tags so the print view matches screen styles
       const headNodes = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'));
       const headHtml = headNodes.map(n => n.outerHTML).join('\n');
@@ -119,23 +125,41 @@ export default function ReplayfilePage() {
       newWin.document.write(docHtml);
       newWin.document.close();
 
-      // Wait briefly for fonts/images to load then print
-      const finish = () => {
+      const doPrint = () => {
         try {
           newWin.focus();
           newWin.print();
         } catch (e) {
           console.error('printSheetDirect error printing:', e);
-          // fallback to in-place print
           printPage();
         } finally {
-          try { newWin.close(); } catch (e) { }
           setIsPrinting(false);
         }
       };
 
-      // Some browsers need a short delay to render external fonts/images
-      setTimeout(finish, 600);
+      try {
+        const start = Date.now();
+        const poll = setInterval(() => {
+          try {
+            if (!newWin || newWin.closed) return clearInterval(poll);
+            if (Date.now() - start > 5000) {
+              clearInterval(poll);
+              return doPrint();
+            }
+            const imgs = Array.from(newWin.document.images || []);
+            const allLoaded = imgs.every(img => img.complete && img.naturalWidth > 0);
+            if (allLoaded) {
+              clearInterval(poll);
+              setTimeout(doPrint, 200);
+            }
+          } catch (e) {
+            clearInterval(poll);
+            doPrint();
+          }
+        }, 150);
+      } catch (e) {
+        doPrint();
+      }
     } catch (e) {
       console.error('printSheetDirect failed:', e);
       setIsPrinting(false);
