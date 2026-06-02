@@ -4,6 +4,7 @@ import ChangeRequest from '../models/ChangeRequest.js';
 import HR from '../models/HR.js';
 import User from '../models/User.js';
 import Role from '../models/Role.js';
+import Letter from '../models/Letter.js';
 import { authRequired, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
@@ -57,10 +58,54 @@ router.get('/', authRequired, requirePermission('approve:hr'), async (req, res) 
     }
   }
 
-  const list = await ChangeRequest.find(filter)
+  let list = await ChangeRequest.find(filter)
     .sort({ createdAt: -1 })
     .populate('requestedBy', 'fullName email')
     .populate('reviewedBy', 'fullName email');
+
+  // Convert list from Mongoose documents to plain objects so we can push letters
+  list = list.map(item => item.toObject ? item.toObject() : item);
+
+  // New logic: fetch Letters and format them as pseudo-ChangeRequests
+  if ((!targetType || targetType === 'all' || targetType === 'letter') && !source && (!hasAttachments || hasAttachments === '0' || hasAttachments === 'false')) {
+    const letterFilter = { type: 'instruction' };
+    if (status && String(status).toLowerCase() !== 'all') {
+      letterFilter.status = status; // pending, completed (approved), rejected
+      if (status === 'approved') letterFilter.status = 'completed';
+    }
+    const letters = await Letter.find(letterFilter)
+      .sort({ createdAt: -1 })
+      .populate('createdBy', 'fullName email')
+      .populate('approvedByAdminId', 'fullName email');
+
+    for (const l of letters) {
+      list.push({
+        _id: l._id.toString(),
+        targetType: 'letter',
+        targetId: l._id.toString(),
+        status: l.status === 'completed' ? 'approved' : l.status,
+        requestedBy: l.createdBy,
+        reviewedBy: l.approvedByAdminId,
+        requestedAt: l.createdAt,
+        reviewedAt: l.approvedAt,
+        reason: l.subject || 'លិខិតបង្គាប់ការ',
+        reviewerNote: l.note || '',
+        payload: {
+          fields: {
+            templateType: l.templateType,
+            officer: l.officer,
+            officerId: l.officerId,
+            newRole: l.newRole,
+            currentRole: l.currentRole,
+            department: l.department,
+            letterNo: l.letterNo
+          },
+          attachments: l.attachments || []
+        }
+      });
+    }
+    list.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+  }
 
   res.json(list);
 });
@@ -70,7 +115,33 @@ router.post('/:id/approve', authRequired, requirePermission('approve:hr'), async
   const { id } = req.params;
   const { reviewerNote } = req.body || {};
   const cr = await ChangeRequest.findById(id);
-  if (!cr) return res.status(404).json({ message: 'Request not found' });
+  if (!cr) {
+    const letter = await Letter.findById(id);
+    if (!letter) return res.status(404).json({ message: 'Request or Letter not found' });
+    if (letter.status !== 'pending') return res.status(400).json({ message: 'Letter already processed' });
+
+    letter.status = 'completed';
+    letter.approvedByAdmin = true;
+    letter.approvedByAdminId = req.auth.user.id || req.auth.user._id;
+    letter.approvedAt = new Date();
+    await letter.save();
+
+    // HR Sync
+    if (['appointment', 'termination', 'adjustment'].includes(letter.templateType) && letter.officerId) {
+      const query = { $or: [{ staffId: letter.officerId }, { civilServantId: letter.officerId }, { cardNumber: letter.officerId }, { nationalId: letter.officerId }] };
+      const employee = await HR.findOne(query);
+      if (employee) {
+        if (letter.templateType === 'appointment' || letter.templateType === 'adjustment') {
+          if (letter.newRole) { employee.civilServantRole = letter.newRole; employee.position = letter.newRole; }
+          if (letter.department) { employee.Department_Kh = letter.department; employee.department = letter.department; }
+        } else if (letter.templateType === 'termination') {
+          employee.civilServantRole = ''; employee.position = '';
+        }
+        await employee.save();
+      }
+    }
+    return res.json({ message: 'Letter approved', letter });
+  }
   if (cr.status !== 'pending') return res.status(400).json({ message: 'Request already processed' });
   let applied = [];
   let prev = null;
@@ -237,7 +308,16 @@ router.post('/:id/reject', authRequired, requirePermission('approve:hr'), async 
   const { id } = req.params;
   const { reviewerNote } = req.body || {};
   const cr = await ChangeRequest.findById(id);
-  if (!cr) return res.status(404).json({ message: 'Request not found' });
+  if (!cr) {
+    const letter = await Letter.findById(id);
+    if (!letter) return res.status(404).json({ message: 'Request or Letter not found' });
+    if (letter.status !== 'pending') return res.status(400).json({ message: 'Letter already processed' });
+
+    letter.status = 'rejected';
+    if (reviewerNote) letter.note = reviewerNote;
+    await letter.save();
+    return res.json({ message: 'Letter rejected', letter });
+  }
   if (cr.status !== 'pending') return res.status(400).json({ message: 'Request already processed' });
 
   cr.status = 'rejected';

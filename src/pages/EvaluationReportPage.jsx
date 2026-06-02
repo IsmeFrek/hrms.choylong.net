@@ -5,6 +5,7 @@ import api from '../services/api';
 import { departmentAPI } from '../services/departmentAPI';
 import usePermission from '../hooks/usePermission';
 import { isExplicitlyRemoved as _isExplicitlyRemoved, hasResignData as _hasResignData, isPreparedForDeletion as _isPreparedForDeletion, isCountedActive as _isCountedActive } from '../utils/hrFilters';
+import { calculateAttendanceData } from '../utils/attendanceCalculator';
 import { Printer, FileSpreadsheet, Plus, Search, Edit2, Trash2, X, Settings2, SlidersHorizontal, ChevronDown, ShieldCheck } from 'lucide-react';
 
 function toKhmerDigits(n) {
@@ -84,10 +85,15 @@ export default function EvaluationReportPage() {
     return d.toISOString().slice(0, 10);
   });
   const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [selectedGroup, setSelectedGroup] = useState('ថ្នាក់ដឹកនាំ');
   const [rowHeight, setRowHeight] = useState(35);
   const [layout, setLayout] = useState('បញ្ឈរ (A4)');
   const [showColsMenu, setShowColsMenu] = useState(false);
+
+  // Default selected group based on permissions
+  const [selectedGroup, setSelectedGroup] = useState(() => {
+    if (perms.isAdmin) return 'ថ្នាក់ដឹកនាំ';
+    return perms.user?.department || '';
+  });
 
   // Default visible columns for evaluation report
   const [visibleCols, setVisibleCols] = useState({
@@ -163,6 +169,7 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
   const [isCustomLeftModal, setIsCustomLeftModal] = useState(false);
   const [isCustomRightModal, setIsCustomRightModal] = useState(false);
   const [editingPolicyId, setEditingPolicyId] = useState(null);
+  const [showKeywordDropdown, setShowKeywordDropdown] = useState(false);
 
   const fetchPolicies = async () => {
     try {
@@ -209,7 +216,11 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
     if (!selectedGroup || selectedGroup === 'all' || signaturePolicies.length === 0) return;
     
     // Find the first matching policy (sorted by priority in backend)
-    const match = signaturePolicies.find(p => selectedGroup.includes(p.keyword));
+    const match = signaturePolicies.find(p => {
+      if (!p.keyword) return false;
+      const keywords = p.keyword.split(',').map(k => k.trim()).filter(k => k);
+      return keywords.some(k => selectedGroup.includes(k));
+    });
     
     if (match) {
       setFooterLeftTitle(match.leftTitle);
@@ -264,25 +275,29 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
       setLoading(true); setError('');
       
       const [yStr, mStr] = selectedMonth.split('-');
-      const y = parseInt(yStr);
-      const m = parseInt(mStr);
-      const startD = new Date(y, m - 2, 22);
-      const endD = new Date(y, m - 1, 21);
-      const startStr = toLocalYmd(startD);
-      const endStr = toLocalYmd(endD);
+      if (!startDate || !endDate) { setLoading(false); return; }
+      const startStr = startDate;
+      const endStr = endDate;
+      const startD = new Date(startStr);
+      const endD = new Date(endStr);
 
       try {
-        const [hrRes, attRes, leaveRes] = await Promise.all([
+        const [hrRes, leaveRes, evalRes] = await Promise.all([
           api.get('/hr'),
-          api.get('/attendance/summary', { params: { from: startStr, to: endStr, year: yStr, month: mStr } }),
-          api.get('/leave-requests', { params: { from: startStr, to: endStr } })
+          api.get('/leave-requests', { params: { from: startStr, to: endStr } }),
+          api.get('/evaluation-records', { params: { yearMonth: selectedMonth } })
         ]);
         if (!mounted) return;
         const hrData = hrRes.data;
-        const attData = attRes.data;
+        const attData = await calculateAttendanceData(api, startStr, endStr, hrData, []);
         const leaveData = (Array.isArray(leaveRes.data) ? leaveRes.data : []).filter(lv => {
           const s = (lv.status || '').toLowerCase();
           return s === 'approved' || s === 'pending';
+        });
+        const evalRecordsData = Array.isArray(evalRes.data) ? evalRes.data : [];
+        const evalMap = {};
+        evalRecordsData.forEach(r => {
+          if (r.staffId) evalMap[r.staffId.toUpperCase()] = r;
         });
 
         // Exact day-by-day mapping logic from Sum-Day Report
@@ -332,9 +347,11 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
             const dayWorkCount = Number(row.dayWorkCount || 0);
             const A = Number(row.A || 0);
             const lateEarlyEvents = Number(row.checkinLateCount || 0) + Number(row.checkoutEarlyCount || 0);
+            const plechEvents = Number(row.plech ?? row.Plech) || 0;
+            const combinedEvents = lateEarlyEvents + plechEvents;
             
             // Must round totalAbsent first to match Sum-Day Report logic
-            let totalAbsent = A + (lateEarlyEvents / 3);
+            let totalAbsent = A + (combinedEvents / 3);
             totalAbsent = Math.round(totalAbsent * 100) / 100;
             
             const clamp = (v) => Math.max(0, Math.min(100, Number.isFinite(v) ? v : 0));
@@ -348,20 +365,49 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
             
             attendanceMap[sid] = {
               percent: overallPercent > 0 ? toKhmerDigits(overallPercent) + '%' : (dayWorkCount > 0 ? toKhmerDigits(0) + '%' : ''),
-              result: result
+              result: result,
+              typeCounts: typeCounts
             };
           });
         }
 
         const merged = (Array.isArray(hrData) ? hrData : []).map(hr => {
           const sid = String(hr.staffId || hr.no || '').trim().toUpperCase();
-          const att = attendanceMap[sid] || { percent: '', result: '' };
+          const att = attendanceMap[sid] || { percent: '', result: '', typeCounts: {} };
+          
+          let specialLeaves = [];
+          let hasSpecialLeave = false;
+          Object.entries(att.typeCounts || {}).forEach(([t, c]) => {
+            if (t.includes('ទំនេរគ្មានបៀវត្ស') || t.includes('ទៅរៀន') || t.includes('មាតុភាព') || t.includes('ប្រចាំ​ឆ្នាំ') || t.includes('ប្រចាំឆ្នាំ')) {
+              hasSpecialLeave = true;
+              let name = t;
+              if (t.includes('ប្រចាំ')) name = 'ច្បាប់ប្រចាំឆ្នាំ';
+              else if (t.includes('មាតុភាព')) name = 'មាតុភាព';
+              else if (t.includes('ទំនេរគ្មានបៀវត្ស')) name = 'ទំនេរគ្មានបៀវត្ស';
+              else if (t.includes('ទៅរៀន')) name = 'ទៅរៀន';
+              specialLeaves.push(`${name} ${toKhmerDigits(c)}ថ្ងៃ`);
+            }
+          });
+          const note = specialLeaves.join(', ');
+
+          const dbRec = evalMap[sid];
+          let finalPerf = '';
+          let finalNote = '';
+          if (dbRec) {
+            finalPerf = dbRec.performanceResult || '';
+            finalNote = dbRec.otherNotes || '';
+          } else {
+            finalPerf = hasSpecialLeave ? note : '';
+            finalNote = note;
+          }
+
           return { 
             ...hr, 
             attendancePercentage: att.percent,
             totalMonthlyAttendance: att.result, 
-            performanceResult: '', 
-            otherNotes: '' 
+            performanceResult: finalPerf, 
+            otherNotes: finalNote,
+            hasSpecialLeave: hasSpecialLeave
           };
         });
         setList(merged);
@@ -374,10 +420,40 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
     };
     load();
     return () => { mounted = false; };
-  }, [perms.canViewHR, perms.canViewEmployees, startDate, endDate]);
+  }, [perms.canViewHR, perms.canViewEmployees, startDate, endDate, selectedMonth]);
+
+  const handleEditEvaluation = (staffId, field, value) => {
+    setList(prev => prev.map(hr => {
+      const sid = String(hr.staffId || hr.no || '').trim().toUpperCase();
+      if (sid === String(staffId).trim().toUpperCase()) {
+        return { ...hr, [field]: value };
+      }
+      return hr;
+    }));
+  };
+
+  const saveEvaluation = async (staffId, performanceResult, otherNotes) => {
+    if (!staffId) return;
+    try {
+      await api.post('/evaluation-records', {
+        staffId: String(staffId).trim().toUpperCase(),
+        yearMonth: selectedMonth,
+        performanceResult: performanceResult || '',
+        otherNotes: otherNotes || ''
+      });
+    } catch (e) {
+      console.error('Failed to save evaluation', e);
+    }
+  };
 
   const filteredList = useMemo(() => {
     let filtered = list.filter(hr => isIncludedAsOf(hr, endDate));
+    
+    // Enforce department access rule: Non-admins can ONLY see their own department
+    if (!perms.isAdmin && perms.user?.department) {
+      filtered = filtered.filter(hr => (hr.Department_Kh || hr.department || '').toString() === perms.user.department);
+    }
+
     if (filterText) {
       const q = filterText.toLowerCase();
       filtered = filtered.filter(hr => (hr.khmerName || '').toLowerCase().includes(q) || (hr.name || '').toLowerCase().includes(q) || (hr.staffId || '').toString().includes(q));
@@ -405,13 +481,42 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
 
   const grouped = useMemo(() => {
     const by = new Map();
+    const evalGroup = selectedGroup ? evaluationGroups.find(g => g.name === selectedGroup) : null;
+    
+    // Helper to robustly parse Khmer/Latin numbers
+    const parseNo = (val) => {
+      if (!val) return 0;
+      let s = String(val).trim();
+      const khmerMap = { '០': '0', '១': '1', '២': '2', '៣': '3', '៤': '4', '៥': '5', '៦': '6', '៧': '7', '៨': '8', '៩': '9' };
+      s = s.replace(/[០-៩]/g, d => khmerMap[d]);
+      const match = s.match(/-?\d+(\.\d+)?/);
+      if (match) {
+        return parseFloat(match[0]);
+      }
+      return 0;
+    };
+
     for (const hr of filteredList) {
-      const key = (hr.Department_Kh || hr.department || '—').toString().trim();
+      let key = (hr.Department_Kh || hr.department || '—').toString().trim();
+      if (evalGroup) {
+        key = selectedGroup;
+      }
       if (!by.has(key)) by.set(key, []);
       by.get(key).push(hr);
     }
-    return Array.from(by.entries()).map(([dept, members]) => ({ dept, members }));
-  }, [filteredList]);
+    
+    return Array.from(by.entries()).map(([dept, members]) => {
+      // Sort members by HR serial number (no), putting empty/0 at the top to match HR list
+      members.sort((a, b) => {
+        const noA = parseNo(a.no);
+        const noB = parseNo(b.no);
+        if (noA !== noB) return noA - noB;
+        // Fallback to staffId if same number
+        return (a.staffId || '').toString().localeCompare((b.staffId || '').toString());
+      });
+      return { dept, members };
+    });
+  }, [filteredList, selectedGroup, evaluationGroups]);
 
   // Exact same SCREEN_CSS as EmployeeReportPage.jsx
   const SCREEN_CSS = `
@@ -421,7 +526,7 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
     .print-scope .title h2 { font-family: "Khmer OS Muol Light","Khmer OS Muol","Noto Serif Khmer", serif; font-size: 15px; font-weight: normal; }
     .print-scope .subtitle { text-align: center; margin-bottom: 8px; }
     .print-scope table { width: 100%; border-collapse: collapse; border: 1px solid #222; table-layout: fixed; }
-    .print-scope th, .print-scope td { border: 1px solid #222; padding: 6px 4px; font-size: 13px; vertical-align: middle; text-align: center; word-wrap: break-word; overflow: hidden; }
+    .print-scope th, .print-scope td { border: 1px solid #222; padding: 6px 4px; font-size: 13px; vertical-align: middle; text-align: center; word-wrap: break-word; }
     .print-scope th { background: #f7f7f7; font-family: "Khmer OS Siemreap", serif; font-weight: bold; text-align: center; }
     .print-scope .section-row th { background: #efefef; text-align: left; font-weight: normal; font-family: "Khmer OS Muol Light", serif; font-size: 11px; padding-left: 10px !important; }
     .print-scope .no-border { border: 0 none; }
@@ -434,8 +539,8 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
       margin: 5mm auto;
       box-sizing: border-box;
     }
-    .print-scope tbody tr { min-height: ${rowHeight}px; }
-    .print-scope th, .print-scope td { padding: ${Math.max(4, Math.round(rowHeight / 6))}px 2px !important; line-height: ${Math.max(12, Math.round(rowHeight * 0.6))}px !important; }
+    .print-scope tbody tr:not(.section-row) { height: ${rowHeight}px; }
+    .print-scope tbody td { padding: ${Math.round(rowHeight / 6)}px 2px !important; line-height: ${Math.max(10, Math.round(rowHeight * 0.6))}px !important; }
     .print-scope td.left { text-align: left !important; padding-left: 3px !important; }
     .print-scope td.center { text-align: center !important; }
     .print-scope select { -webkit-appearance: none; -moz-appearance: none; appearance: none; background: transparent; border: none; color: inherit; font-family: inherit; font-size: inherit; padding: 0; margin: 0; cursor: default; }
@@ -447,6 +552,30 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
 
   const handlePrint = () => {
     if (!printRef.current) return;
+
+    // Synchronize input and select values to DOM attributes so innerHTML captures them
+    const inputs = printRef.current.querySelectorAll('input, textarea');
+    inputs.forEach(input => {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        if (input.checked) input.setAttribute('checked', 'checked');
+        else input.removeAttribute('checked');
+      } else {
+        input.setAttribute('value', input.value);
+      }
+    });
+
+    const selects = printRef.current.querySelectorAll('select');
+    selects.forEach(select => {
+      const options = select.querySelectorAll('option');
+      options.forEach(option => {
+        if (option.value === select.value) {
+          option.setAttribute('selected', 'selected');
+        } else {
+          option.removeAttribute('selected');
+        }
+      });
+    });
+
     const w = window.open('', '_blank');
     if (!w) return;
     const PRINT_STYLES = `
@@ -463,11 +592,11 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
         .title h2 { font-family: "Khmer OS Muol Light", serif; font-size: 15px; margin: 0; font-weight: normal; }
         .subtitle { text-align: center; margin-bottom: 8px; font-size: 13px; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; border: 1px solid #222; table-layout: fixed; }
-        th, td { border: 1px solid #222; padding: 6px 4px; vertical-align: middle; text-align: center; font-size: 13px; word-wrap: break-word; overflow: hidden; }
+        th, td { border: 1px solid #222; padding: 6px 4px; vertical-align: middle; text-align: center; font-size: 13px; word-wrap: break-word; }
         th { background: #f7f7f7; font-family: "Khmer OS Siemreap", serif; font-weight: bold; }
         .section-row th { background: #efefef; text-align: left; padding: 6px 10px; font-family: "Khmer OS Muol Light", serif; border-bottom: 1px solid #222; font-size: 11px; font-weight: normal; }
-        tbody tr { min-height: ${rowHeight}px; }
-        th, td { padding: ${Math.max(4, Math.round(rowHeight / 6))}px 2px !important; line-height: ${Math.max(12, Math.round(rowHeight * 0.6))}px !important; }
+        tbody tr:not(.section-row) { height: ${rowHeight}px; }
+        tbody td { padding: ${Math.round(rowHeight / 6)}px 2px !important; line-height: ${Math.max(10, Math.round(rowHeight * 0.6))}px !important; }
         .signatures { display: flex; justify-content: space-around; margin-top: 40px; font-size: 12px; text-align: center; }
         .sig-box { width: 40%; display: flex; flex-direction: column; align-items: center; }
         .sig-role { font-family: "Khmer OS Muol Light", serif; font-size: 12px; margin-top: 2px; }
@@ -542,51 +671,64 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
       <style dangerouslySetInnerHTML={{ __html: SCREEN_CSS }} />
 
       {/* Top Filter Bar */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8 max-w-[1600px] mx-auto">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 max-w-[1600px] mx-auto">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="relative flex-1 min-w-[200px]">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none pb-1">
               <Search size={18} className="text-gray-400" />
             </div>
-            <input type="text" placeholder="ស្វែងរកឈ្មោះ, អត្តលេខ, ផ្នែក, តួនាទី..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-indigo-400 text-sm" />
+            <input type="text" placeholder="ស្វែងរកឈ្មោះ, អត្តលេខ, ផ្នែក..." value={filterText} onChange={e => setFilterText(e.target.value)} className="w-full pl-10 pr-4 py-1.5 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-indigo-400 text-sm h-[34px] mb-0.5" />
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowGroupModal(true)} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-bold text-sm hover:bg-indigo-100 transition-all">បង្កើតក្រុមជំនាញ</button>
-            <button onClick={handleExportExcel} className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-sm hover:bg-emerald-100 transition-all">នាំចេញ Excel</button>
-            <button onClick={handlePrint} className="px-4 py-2 bg-gray-50 text-gray-700 rounded-lg font-bold text-sm hover:bg-gray-100 transition-all">បោះពុម្ព</button>
-          </div>
-        </div>
 
-        <div className="flex flex-wrap items-end gap-x-4 gap-y-4">
-          <div className="flex flex-col min-w-[140px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ប្រចាំខែ:</label><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none" /></div>
-          <div className="flex flex-col min-w-[140px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ចាប់ពីថ្ងៃ:</label><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none" /></div>
-          <div className="flex flex-col min-w-[140px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ដល់ថ្ងៃ:</label><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none" /></div>
-          <div className="flex flex-col min-w-[200px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ក្រុម:</label><select value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none bg-white"><option value="">— ជ្រើសរើសក្រុម —</option>{evaluationGroups.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}{departments.map(d => <option key={d._id} value={d.Department_Kh}>{d.Department_Kh}</option>)}</select></div>
-          <div className="flex flex-col min-w-[120px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">របៀប:</label><select value={layout} onChange={e => setLayout(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none bg-white"><option>បញ្ឈរ (A4)</option><option>ផ្តេក (A4)</option></select></div>
-          <div className="flex flex-col min-w-[120px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1 text-center">Row Height:</label><div className="flex items-center gap-2"><input type="range" min={20} max={60} value={rowHeight} onChange={e => setRowHeight(parseInt(e.target.value))} className="w-full h-1.5 bg-blue-100 rounded-lg appearance-none cursor-pointer accent-blue-600" /></div></div>
+          <div className="flex flex-col min-w-[120px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ប្រចាំខែ:</label><input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none h-[34px]" /></div>
+          <div className="flex flex-col min-w-[120px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ចាប់ពីថ្ងៃ:</label><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none h-[34px]" /></div>
+          <div className="flex flex-col min-w-[120px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ដល់ថ្ងៃ:</label><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none h-[34px]" /></div>
 
-          <div className="relative">
-            <button onClick={() => setShowColsMenu(!showColsMenu)} className="px-4 py-1.5 border border-gray-200 rounded-md text-sm font-bold text-gray-600 bg-white hover:bg-gray-50 h-[34px]">Columns</button>
-            {showColsMenu && (
-              <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 shadow-xl rounded-xl p-4 min-w-[260px] z-[100]">
-                <div className="text-[11px] font-bold text-gray-400 mb-3 uppercase tracking-wider">បង្ហាញជួរឈរ</div>
-                <div className="flex flex-col gap-1 max-h-[400px] overflow-y-auto pr-2">
-                  {listColumns.map(c => (
-                    <label key={c.key} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={!!visibleCols[c.key]}
-                        onChange={() => toggleCol(c.key)}
-                        className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 transition-all shrink-0"
-                      />
-                      <span className="text-[13px] text-gray-700 group-hover:text-indigo-600 transition-colors">
-                        {Array.isArray(c.label) ? c.label.join('') : c.label}
-                      </span>
-                    </label>
-                  ))}
-                </div>
+          {perms.isAdmin && (
+            <>
+              <div className="flex flex-col min-w-[180px]">
+                <label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">ក្រុម:</label>
+                <select value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none bg-white h-[34px]">
+                  <option value="">— ជ្រើសរើសក្រុម —</option>
+                  {evaluationGroups.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}
+                  {departments.map(d => <option key={d._id} value={d.Department_Kh}>{d.Department_Kh}</option>)}
+                </select>
               </div>
+              <div className="flex flex-col min-w-[110px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1">របៀប:</label><select value={layout} onChange={e => setLayout(e.target.value)} className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm outline-none bg-white h-[34px]"><option>បញ្ឈរ (A4)</option><option>ផ្តេក (A4)</option></select></div>
+              <div className="flex flex-col min-w-[110px]"><label className="text-[11px] font-bold text-gray-400 mb-1 ml-1 text-center">Row Height: {rowHeight}px</label><div className="flex items-center gap-2 h-[34px]"><input type="range" min={0} max={60} value={rowHeight} onChange={e => setRowHeight(parseInt(e.target.value))} className="w-full h-1.5 bg-blue-100 rounded-lg appearance-none cursor-pointer accent-blue-600" /></div></div>
+
+              <div className="relative">
+                <button onClick={() => setShowColsMenu(!showColsMenu)} className="px-4 py-1.5 border border-gray-200 rounded-md text-sm font-bold text-gray-600 bg-white hover:bg-gray-50 h-[34px]">Columns</button>
+                {showColsMenu && (
+                  <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 shadow-xl rounded-xl p-4 min-w-[260px] z-[100]">
+                    <div className="text-[11px] font-bold text-gray-400 mb-3 uppercase tracking-wider">បង្ហាញជួរឈរ</div>
+                    <div className="flex flex-col gap-1 max-h-[400px] overflow-y-auto pr-2">
+                      {listColumns.map(c => (
+                        <label key={c.key} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={!!visibleCols[c.key]}
+                            onChange={() => toggleCol(c.key)}
+                            className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 transition-all shrink-0"
+                          />
+                          <span className="text-[13px] text-gray-700 group-hover:text-indigo-600 transition-colors">
+                            {Array.isArray(c.label) ? c.label.join('') : c.label}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          <div className="flex items-center gap-2 mb-0.5">
+            {perms.isAdmin && (
+              <button onClick={() => setShowGroupModal(true)} className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg font-bold text-sm hover:bg-indigo-100 transition-all h-[34px]">បង្កើតក្រុម</button>
             )}
+            <button onClick={handleExportExcel} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-sm hover:bg-emerald-100 transition-all h-[34px]">នាំចេញ Excel</button>
+            <button onClick={handlePrint} className="px-3 py-1.5 bg-gray-50 text-gray-700 rounded-lg font-bold text-sm hover:bg-gray-100 transition-all h-[34px]">បោះពុម្ព</button>
           </div>
         </div>
       </div>
@@ -634,10 +776,65 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
                         {visibleCols.name && <td className="left" style={{ paddingLeft: '2px' }}>{r.khmerName || r.name}</td>}
                         {visibleCols.skill && <td className="left" style={{ fontSize: getFontSize(r.skill || r.technicalRole), whiteSpace: 'nowrap', paddingLeft: '2px' }}>{r.skill || r.technicalRole || ''}</td>}
                         {visibleCols.position && <td className="left" style={{ fontSize: getFontSize(r.position), whiteSpace: 'nowrap', paddingLeft: '2px' }}>{r.position || ''}</td>}
-                        {visibleCols.attendancePercentage && <td className="center">{r.attendancePercentage || ''}</td>}
-                        {visibleCols.totalMonthlyAttendance && <td className="center">{r.totalMonthlyAttendance || ''}</td>}
-                        {visibleCols.performanceResult && <td className="center">{r.performanceResult || ''}</td>}
-                        {visibleCols.otherNotes && <td className="left">{r.otherNotes || ''}</td>}
+                        {visibleCols.attendancePercentage && (
+                          <td className="center" style={{ padding: 0 }}>
+                            <input
+                              className="no-print-border"
+                              style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', textAlign: 'center', outline: 'none', minHeight: '0px', padding: 0 }}
+                              value={r.attendancePercentage || ''}
+                              onChange={(e) => handleEditEvaluation(r.staffId || r.no, 'attendancePercentage', e.target.value)}
+                            />
+                          </td>
+                        )}
+                        {visibleCols.totalMonthlyAttendance && (
+                          <td className="center" style={{ padding: 0 }}>
+                            <input
+                              className="no-print-border"
+                              style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', textAlign: 'center', outline: 'none', minHeight: '0px', padding: 0 }}
+                              value={r.totalMonthlyAttendance || ''}
+                              onChange={(e) => handleEditEvaluation(r.staffId || r.no, 'totalMonthlyAttendance', e.target.value)}
+                            />
+                          </td>
+                        )}
+                        {(visibleCols.performanceResult && visibleCols.otherNotes && r.hasSpecialLeave) ? (
+                          <td colSpan={2} className="center" style={{ padding: 0 }}>
+                            <input
+                              className="no-print-border"
+                              style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', textAlign: 'center', outline: 'none', fontWeight: 'bold', minHeight: '0px', padding: 0 }}
+                              value={r.otherNotes || ''}
+                              onChange={(e) => {
+                                handleEditEvaluation(r.staffId || r.no, 'performanceResult', e.target.value);
+                                handleEditEvaluation(r.staffId || r.no, 'otherNotes', e.target.value);
+                              }}
+                              onBlur={() => saveEvaluation(r.staffId || r.no, r.otherNotes, r.otherNotes)}
+                            />
+                          </td>
+                        ) : (
+                          <>
+                            {visibleCols.performanceResult && (
+                              <td className="center" style={{ padding: 0 }}>
+                                <input
+                                  className="no-print-border"
+                                  style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', textAlign: 'center', outline: 'none', minHeight: '0px', padding: 0 }}
+                                  value={r.performanceResult || ''}
+                                  onChange={(e) => handleEditEvaluation(r.staffId || r.no, 'performanceResult', e.target.value)}
+                                  onBlur={() => saveEvaluation(r.staffId || r.no, r.performanceResult, r.otherNotes)}
+                                />
+                              </td>
+                            )}
+                            {visibleCols.otherNotes && (
+                              <td className="left" style={{ padding: 0 }}>
+                                <input
+                                  className="no-print-border"
+                                  style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', textAlign: 'left', outline: 'none', paddingLeft: '4px', minHeight: '0px', padding: 0 }}
+                                  value={r.otherNotes || ''}
+                                  onChange={(e) => handleEditEvaluation(r.staffId || r.no, 'otherNotes', e.target.value)}
+                                  onBlur={() => saveEvaluation(r.staffId || r.no, r.performanceResult, r.otherNotes)}
+                                />
+                              </td>
+                            )}
+                          </>
+                        )}
                         {visibleCols.staffId && <td className="center">{r.staffId || ''}</td>}
                       </tr>
                     ))}
@@ -649,7 +846,7 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
             <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div style={{ fontSize: '13px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', fontWeight: 'bold' }}>សំគាល់៖</div>
               <div style={{ fontSize: '12px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', paddingLeft: '10px', lineHeight: '1.6' }}>
-                ១. វឌ្ឍនការងារ៖ ល្អ (≥{toKhmerDigits(85)}%-{toKhmerDigits(100)}%), ល្អបង្គួរ (≥{toKhmerDigits(65)}%-{"<"}{toKhmerDigits(85)}%), មធ្យម (≥{toKhmerDigits(45)}%-{"<"}{toKhmerDigits(65)}%), ខ្សោយ ({"<"}{toKhmerDigits(45)}%)<br />
+                ១. វត្តមានការងារ៖ ល្អ (≥{toKhmerDigits(85)}%-{toKhmerDigits(100)}%), ល្អបង្គួរ (≥{toKhmerDigits(65)}%-{"<"}{toKhmerDigits(85)}%), មធ្យម (≥{toKhmerDigits(45)}%-{"<"}{toKhmerDigits(65)}%), ខ្សោយ ({"<"}{toKhmerDigits(45)}%)<br />
                 ២. ការផ្តល់ប្រាក់លើកទឹកចិត្ត៖ ល្អ ({toKhmerDigits(100)}%), ល្អបង្គួរ ({toKhmerDigits(75)}%), មធ្យម ({toKhmerDigits(50)}%), ខ្សោយ ({toKhmerDigits(0)}%)
               </div>
             </div>
@@ -723,7 +920,8 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
       </div>
 
       {/* Signature Policy Info Panel (Screen Only) */}
-      <div className="max-w-[1000px] mx-auto mt-12 mb-20 no-print">
+      {perms.isAdmin && (
+        <div className="max-w-[1000px] mx-auto mt-12 mb-20 no-print">
         <div className="bg-white rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
           <div className="bg-blue-50/50 px-6 py-4 border-b border-blue-100 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -764,6 +962,7 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
           </div>
         </div>
       </div>
+      )}
 
       {/* Policy Management Modal */}
       {showPolicyModal && (
@@ -785,9 +984,57 @@ const toggleCol = (k) => setVisibleCols(prev => ({ ...prev, [k]: !prev[k] }));
             <div className="flex-1 overflow-hidden flex flex-col">
               <div className="p-6 bg-indigo-50/30 border-b">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-bold text-gray-500 ml-1 uppercase">ពាក្យគន្លឹះ (Keyword)</label>
-                    <input value={newPolicy.keyword} onChange={e => setNewPolicy({...newPolicy, keyword: e.target.value})} className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400" placeholder="ឧ: ផ្នែក, រដ្ឋបាល..." />
+                  <div className="flex flex-col gap-1.5 relative">
+                    <label className="text-[11px] font-bold text-gray-500 ml-1 uppercase">ផ្នែក (Keyword)</label>
+                    <div 
+                      onClick={() => setShowKeywordDropdown(!showKeywordDropdown)} 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer min-h-[46px] max-h-[140px] overflow-y-auto flex content-start flex-wrap gap-1.5 custom-scrollbar"
+                    >
+                      {newPolicy.keyword ? newPolicy.keyword.split(',').map(k => k.trim()).filter(k=>k).map((k, i) => (
+                        <span key={i} className="bg-indigo-100 text-indigo-700 text-[12px] px-2 py-1 rounded-md font-bold flex items-center gap-1">
+                          {k}
+                          <span 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const keywords = newPolicy.keyword.split(',').map(kw => kw.trim()).filter(kw => kw && kw !== k);
+                              setNewPolicy({...newPolicy, keyword: keywords.join(', ')});
+                            }} 
+                            className="text-indigo-400 hover:text-indigo-800 ml-1 cursor-pointer font-black"
+                          >
+                            ✕
+                          </span>
+                        </span>
+                      )) : null}
+                      <span className="text-indigo-400 text-[12px] font-bold py-1 px-1 hover:text-indigo-600 transition-colors">
+                        {newPolicy.keyword ? '+ ថែមផ្នែកទៀត' : 'ជ្រើសរើសផ្នែក...'}
+                      </span>
+                    </div>
+                    {showKeywordDropdown && (
+                      <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 shadow-xl rounded-xl p-2 max-h-[250px] overflow-y-auto z-[200]">
+                        <div className="flex flex-col gap-1">
+                          {(() => {
+                            const selectedKeywords = newPolicy.keyword ? newPolicy.keyword.split(',').map(k => k.trim()).filter(k=>k) : [];
+                            const unselectedDepartments = departments.filter(d => !selectedKeywords.includes(d.Department_Kh));
+                            if (unselectedDepartments.length === 0) {
+                              return <div className="text-center text-gray-400 text-[13px] py-3">គ្មានផ្នែកសម្រាប់ជ្រើសរើសទៀតទេ</div>;
+                            }
+                            return unselectedDepartments.map(d => (
+                              <div 
+                                key={d._id} 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  selectedKeywords.push(d.Department_Kh);
+                                  setNewPolicy({...newPolicy, keyword: selectedKeywords.join(', ')});
+                                }}
+                                className="p-2 hover:bg-indigo-50 hover:text-indigo-700 rounded-lg cursor-pointer transition-colors text-[13px] text-gray-700 font-medium"
+                              >
+                                {d.Department_Kh}
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[11px] font-bold text-gray-500 ml-1 uppercase">ហត្ថលេខាឆ្វេង</label>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Users,
   User,
@@ -40,6 +40,30 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
   const { user, logout } = useAuth();
   const perms = usePermission() || {};
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const getIsSubActive = (subItem) => {
+    if (subItem.route) {
+      try {
+        const url = new URL(subItem.route, window.location.origin);
+        const subTemplate = url.searchParams.get('template');
+        
+        const currentParams = new URLSearchParams(location.search);
+        const curTemplate = currentParams.get('template');
+        
+        if (location.pathname === url.pathname) {
+          if (subTemplate || curTemplate) {
+            return subTemplate === curTemplate;
+          }
+          return true;
+        }
+      } catch (e) {
+        return activeSection === subItem.path;
+      }
+      return false;
+    }
+    return activeSection === subItem.path;
+  };
   const [activeUsers, setActiveUsers] = useState([]);
   const [showUsersList, setShowUsersList] = useState(false);
 
@@ -133,7 +157,7 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
       documents: 'documents', signatures: 'documents', 'howto-docs': 'documents', 'file-transfer': 'documents', 'file-transfer-outgoing': 'documents', 'file-transfer-stats': 'documents',
       'attendance-scan': 'attendance-scan', 'attendance-scan-qr': 'attendance-scan', 'attendance-scan-face': 'attendance-scan', 'attendance-scan-face-group': 'attendance-scan', 'attendance-face-enroll': 'attendance-scan', 'geo-fence-policies': 'attendance-scan',
       attendance: 'attendance', 'attendance-report': 'attendance', 'attendance-ministry-report': 'attendance',
-      'work-schedule': 'calendar-group', 'work-schedule1': 'calendar-group', shifts: 'calendar-group', 'shift-groups': 'calendar-group',
+      'work-schedule': 'calendar-group', shifts: 'calendar-group', 'shift-groups': 'calendar-group',
       'employee-report': 'reports', 'department-report': 'reports', 'retirement-report': 'reports',
       'employee-id-docs': 'documents',
       'employee-other-docs': 'documents'
@@ -163,7 +187,7 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
 
   const menuItems = [
     ...(hasDashboardPerm ? [{ id: 'dashboard', label: 'ទំព័រដើម', icon: Home, path: 'dashboard', route: '/' }] : []),
-    { id: 'staff-biography', label: 'ប្រវត្តរូបបុគ្គលិក', icon: FileText, path: 'staff-biography', route: '/staff-biography' },
+    ...(perms.canViewStaffBiography ? [{ id: 'staff-biography', label: 'ប្រវត្តរូបបុគ្គលិក', icon: FileText, path: 'staff-biography', route: '/staff-biography' }] : []),
 
     // Root level items as per image
     ...(canViewDeptUnits ? [{ id: 'department-units', label: 'អង្គភាព', icon: BarChart3, path: 'department-units', route: '/department-units' }] : []),
@@ -181,7 +205,7 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
       submenu: [
         { id: 'hr', label: 'បញ្ជីបុគ្គលិក', icon: Users, path: 'hr' },
         ...(perms.canViewDepartments ? [{ id: 'departments', label: 'ផ្នែក', icon: BarChart3, path: 'departments' }] : []),
-        ...(perms.canViewSkills ? [{ id: 'skills', label: 'ជំនាញ', icon: Award, path: 'skills' }] : []),
+        ...(perms.canViewSkills ? [{ id: 'skills', label: 'ជំនាញ (KSFH Skills)', icon: Award, path: 'skills' }] : []),
         ...(perms.canViewSkills ? [{ id: 'ministry-skills', label: 'ជំនាញក្រសួង', icon: Award, path: 'ministry-skills' }] : []),
         ...(perms.canViewPositions ? [{ id: 'positions', label: 'តួនាទី', icon: UserPlus, path: 'positions' }] : []),
         ...(perms.isAdmin ? [{ id: 'system-settings', label: 'កំណត់ប្រព័ន្ធ', icon: Settings, path: 'system-settings' }] : [])
@@ -207,18 +231,19 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
     }] : []),
 
     // Group 3.5: Instruction Letters (លិខិតបង្គាប់ការ)
-    ...(perms.canViewDocuments ? [{
+    ...(perms.canViewMaternityLeaveReport || perms.canViewResignationLetter || perms.canViewOnboardingLetter || perms.canViewAppointmentLetter || perms.canViewTerminationLetter || perms.canViewOtherLetters ? [{
       id: 'instruction-letters-group',
       label: 'លិខិតបង្គាប់ការ',
       icon: FileText,
       hasSubmenu: true,
       submenu: [
-        { id: 'il-maternity', label: 'មាតុភាព', icon: FileText, route: '/maternity-leave-report', path: 'maternity-leave-report' },
-        { id: 'il-resignation', label: 'ឈប់ពីការងារ', icon: FileText, route: '/instruction-letters?template=resignation', path: 'instruction-letters' },
-        { id: 'il-onboarding', label: 'ចូលបុគ្គលិកថ្មី', icon: FileText, route: '/instruction-letters?template=onboarding', path: 'instruction-letters' },
-        { id: 'il-appointment', label: 'តែងតាំង', icon: FileText, route: '/instruction-letters?template=appointment', path: 'instruction-letters' },
-        { id: 'il-termination', label: 'បញ្ចប់មុខតំណែង', icon: FileText, route: '/instruction-letters?template=termination', path: 'instruction-letters' },
-        { id: 'il-others', label: 'ផ្សេងៗ', icon: FileText, route: '/instruction-letters?template=others', path: 'instruction-letters' },
+        ...(perms.canViewMaternityLeaveReport ? [{ id: 'il-maternity', label: 'មាតុភាព', icon: FileText, route: '/maternity-leave-report', path: 'maternity-leave-report' }] : []),
+        ...(perms.canViewResignationLetter ? [{ id: 'il-resignation', label: 'ឈប់ពីការងារ', icon: FileText, route: '/instruction-letters?template=resignation', path: 'instruction-letters' }] : []),
+        ...(perms.canViewOnboardingLetter ? [{ id: 'il-onboarding', label: 'ចូលបុគ្គលិកថ្មី', icon: FileText, route: '/instruction-letters?template=onboarding', path: 'instruction-letters' }] : []),
+        ...(perms.canViewAppointmentLetter ? [{ id: 'il-appointment', label: 'តែងតាំង', icon: FileText, route: '/instruction-letters?template=appointment', path: 'instruction-letters' }] : []),
+        ...(perms.canViewTerminationLetter ? [{ id: 'il-termination', label: 'បញ្ចប់មុខតំណែង', icon: FileText, route: '/instruction-letters?template=termination', path: 'instruction-letters' }] : []),
+        ...(perms.canViewOtherLetters ? [{ id: 'il-adjustment', label: 'កែសម្រួលភារកិច្ច', icon: FileText, route: '/instruction-letters?template=adjustment', path: 'instruction-letters' }] : []),
+        ...(perms.canViewOtherLetters ? [{ id: 'il-others', label: 'ផ្សេងៗ', icon: FileText, route: '/instruction-letters?template=others', path: 'instruction-letters' }] : []),
       ]
     }] : []),
 
@@ -240,7 +265,7 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
     }] : []),
 
     // Group 5: Attendance Documents (វត្តមាន)
-    ...(perms.canViewAbsence || perms.canViewAttendanceReport || perms.canViewAttendanceMonthly || perms.canViewAttendanceDaily ? [{
+    ...(perms.canViewAbsence || perms.canViewAttendanceReport || perms.canViewAttendanceMonthly || perms.canViewAttendanceDaily || perms.canViewAttendanceSumDayReport || perms.canViewAttendanceMonthlyData || perms.canViewAttendanceMonthlyReport || perms.canViewAttendanceDayData || perms.canViewAttendanceMonthlyDataFile || perms.canViewAttendanceAudit || perms.canViewAttendanceMinistry || perms.canViewDailyReportCheckinme || perms.canViewEmployeeEvaluation ? [{
       id: 'attendance',
       label: 'វត្តមាន',
       icon: CalendarCheck,
@@ -255,16 +280,22 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
         ...(perms.canViewAttendanceMonthlyReport ? [
           { id: 'attendance-ministry-report', label: 'រ_វត្តមានក្រសួង', icon: FileSearch, path: 'attendance-ministry-report' }
         ] : []),
-        ...(perms.canViewAttendanceMonthlyData ? [
-          { id: 'attendance-day-data', label: 'ទិន្នន័យវត្តមានថ្ងៃ', icon: FileSpreadsheet, path: 'attendance-day-data' },
+        ...(perms.canViewAttendanceDayData ? [
+          { id: 'attendance-day-data', label: 'ទិន្នន័យវត្តមានថ្ងៃ', icon: FileSpreadsheet, path: 'attendance-day-data' }
+        ] : []),
+        ...(perms.canViewAttendanceMonthlyDataFile ? [
           { id: 'attendance-monthly-data', label: 'ទិន្នន័យវត្តមានខែ', icon: FileSpreadsheet, path: 'attendance-monthly-data' }
         ] : []),
-        ...(perms.canViewAttendanceReport ? [
-          { id: 'attendance-audit', label: 'វត្តមានអូឌិត', icon: SearchCheck, path: 'attendance-audit' },
-          { id: 'attendance-ministry', label: 'វត្តមានក្រសួង', icon: TrendingUp, path: 'attendance-ministry' },
+        ...(perms.canViewAttendanceAudit ? [
+          { id: 'attendance-audit', label: 'វត្តមានអូឌិត', icon: SearchCheck, path: 'attendance-audit' }
+        ] : []),
+        ...(perms.canViewAttendanceMinistry ? [
+          { id: 'attendance-ministry', label: 'វត្តមានក្រសួង', icon: TrendingUp, path: 'attendance-ministry' }
+        ] : []),
+        ...(perms.canViewDailyReportCheckinme ? [
           { id: 'attendance-daily-report', label: 'Daily Report Checkinme', icon: CloudDownload, route: '/attendance-daily-report' }
         ] : []),
-        ...(perms.canViewEmployeeReport ? [{ id: 'employee-evaluation-report', label: 'វាយតំលៃបុគ្គលិក', icon: FileText, route: '/evaluation' }] : [])
+        ...(perms.canViewEmployeeEvaluation ? [{ id: 'employee-evaluation-report', label: 'វាយតំលៃបុគ្គលិក', icon: FileText, route: '/evaluation' }] : [])
       ]
     }] : []),
     ...(perms.canViewLeaveRequests ? [{ id: 'leave-requests', label: 'ច្បាប់', icon: ClipboardList, path: 'leave-requests' }] : []),
@@ -277,7 +308,6 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
       hasSubmenu: true,
       submenu: [
         ...(perms.canViewWorkSchedule ? [{ id: 'work-schedule', label: 'ប្រតិទិនការងារ', icon: Calendar, route: '/work-schedule', path: 'work-schedule' }] : []),
-        ...(perms.canViewWorkSchedule ? [{ id: 'work-schedule1', label: 'ប្រតិទិនការងារ 1', icon: Calendar, route: '/work-schedule1', path: 'work-schedule1' }] : []),
         ...(perms.canViewShifts ? [{ id: 'shifts-att', label: 'Shifts', icon: Calendar, route: '/shifts', path: 'shifts' }] : []),
         ...(perms.canViewShiftGroups ? [{ id: 'shift-groups', label: 'Shift Groups', icon: Calendar, route: '/shift-groups', path: 'shift-groups' }] : []),
         ...(perms.canViewGroupTimetables ? [{ id: 'group-timetables', label: 'គ្រប់គ្រងម៉ោងក្រុម', icon: Clock, route: '/group-timetables', path: 'group-timetables' }] : [])
@@ -288,6 +318,7 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
     ...(perms.canViewEmployeeReport || perms.canViewAttendance || perms.canViewRetirementReport ?
       [{
         id: 'reports', label: 'របាយការណ៍', icon: FileText, hasSubmenu: true, submenu: [
+          ...(perms.canViewEmployeeReport ? [{ id: 'payroll', label: 'តារាងបៀវត្សន៍', icon: FileSpreadsheet, path: 'payroll' }] : []),
           ...(perms.canViewEmployeeReport ? [{ id: 'employee-report', label: 'បុគ្គលិក', icon: FileText, path: 'employee-report' }] : []),
           ...(perms.canViewDailyReport ? [{ id: 'daily-report', label: 'ប្រចាំថ្ងៃ', icon: FileText, path: 'daily-report' }] : []),
           ...(perms.canViewGroupReport ? [{ id: 'group-report', label: 'ក្រុម', icon: FileText, path: 'group-report' }] : []),
@@ -313,7 +344,10 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
       icon: Award,
       hasSubmenu: true,
       submenu: [
-        ...(perms.canViewKamprak ? [{ id: 'kamprak-page', label: 'គ្រប់គ្រងកាំប្រាក់', icon: Settings, route: '/kamprak' }] : []),
+        ...(perms.canViewKamprak ? [
+          { id: 'kamprak-page', label: 'គ្រប់គ្រងកាំប្រាក់', icon: Settings, route: '/kamprak' },
+          { id: 'budget-report', label: 'គម្រោងថវិកា', icon: FileSpreadsheet, route: '/budget-report' }
+        ] : []),
         ...(perms.canViewTransformationReport ? [{ id: 'picture-report-k', label: 'របាយការណ៍ប្តូរទម្រង់', icon: FileText, path: 'picture-report' }] : []),
         ...(perms.canViewPromotionByRotationReport ? [{ id: 'promotion-rotation-report', label: 'របាយការណ៍ប្តូរវេន', icon: FileText, path: 'promotion-rotation-report' }] : []),
         ...(perms.canViewPromotionByDiplomaReport ? [{ id: 'promotion-diploma-report', label: 'របាយការណ៍សញ្ញាបត្រ', icon: FileText, path: 'promotion-diploma-report' }] : []),
@@ -365,7 +399,7 @@ export default function Sidebar({ activeSection, onSectionChange, isCollapsed = 
           {isExpanded && (
             <div className="ml-6 mt-1 space-y-1">
               {item.submenu.map(subItem => {
-                const isSubActive = activeSection === subItem.path;
+                const isSubActive = getIsSubActive(subItem);
                 return (
                   <button key={subItem.id} onClick={() => {
                     if (subItem.route) { navigate(subItem.route); return; }

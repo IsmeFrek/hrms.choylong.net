@@ -447,7 +447,7 @@ export default function AttendancedayReportPage() {
       const v = localStorage.getItem('attendancedayReportPrintOrientation');
       if (v === 'landscape' || v === 'portrait') return v;
     } catch { void 0; }
-    return 'portrait';
+    return 'landscape';
   });
 
   useEffect(() => {

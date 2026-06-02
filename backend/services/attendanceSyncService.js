@@ -27,11 +27,19 @@ function calculateDuration(in1, out1, in2, out2) {
   const tOut2 = timeToDecimal(out2);
 
   if (tIn1 > 0 && tOut1 > 0) {
-    if (tOut1 >= tIn1) total += (tOut1 - tIn1);
+    if (tOut1 >= tIn1) {
+      const diff = tOut1 - tIn1;
+      if (diff < 4.0) total += (24 + diff);
+      else total += diff;
+    }
     else total += (24 - tIn1) + tOut1;
   }
   if (tIn2 > 0 && tOut2 > 0) {
-    if (tOut2 >= tIn2) total += (tOut2 - tIn2);
+    if (tOut2 >= tIn2) {
+      const diff = tOut2 - tIn2;
+      if (diff < 4.0) total += (24 + diff);
+      else total += diff;
+    }
     else total += (24 - tIn2) + tOut2;
   }
   return parseFloat(total.toFixed(2));
@@ -67,6 +75,18 @@ async function consolidateAndSaveDailyReport(date, records) {
 
   const finalOpsMap = new Map();
   hrListFull.forEach(h => {
+    if (h.joinDate) {
+      const jd = new Date(h.joinDate);
+      const jdStart = new Date(Date.UTC(jd.getFullYear(), jd.getMonth(), jd.getDate()));
+      if (start < jdStart) return; // Haven't joined yet
+    }
+    
+    if (h.resignationDate) {
+      const rd = new Date(h.resignationDate);
+      const rdStart = new Date(Date.UTC(rd.getFullYear(), rd.getMonth(), rd.getDate()));
+      if (start > rdStart) return; // Already resigned
+    }
+
     let category = h.officerType || h.employeeCategory || '';
     const cLower = String(category).toLowerCase();
     if (cLower.includes('មន្ត្រីរាជការ') || cLower.includes('civil')) category = 'មន្ត្រីរាជការ';

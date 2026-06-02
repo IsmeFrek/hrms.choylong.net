@@ -1,6 +1,7 @@
 import express from 'express';
 import https from 'https';
 import MeetingRoomBooking from '../models/MeetingRoomBooking.js';
+import MeetingRoomImage from '../models/MeetingRoomImage.js';
 
 const router = express.Router();
 
@@ -208,6 +209,48 @@ router.get('/db-check', async (req, res) => {
     res.type('text/plain').send(out);
   } catch (err) {
     res.status(500).send(`DB Check Error: ${err.message}`);
+  }
+});
+
+// GET /api/meeting-rooms/images - Fetch all custom room images (MUST be before /:id)
+router.get('/images', async (req, res) => {
+  try {
+    const images = await MeetingRoomImage.find({});
+    // Convert to object with roomId as key
+    const result = {};
+    images.forEach(img => {
+      result[img.roomId] = img.imageUrl;
+    });
+    res.json(result);
+  } catch (err) {
+    console.error('Error fetching room images:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// POST /api/meeting-rooms/images - Save or update a room's custom image (MUST be before /:id)
+router.post('/images', async (req, res) => {
+  try {
+    const { roomId, imageUrl } = req.body;
+    if (!roomId || !imageUrl) {
+      return res.status(400).json({ message: 'roomId and imageUrl are required' });
+    }
+
+    // Use findOneAndUpdate with upsert to save or update
+    const updated = await MeetingRoomImage.findOneAndUpdate(
+      { roomId },
+      { 
+        roomId,
+        imageUrl,
+        uploadedAt: new Date()
+      },
+      { upsert: true, new: true }
+    );
+
+    res.json(updated);
+  } catch (err) {
+    console.error('Error saving room image:', err);
+    res.status(500).json({ message: err.message });
   }
 });
 

@@ -32,6 +32,7 @@ export default function LetterPage() {
   });
 
   const [letters, setLetters] = useState([]);
+  const [searchQ, setSearchQ] = useState('');
   // resizable table columns (px) and row height
   const defaultColWidths = [40, 160, 120, 180, 150, 260, 140, 160, 140, 180, 100, 150]; // roughly match columns (added status column)
   const [colWidths, setColWidths] = useState(defaultColWidths);
@@ -668,6 +669,29 @@ export default function LetterPage() {
             </button>
           </div>
 
+          {/* Search bar — filters letters client-side by letter no, dept, subject, name, etc. */}
+          <div className="mb-4 flex flex-col gap-1">
+            <label className="text-xs font-semibold text-gray-600 font-khmer">ស្វែងរក (លេខលិខិត ឬ ឈ្មោះ ឬ ផ្នែក):</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-khmer"
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                placeholder="ឧ. លេខកាត ឬ ឈ្មោះ ឬ ផ្នែក"
+              />
+              {searchQ && (
+                <button
+                  type="button"
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-all font-khmer"
+                  onClick={() => setSearchQ('')}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Template selector: click to apply a template and open editor/preview */}
           <div className="mb-4 flex gap-2 items-center">
             <span className="font-medium">គំរូលិខិត:</span>
@@ -729,12 +753,35 @@ export default function LetterPage() {
                   <tr>
                     <td colSpan={12} className="border px-4 py-6 text-center">Loading...</td>
                   </tr>
-                ) : letters.length === 0 ? (
-                  <tr>
-                    <td colSpan={12} className="border px-4 py-6 text-center">មិនមានទិន្នន័យ</td>
-                  </tr>
-                ) : (
-                  letters.map((l, idx) => (
+                ) : (() => {
+                  // Filter letters client-side when searchQ is non-empty
+                  const qLower = searchQ.trim().toLowerCase();
+                  const filteredLetters = qLower
+                    ? letters.filter((l) => {
+                        const fields = [
+                          l.letterNo,
+                          l.department,
+                          l.subject,
+                          l.recipient,
+                          l.body,
+                          l.signName,
+                          l.signPlace,
+                          l.createdBy,
+                          l.reference,
+                        ];
+                        return fields.some((f) => f && String(f).toLowerCase().includes(qLower));
+                      })
+                    : letters;
+                  if (filteredLetters.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={12} className="border px-4 py-6 text-center font-khmer">
+                          {qLower ? `រកមិនឃើញ "${searchQ}"` : 'មិនមានទិន្នន័យ'}
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return filteredLetters.map((l, idx) => (
                     <tr key={l._id || idx} className="hover:bg-gray-50" style={autoRowHeight ? {} : { height: rowHeight }}>
                       <td className="border px-4 py-3 align-middle text-sm text-center" style={{ width: colWidths[0] }}>{idx + 1}</td>
                       <td className="border px-4 py-3 align-middle text-sm" style={{ width: colWidths[1] }}>{l.department || '-'}</td>
@@ -787,8 +834,8 @@ export default function LetterPage() {
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>

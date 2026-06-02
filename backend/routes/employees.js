@@ -14,11 +14,16 @@ router.use(authRequired);
 // Distinct department names from employees, used by several reports.
 router.get('/meta/departments', requirePermission('view:employees'), async (req, res) => {
   try {
-    const docs = await Employee.find({}, { department: 1, Department_Kh: 1, Department_En: 1 }).lean();
+    const depts1 = await Employee.distinct('department');
+    const depts2 = await Employee.distinct('Department_Kh');
+    const depts3 = await Employee.distinct('Department_En');
+    const allDepts = [...depts1, ...depts2, ...depts3];
     const set = new Set();
-    for (const d of docs || []) {
-      const name = (d.department || d.Department_Kh || d.Department_En || '').toString().trim();
-      if (name) set.add(name);
+    for (const d of allDepts) {
+      if (d) {
+        const name = d.toString().trim();
+        if (name) set.add(name);
+      }
     }
     const list = Array.from(set).sort((a, b) => a.localeCompare(b, 'km'));
     res.json(list);
@@ -31,11 +36,13 @@ router.get('/meta/departments', requirePermission('view:employees'), async (req,
 // Distinct positions from employees.
 router.get('/meta/positions', requirePermission('view:employees'), async (req, res) => {
   try {
-    const docs = await Employee.find({}, { position: 1 }).lean();
+    const positions = await Employee.distinct('position');
     const set = new Set();
-    for (const d of docs || []) {
-      const name = (d.position || '').toString().trim();
-      if (name) set.add(name);
+    for (const d of positions) {
+      if (d) {
+        const name = d.toString().trim();
+        if (name) set.add(name);
+      }
     }
     const list = Array.from(set).sort((a, b) => a.localeCompare(b, 'km'));
     res.json(list);

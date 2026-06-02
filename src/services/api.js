@@ -136,6 +136,14 @@ export const skillAPI = {
   deleteSkill: (id) => api.delete(`/skills/${id}`)
 };
 
+// Ministry Skill API functions
+export const ministrySkillAPI = {
+  getSkills: () => api.get('/ministry-skills'),
+  createSkill: (skillData) => api.post('/ministry-skills', skillData),
+  updateSkill: (id, skillData) => api.put(`/ministry-skills/${id}`, skillData),
+  deleteSkill: (id) => api.delete(`/ministry-skills/${id}`)
+};
+
 // Shift Groups API functions
 export const shiftGroupAPI = {
   // Get all shift groups

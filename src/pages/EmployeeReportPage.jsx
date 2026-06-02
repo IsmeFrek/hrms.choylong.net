@@ -4,6 +4,7 @@ import ExcelJS from 'exceljs';
 import api from '../services/api';
 import { departmentAPI } from '../services/departmentAPI';
 import { skillAPI } from '../services/skillAPI';
+import { ministrySkillAPI } from '../services/api';
 import usePermission from '../hooks/usePermission';
 import { isExplicitlyRemoved as _isExplicitlyRemoved, hasResignData as _hasResignData, isPreparedForDeletion as _isPreparedForDeletion, isCountedActive as _isCountedActive } from '../utils/hrFilters';
 import { Bold, Indent } from 'lucide-react';
@@ -88,6 +89,11 @@ function isHospitalType(v) { const n = normOfficerType(v); return n === 'កិ�
 function isPartTimeType(v) { const n = normOfficerType(v); return n === 'កិច្ចសន្យាក្រៅម៉ោង' || n.includes('ក្រៅម៉ោង') || n.includes('part'); }
 function isWorkerType(v) { const n = normOfficerType(v); return n === 'កម្មករកិច្ចសន្យា' || n.includes('កម្មករ') || n.includes('worker'); }
 
+function isCivil(hr) {
+  if (!hr) return false;
+  return !isStateType(hr.officerType) && !isHospitalType(hr.officerType) && !isPartTimeType(hr.officerType) && !isWorkerType(hr.officerType);
+}
+
 function fmtDateLong(d) {
   if (!d) return '';
   const dt = new Date(d);
@@ -111,9 +117,11 @@ function normSkill(s) {
 
 // Move listColumns definition to top-level (outside of EmployeeReportPage) to ensure it's initialized before use
 const listColumns = [
+  { key: 'staffId', label: 'អត្តលេខកាត់', width: '80px', align: 'center' },
   { key: 'serialOverall', label: 'ស.រ', width: '35px', align: 'center' },
   { key: 'serialDept', label: 'ល.រ', width: '30px', align: 'center' },
   { key: 'name', label: 'គោត្តនាម និងនាម', width: '110px', align: 'left' },
+  { key: 'latinName', label: 'ឈ្មោះឡាតាំង', width: '120px', align: 'left' },
   { key: 'gender', label: 'ភេទ', width: '30px', align: 'center' },
   { key: 'dob', label: 'ថ្ងៃខែឆ្នាំកំណើត', width: '90px', align: 'center' },
   { key: 'salaryLevel', label: 'កាំប្រាក់', width: '55px', align: 'center' },
@@ -121,16 +129,13 @@ const listColumns = [
   { key: 'skill', label: 'ជំនាញ', width: '140px', align: 'left' },
   { key: 'position', label: 'តួនាទី', width: '140px', align: 'left' },
   { key: 'department', label: 'ផ្នែក', width: '140px', align: 'left' },
-  { key: 'staffId', label: 'អត្តលេខកាត់', width: '80px', align: 'center' },
-  { key: 'totalMonthlyAttendance', label: 'សរុបវត្តមានប្រចាំខែ', width: '80px', align: 'center' },
-  { key: 'performanceResult', label: 'លទ្ធផលការងារសម្រេចបាន', width: '120px', align: 'center' },
-  { key: 'otherNotes', label: 'ផ្សេងៗ', width: '120px', align: 'left' },
-  { key: 'latinName', label: 'ឈ្មោះឡាតាំង', width: '120px', align: 'left' },
   { key: 'phone', label: 'លេខទូរស័ព្ទ', width: '110px', align: 'center' },
   { key: 'joinDate', label: 'កាលបរិច្ឆេទចូល', width: '110px', align: 'center' },
   { key: 'birthplace', label: 'ទីកន្លែងកំណើត/បច្ចុប្បន្ន', width: '180px', align: 'left' },
   { key: 'nid', label: 'លេខអត្តសញ្ញាណ', width: '120px', align: 'center' },
+  { key: 'degree', label: 'សញ្ញាប័ត្រ', width: '120px', align: 'left' },
   { key: 'bankAccount', label: 'លេខគណនីធនាគារ', width: '140px', align: 'left' },
+  { key: 'ministrySkill', label: 'ជំនាញក្រសួង', width: '140px', align: 'left' }
 ];
 
 export default function EmployeeReportPage() {
@@ -186,11 +191,11 @@ export default function EmployeeReportPage() {
   const rowFontSize = Math.max(10, Math.round(rowHeight * 0.36));
   // Column visibility controls (persist in sessionStorage)
   const defaultColumns = {
+    staffId: true,
     serialOverall: true,
     serialDept: true,
     name: true,
     latinName: true,
-    staffId: true,
     gender: true,
     dob: true,
     salaryLevel: true,
@@ -201,18 +206,12 @@ export default function EmployeeReportPage() {
     phone: true,
     joinDate: true,
     birthplace: true,
-    totalMonthlyAttendance: true,
-    performanceResult: true,
-    otherNotes: true,
     nid: true,
+    degree: true,
     bankAccount: true,
+    ministrySkill: false
   };
-  if (perms.isAdmin || perms.canEditEmployeeReport) {
-    if (!listColumns.find(c => c.key === 'actions')) {
-      listColumns.push({ key: 'actions', label: 'កែ', width: '60px', align: 'center' });
-    }
-    defaultColumns.actions = true;
-  }
+  // The 'actions' column (កែ) is intentionally removed per user request.
   const [visibleCols, setVisibleCols] = useState(() => {
     try {
       const v = sessionStorage.getItem('employee_report_visible_cols');
@@ -234,6 +233,7 @@ export default function EmployeeReportPage() {
         dob: true,
         salaryLevel: true,
         idOrOfficerType: true,
+        ministrySkill: true,
         skill: true,
         position: true,
       };
@@ -247,6 +247,7 @@ export default function EmployeeReportPage() {
       const evaluationSet = {
         serialDept: true,
         name: true,
+        ministrySkill: true,
         skill: true,
         position: true,
         totalMonthlyAttendance: true,
@@ -268,6 +269,7 @@ export default function EmployeeReportPage() {
         dob: true,
         salaryLevel: true,
         idOrOfficerType: true, // Will show "ប្រភេទមន្ត្រី"
+        ministrySkill: true,
         skill: true,
         position: true,
       };
@@ -368,6 +370,7 @@ export default function EmployeeReportPage() {
   const [deptQuery, setDeptQuery] = useState('');
   const [showDeptList, setShowDeptList] = useState(false);
   const [skills, setSkills] = useState([]);
+  const [ministrySkills, setMinistrySkills] = useState([]);
   const [expandedSkills, setExpandedSkills] = useState(new Set());
 
   const toggleExpandSkill = (skillName) => {
@@ -384,6 +387,8 @@ export default function EmployeeReportPage() {
       return raw ? JSON.parse(raw) : [];
     } catch { return []; }
   });
+  const [isSkillGroupsLoaded, setIsSkillGroupsLoaded] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('idle');
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupNameInput, setGroupNameInput] = useState('');
   const [groupSelection, setGroupSelection] = useState(new Set());
@@ -430,9 +435,41 @@ export default function EmployeeReportPage() {
     return allSkillNames.filter(s => !excludeSet.has(s));
   }, [allSkillNames, existingGroupMembers, existingGroupMembersExcludingCurrent, selectedEditGroupIndex]);
 
+  // Load groups from backend on mount
   useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/report-settings/employee-skill-groups');
+        if (res?.data?.ok && res.data.prefs?.groups) {
+          if (Array.isArray(res.data.prefs.groups) && res.data.prefs.groups.length > 0) {
+            setSkillGroups(res.data.prefs.groups);
+          }
+        }
+      } catch (err) { /* ignore */ }
+      finally {
+        setIsSkillGroupsLoaded(true);
+      }
+    })();
+  }, []);
+
+  // Save to local storage and backend whenever skillGroups change (debounced)
+  useEffect(() => {
+    if (!isSkillGroupsLoaded) return;
     try { localStorage.setItem('employee_skill_groups', JSON.stringify(skillGroups || [])); } catch { void 0; }
-  }, [skillGroups]);
+    
+    let t = null;
+    setSaveStatus('saving');
+    t = setTimeout(() => {
+      api.post('/report-settings/employee-skill-groups', { groups: skillGroups || [], groupName: 'global' })
+        .then(() => {
+          setSaveStatus('saved');
+          setTimeout(() => setSaveStatus('idle'), 1500);
+        }).catch(() => {
+          setSaveStatus('error');
+        });
+    }, 700);
+    return () => { if (t) clearTimeout(t); };
+  }, [skillGroups, isSkillGroupsLoaded]);
 
   const toggleSelectSkillForGroup = (skillName) => {
     setGroupSelection(prev => {
@@ -496,8 +533,15 @@ export default function EmployeeReportPage() {
     skillAPI.getSkills().then(res => {
       if (!mounted) return;
       const data = res?.data || res;
-      setSkills(Array.isArray(data) ? data : []);
+      setSkills(Array.isArray(data) ? data.filter(s => !s.ministryFunction || s.ministryFunction.trim() === '') : []);
     }).catch(() => { if (mounted) setSkills([]); });
+
+    ministrySkillAPI.getSkills().then(res => {
+      if (!mounted) return;
+      const data = res?.data || res;
+      setMinistrySkills(Array.isArray(data) ? data : []);
+    }).catch(() => { if (mounted) setMinistrySkills([]); });
+
     return () => { mounted = false; };
   }, []);
 
@@ -523,25 +567,28 @@ export default function EmployeeReportPage() {
   // Determine if a record should be considered active as of a given date.
   // Active means status==='active', not deleted, joined on/before asOf and not resigned on/before asOf.
   const isActiveAsOf = (hr, asOf) => {
-    // Use shared HR filter rules so counts match HR listing
     if (!hr) return false;
-    // If explicit 'Deleted' or 'Resigned' statuses, exclude
-    const st = (hr.status || '').toString();
-    if (st === 'Deleted' || st === 'Resigned' || st === 'deleted' || st === 'resigned') return false;
+    const st = (hr.status || '').toString().toLowerCase();
+    if (st === 'deleted') return false;
+
     const asDate = parseDate(asOf);
-    // If asOf provided, exclude if explicit removal/resignation occurred on or before asOf
     if (asDate) {
       const removed = parseDate(hr.dateRemoved) || (hr.delisted && (parseDate(hr.delisted.dateRemoved) || parseDate(hr.delisted.date_removed))) || parseDate(hr.dateRemovedFromDataset) || parseDate(hr.removalDate) || null;
       if (removed && removed <= asDate) return false;
       const resign = parseDate(hr.resignDate) || parseDate(hr.resignationDate) || null;
       if (resign && resign <= asDate) return false;
+
+      // If resignation is explicitly in the future relative to asDate, they are still active
+      if (resign && resign > asDate) return true;
+      if (removed && removed > asDate) return true;
     }
-    // If record has resign/removal data and is NOT prepared-for-deletion, exclude
+
+    if (st === 'resigned') return false;
+
     const hasResign = _hasResignData(hr);
     const hasExplicitRemoval = _isExplicitlyRemoved(hr);
     const prepared = _isPreparedForDeletion(hr) && !hasExplicitRemoval;
     if (hasResign && !prepared) return false;
-    // Otherwise include (do not require status === 'active' to match HR listing semantics)
     return true;
   };
 
@@ -671,28 +718,8 @@ export default function EmployeeReportPage() {
     // apply group filter if selected
     if (selectedGroup) {
       base = base.filter(hr => {
-        const role = (hr.position || '').toString().trim();
         const deptName = (hr.Department_Kh || hr.department || '').toString().trim();
-        const isLead = (role.includes('ប្រធានការិយាល័យ') && !role.includes('អនុប្រធាន')) || role.includes('ក្ដាប់រួម');
-        
-        let virtualKey = '';
-        if (isLead) {
-          if (deptName.includes('រដ្ឋបាល')) virtualKey = 'ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក';
-          else if (deptName.includes('ហិរញ្ញវត្ថុ')) virtualKey = 'ប្រធានការិយាល័យហិរញ្ញវត្ថុ';
-          else if (deptName.includes('បច្ចេកទេស')) virtualKey = 'ប្រធានការិយាល័យបច្ចេកទេស';
-          else virtualKey = deptName; // Fallback to dept name if lead of other dept
-        } else {
-          const serviceRoles = ['បុគ្គលិកអនាម័យ', 'សន្តិសុខ', 'ផ្ទះបាយ', 'ថែសួន', 'ប្រមូលសម្រាម'];
-          if (deptName.includes('រដ្ឋបាល') && serviceRoles.some(sr => role.includes(sr))) {
-            virtualKey = 'ការិយាល័យរដ្ឋបាល និងបុគ្គលិក បុគ្គលិកអនាម័យ';
-          }
-          const techServiceRoles = ['ចំហុយសម្ភារៈ', 'ផ្នែកបោកអ៊ុត'];
-          if (deptName.includes('បច្ចេកទេស') && techServiceRoles.some(sr => role.includes(sr))) {
-            virtualKey = 'ការិយាល័យបច្ចេកទេស ចំហុយសម្ភារៈ និង ផ្នែកបោកអ៊ុត';
-          }
-          if (!virtualKey) virtualKey = deptName; // Fallback to department name for others
-        }
-        return virtualKey === selectedGroup;
+        return deptName === selectedGroup;
       });
     }
     return base;
@@ -745,35 +772,6 @@ export default function EmployeeReportPage() {
       }
       if (!key) key = '—';
 
-      // Special logic: Separate leadership roles (Heads and Deputy in Charge)
-      const role = (hr.position || '').toString().trim();
-      const deptName = (hr.Department_Kh || hr.department || '').toString().trim();
-      
-      // A leader is someone who is a Head (but not a normal deputy) or is a Deputy in Charge (ក្ដាប់រួម)
-      const isLead = (role.includes('ប្រធានការិយាល័យ') && !role.includes('អនុប្រធាន')) || 
-                     role.includes('ក្ដាប់រួម');
-
-      if (isLead) {
-        if (deptName.includes('រដ្ឋបាល')) {
-          key = 'ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក';
-        } else if (deptName.includes('ហិរញ្ញវត្ថុ')) {
-          key = 'ប្រធានការិយាល័យហិរញ្ញវត្ថុ';
-        } else if (deptName.includes('បច្ចេកទេស')) {
-          key = 'ប្រធានការិយាល័យបច្ចេកទេស';
-        }
-      } else {
-        // Special logic for Service Staff in Admin office
-        const serviceRoles = ['បុគ្គលិកអនាម័យ', 'សន្តិសុខ', 'ផ្ទះបាយ', 'ថែសួន', 'ប្រមូលសម្រាម'];
-        if (deptName.includes('រដ្ឋបាល') && serviceRoles.some(sr => role.includes(sr))) {
-          key = 'ការិយាល័យរដ្ឋបាល និងបុគ្គលិក បុគ្គលិកអនាម័យ';
-        }
-        // Special logic for Sterilization and Laundry in Technical office
-        const techServiceRoles = ['ចំហុយសម្ភារៈ', 'ផ្នែកបោកអ៊ុត'];
-        if (deptName.includes('បច្ចេកទេស') && techServiceRoles.some(sr => role.includes(sr))) {
-          key = 'ការិយាល័យបច្ចេកទេស ចំហុយសម្ភារៈ និង ផ្នែកបោកអ៊ុត';
-        }
-      }
-
       if (!by.has(key)) by.set(key, []);
       by.get(key).push(hr);
     }
@@ -803,22 +801,6 @@ export default function EmployeeReportPage() {
         if (na != null) return -1;
         if (nb != null) return 1;
         
-        // Ensure special leadership groups are at the top
-        const leadershipOrder = [
-          'ប្រធានការិយាល័យរដ្ឋបាល និងបុគ្គលិក',
-          'ប្រធានការិយាល័យហិរញ្ញវត្ថុ',
-          'ប្រធានការិយាល័យបច្ចេកទេស',
-          'ការិយាល័យរដ្ឋបាល និងបុគ្គលិក បុគ្គលិកអនាម័យ',
-          'ការិយាល័យបច្ចេកទេស ចំហុយសម្ភារៈ និង ផ្នែកបោកអ៊ុត'
-        ];
-        
-        const idxA = leadershipOrder.indexOf(depA);
-        const idxB = leadershipOrder.indexOf(depB);
-        
-        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-        if (idxA !== -1) return -1;
-        if (idxB !== -1) return 1;
-
         return depA.localeCompare(depB, 'km');
       })
       .map(([dept, items]) => ({ dept, items: items.sort((x, y) => (x.no || 0) - (y.no || 0)) }));
@@ -1096,7 +1078,7 @@ export default function EmployeeReportPage() {
   const technicalSummary = useMemo(() => {
     const label = (v) => (v && String(v).trim()) || 'មិនបានកំណត់';
 
-    const hrSkillNormOf = (hr) => normSkill(hr.skill || hr.technicalRole || hr.specialty || '');
+    const hrSkillNormOf = (hr) => normSkill(hr.skill || '');
     // Respect as-of semantics when computing technical summary so resigned/deleted are excluded
     const sourceList = (list || []).filter(hr => (includeArchived ? isIncludedAsOf(hr, asOfDate) : isActiveAsOf(hr, asOfDate)));
 
@@ -1119,6 +1101,7 @@ export default function EmployeeReportPage() {
         const skillName = (skill.skills_Kh || '').toString();
         const skillNorm = normSkill(skillName);
         if (!skillNorm) continue;
+        if (processedSkills.has(skillNorm)) continue;
 
         if (memberToGroup.has(skillNorm)) {
           const gi = memberToGroup.get(skillNorm);
@@ -1130,7 +1113,7 @@ export default function EmployeeReportPage() {
               const hs = hrSkillNormOf(hr);
               if (!hs) continue;
               if (!groupSet.has(hs)) continue;
-              if (hr.civilServantId) civil++; else contract++;
+              if (isCivil(hr)) civil++; else contract++;
               if (hr.gender === 'Male' || hr.gender === 'ប្រុស') male++;
               else if (hr.gender === 'Female' || hr.gender === 'ស្រី') female++;
             }
@@ -1147,7 +1130,7 @@ export default function EmployeeReportPage() {
           const hs = hrSkillNormOf(hr);
           if (!hs) continue;
           if (hs !== skillNorm) continue;
-          if (hr.civilServantId) civil++; else contract++;
+          if (isCivil(hr)) civil++; else contract++;
           if (hr.gender === 'Male' || hr.gender === 'ប្រុស') male++;
           else if (hr.gender === 'Female' || hr.gender === 'ស្រី') female++;
         }
@@ -1166,7 +1149,7 @@ export default function EmployeeReportPage() {
           if (!hs) continue;
           if (!groupSet.has(hs)) continue;
           groupHasMembersInData = true;
-          if (hr.civilServantId) civil++; else contract++;
+          if (isCivil(hr)) civil++; else contract++;
           if (hr.gender === 'Male' || hr.gender === 'ប្រុស') male++;
           else if (hr.gender === 'Female' || hr.gender === 'ស្រី') female++;
           processedSkills.add(hs); // Mark members as processed
@@ -1182,18 +1165,26 @@ export default function EmployeeReportPage() {
       let hasOthers = false;
       for (const hr of sourceList || []) {
         const hs = hrSkillNormOf(hr);
-        if (!hs) continue;
-        if (processedSkills.has(hs)) continue;
-        if (memberToGroup.has(hs)) continue; // Should have been caught by group loop above
+        if (hs && processedSkills.has(hs)) continue;
+        if (hs && memberToGroup.has(hs)) continue; // Should have been caught by group loop above
 
         hasOthers = true;
-        if (hr.civilServantId) otherCivil++; else otherContract++;
+        if (isCivil(hr)) otherCivil++; else otherContract++;
         if (hr.gender === 'Male' || hr.gender === 'ប្រុស') otherMale++;
         else if (hr.gender === 'Female' || hr.gender === 'ស្រី') otherFemale++;
       }
 
       if (hasOthers) {
-        rows.unshift({ name: 'ផ្សេងៗ', male: otherMale, female: otherFemale, total: otherMale + otherFemale, civil: otherCivil, contract: otherContract, isGroup: false });
+        const existingOther = rows.find(r => r.name === 'ផ្សេងៗ');
+        if (existingOther) {
+          existingOther.male += otherMale;
+          existingOther.female += otherFemale;
+          existingOther.total += (otherMale + otherFemale);
+          existingOther.civil += otherCivil;
+          existingOther.contract += otherContract;
+        } else {
+          rows.push({ name: 'ផ្សេងៗ', male: otherMale, female: otherFemale, total: otherMale + otherFemale, civil: otherCivil, contract: otherContract, isGroup: false });
+        }
       }
 
       const totals = rows.reduce((acc, r) => ({
@@ -1210,10 +1201,10 @@ export default function EmployeeReportPage() {
     // Fallback: derive skills from existing HR list and sort by Khmer name, include civil/contract counts
     const rowsMap = new Map();
     for (const hr of sourceList || []) {
-      const key = label(hr.civilServantRole || hr.technicalRole || hr.skill || hr.specialty);
+      const key = label(hr.skill);
       if (!rowsMap.has(key)) rowsMap.set(key, { name: key, male: 0, female: 0, civil: 0, contract: 0 });
       const row = rowsMap.get(key);
-      if (hr.civilServantId) row.civil += 1; else row.contract += 1;
+      if (isCivil(hr)) row.civil += 1; else row.contract += 1;
       if (hr.gender === 'Male' || hr.gender === 'ប្រុស') row.male += 1;
       else if (hr.gender === 'Female' || hr.gender === 'ស្រី') row.female += 1;
     }
@@ -1228,13 +1219,97 @@ export default function EmployeeReportPage() {
     return { rows, totals };
   }, [list, skills, skillGroups, asOfDate, includeArchived, isIncludedAsOf, isActiveAsOf]);
 
+  const ministryTechnicalSummary = useMemo(() => {
+    const label = (v) => (v && String(v).trim()) || 'មិនបានកំណត់';
+    const hrMinistrySkillNormOf = (hr) => normSkill(hr.civilServantRole || '');
+    const sourceList = (list || []).filter(hr => (includeArchived ? isIncludedAsOf(hr, asOfDate) : isActiveAsOf(hr, asOfDate)));
+
+    if (ministrySkills && Array.isArray(ministrySkills) && ministrySkills.length > 0) {
+      const rows = [];
+      const processedSkills = new Set();
+      
+      for (const skill of ministrySkills) {
+        const skillName = (skill.ministryFunction || '').toString();
+        const skillNorm = normSkill(skillName);
+        if (!skillNorm) continue;
+        if (processedSkills.has(skillNorm)) continue;
+
+        let male = 0, female = 0, civil = 0, contract = 0;
+        for (const hr of sourceList || []) {
+          const hs = hrMinistrySkillNormOf(hr);
+          if (!hs) continue;
+          if (hs !== skillNorm) continue;
+          if (isCivil(hr)) civil++; else contract++;
+          if (hr.gender === 'Male' || hr.gender === 'ប្រុស') male++;
+          else if (hr.gender === 'Female' || hr.gender === 'ស្រី') female++;
+        }
+        rows.push({ name: skillName, male, female, total: male + female, civil, contract, skills_Id: skill.skills_Id || skill.ID_skills, skills_En: skill.amount });
+        processedSkills.add(skillNorm);
+      }
+
+      let otherMale = 0, otherFemale = 0, otherCivil = 0, otherContract = 0;
+      let hasOthers = false;
+      for (const hr of sourceList || []) {
+        const hs = hrMinistrySkillNormOf(hr);
+        if (hs && processedSkills.has(hs)) continue;
+
+        hasOthers = true;
+        if (isCivil(hr)) otherCivil++; else otherContract++;
+        if (hr.gender === 'Male' || hr.gender === 'ប្រុស') otherMale++;
+        else if (hr.gender === 'Female' || hr.gender === 'ស្រី') otherFemale++;
+      }
+
+      if (hasOthers) {
+        const existingOther = rows.find(r => r.name === 'ផ្សេងៗ');
+        if (existingOther) {
+          existingOther.male += otherMale;
+          existingOther.female += otherFemale;
+          existingOther.total += (otherMale + otherFemale);
+          existingOther.civil += otherCivil;
+          existingOther.contract += otherContract;
+        } else {
+          rows.push({ name: 'ផ្សេងៗ', male: otherMale, female: otherFemale, total: otherMale + otherFemale, civil: otherCivil, contract: otherContract, isGroup: false });
+        }
+      }
+      
+      const totals = rows.reduce((acc, r) => ({
+        male: acc.male + (r.male || 0),
+        female: acc.female + (r.female || 0),
+        total: acc.total + (r.total || 0),
+        civil: (acc.civil || 0) + (r.civil || 0),
+        contract: (acc.contract || 0) + (r.contract || 0),
+      }), { male: 0, female: 0, total: 0, civil: 0, contract: 0 });
+
+      return { rows, totals };
+    }
+
+    const rowsMap = new Map();
+    for (const hr of sourceList || []) {
+      const key = label(hr.civilServantRole);
+      if (!rowsMap.has(key)) rowsMap.set(key, { name: key, male: 0, female: 0, civil: 0, contract: 0 });
+      const row = rowsMap.get(key);
+      if (isCivil(hr)) row.civil += 1; else row.contract += 1;
+      if (hr.gender === 'Male' || hr.gender === 'ប្រុស') row.male += 1;
+      else if (hr.gender === 'Female' || hr.gender === 'ស្រី') row.female += 1;
+    }
+    const rows = Array.from(rowsMap.values()).map(r => ({ ...r, total: r.male + r.female })).sort((a, b) => a.name.localeCompare(b.name, 'km'));
+    const totals = rows.reduce((acc, r) => ({
+      male: acc.male + r.male,
+      female: acc.female + r.female,
+      total: acc.total + r.total,
+      civil: acc.civil + (r.civil || 0),
+      contract: acc.contract + (r.contract || 0),
+    }), { male: 0, female: 0, total: 0, civil: 0, contract: 0 });
+    return { rows, totals };
+  }, [list, ministrySkills, asOfDate, includeArchived, isIncludedAsOf, isActiveAsOf]);
+
   // total technical staff for the hospital (active as-of unless `includeArchived`)
   const hospitalTechnicalTotal = useMemo(() => {
     try {
       const asOf = asOfDate;
       const active = list.filter(hr => (includeArchived ? isIncludedAsOf(hr, asOf) : isActiveAsOf(hr, asOf)));
       const tech = active.filter(hr => {
-        const s = normSkill(hr.skill || hr.technicalRole || hr.specialty || '');
+        const s = normSkill(hr.skill || '');
         return !!s;
       });
       const seen = new Set();
@@ -1254,7 +1329,8 @@ export default function EmployeeReportPage() {
   // Dynamic title per report type
   const computedTitle = useMemo(() => {
     if (reportType === 'total') return 'ចំនួនបុគ្គលិកសរុប នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត';
-    if (reportType === 'technical') return 'ចំនួនសរុបជំនាញបច្ចេកទេស នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត';
+    if (reportType === 'technical') return 'របាយការណ៍ជំនាញមន្ទីរពេទ្យ នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត';
+    if (reportType === 'ministryTechnical') return 'របាយការណ៍ជំនាញក្រសួង នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត';
     if (reportType === 'allhr') return 'បញ្ជីរាយនាម បុគ្គលិក នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត';
     if (reportType === 'civil') return 'បញ្ជីរាយនាម មន្រ្តីរាជការ នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត';
     if (reportType === 'state') return 'បញ្ជីរាយនាម បុគ្គលិកកិច្ចសន្យារដ្ឋ នៃមន្ទីរពេទ្យមិត្តភាពខ្មែរ-សូវៀត';
@@ -1276,6 +1352,7 @@ export default function EmployeeReportPage() {
     try {
       if (reportType === 'total') return grandSummary.all || { total: 0, male: 0, female: 0 };
       if (reportType === 'technical') return (technicalSummary && technicalSummary.totals) ? technicalSummary.totals : { total: 0, male: 0, female: 0 };
+      if (reportType === 'ministryTechnical') return (ministryTechnicalSummary && ministryTechnicalSummary.totals) ? ministryTechnicalSummary.totals : { total: 0, male: 0, female: 0 };
       if (reportType === 'civil') return grandSummary.civil || { total: 0, male: 0, female: 0 };
       if (reportType === 'state') return grandSummary.state || { total: 0, male: 0, female: 0 };
       if (reportType === 'hospital') return grandSummary.hospital || { total: 0, male: 0, female: 0 };
@@ -1436,6 +1513,30 @@ export default function EmployeeReportPage() {
 
   const handlePrint = () => {
     if (!printRef.current) return;
+
+    // Synchronize input and select values to DOM attributes so innerHTML captures them
+    const inputs = printRef.current.querySelectorAll('input, textarea');
+    inputs.forEach(input => {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        if (input.checked) input.setAttribute('checked', 'checked');
+        else input.removeAttribute('checked');
+      } else {
+        input.setAttribute('value', input.value);
+      }
+    });
+
+    const selects = printRef.current.querySelectorAll('select');
+    selects.forEach(select => {
+      const options = select.querySelectorAll('option');
+      options.forEach(option => {
+        if (option.value === select.value) {
+          option.setAttribute('selected', 'selected');
+        } else {
+          option.removeAttribute('selected');
+        }
+      });
+    });
+
     const w = window.open('', '_blank');
     if (!w) return;
     const pageSize = (orientation === 'landscape') ? 'A4 landscape' : 'A4';
@@ -1464,9 +1565,8 @@ export default function EmployeeReportPage() {
   .a4-portrait { width: 210mm; min-height: 297mm; padding: 10mm; box-sizing: border-box; background: #fff; }
   .a4-landscape { width: 297mm; min-height: 210mm; padding: 10mm; box-sizing: border-box; background: #fff; }
   /* Dynamic row height / padding overrides - allow wrapping for multi-line cells */
-  .print-scope tbody tr { min-height: ${rowHeight}px; }
-  .print-scope tbody tr > td, .print-scope tbody tr > th { vertical-align: middle !important; white-space: normal !important; overflow: visible !important; text-overflow: unset !important; }
-  .print-scope th, .print-scope td { padding: ${Math.max(6, Math.round(rowHeight / 4))}px ${Math.max(4, Math.round(rowHeight / 8))}px !important; line-height: ${Math.max(12, Math.round(rowHeight * 0.6))}px !important; }
+  .print-scope tbody tr:not(.section-row) { height: ${rowHeight}px; }
+  .print-scope tbody td { padding: ${Math.round(rowHeight / 6)}px 2px !important; line-height: ${Math.max(10, Math.round(rowHeight * 0.6))}px !important; }
       </style>
     `;
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"/>${PRINT_STYLES}</head><body>${printRef.current.innerHTML}</body></html>`);
@@ -1682,6 +1782,53 @@ export default function EmployeeReportPage() {
         </table>
       );
     }
+    if (reportType === 'ministryTechnical') {
+      return (
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '40px' }}>ល.រ</th>
+              <th>ជំនាញក្រសួង</th>
+              <th className="center">មន្រ្តីរាជការ</th>
+              <th className="center">មន្រ្តីកិច្ចសន្យា</th>
+              <th className="center">សរុប</th>
+              <th className="center">ប្រុស</th>
+              <th className="center">ស្រី</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ministryTechnicalSummary.rows.length === 0 && (
+              <tr>
+                <td colSpan={7} className="center text-gray-600">មិនមានទិន្នន័យ</td>
+              </tr>
+            )}
+            {ministryTechnicalSummary.rows.map((r, idx) => (
+              <tr key={r.name || idx}>
+                <td className="center">{toKhmerDigits(idx + 1)}</td>
+                <td style={{ textAlign: 'left' }}>{r.name}</td>
+                <td className="center">{toKhmerDigits(r.civil || 0)}</td>
+                <td className="center">{toKhmerDigits(r.contract || 0)}</td>
+                <td className="center">{toKhmerDigits(r.total || 0)}</td>
+                <td className="center">{toKhmerDigits(r.male || 0)}</td>
+                <td className="center">{toKhmerDigits(r.female || 0)}</td>
+              </tr>
+            ))}
+            {ministryTechnicalSummary.rows.length > 0 && (
+              <>
+                <tr>
+                  <td colSpan={2} style={{ textAlign: 'center', fontWeight: 700 }}>សរុប </td>
+                  <td className="center" style={{ fontWeight: 700 }}>{toKhmerDigits(ministryTechnicalSummary.totals.civil || 0)}</td>
+                  <td className="center" style={{ fontWeight: 700 }}>{toKhmerDigits(ministryTechnicalSummary.totals.contract || 0)}</td>
+                  <td className="center" style={{ fontWeight: 700 }}>{toKhmerDigits(ministryTechnicalSummary.totals.total || 0)}</td>
+                  <td className="center" style={{ fontWeight: 700 }}>{toKhmerDigits(ministryTechnicalSummary.totals.male || 0)}</td>
+                  <td className="center" style={{ fontWeight: 700 }}>{toKhmerDigits(ministryTechnicalSummary.totals.female || 0)}</td>
+                </tr>
+              </>
+            )}
+          </tbody>
+        </table>
+      );
+    }
     if (reportType === 'evaluation') {
       const evalOrder = ['serialDept', 'name', 'skill', 'position', 'totalMonthlyAttendance', 'performanceResult', 'otherNotes', 'staffId'];
       const visibleListCols = evalOrder
@@ -1754,7 +1901,7 @@ export default function EmployeeReportPage() {
                         return <td key={c.key} style={{ textAlign: 'left', paddingLeft: '12px' }}>{r.khmerName || r.name || ''}</td>;
                       }
                       if (c.key === 'skill') {
-                        return <td key={c.key} style={{ textAlign: 'left' }}>{r.skill || r.technicalRole || ''}</td>;
+                        return <td key={c.key} style={{ textAlign: 'left' }}>{r.skill || ''}</td>;
                       }
                       if (c.key === 'position') {
                         return <td key={c.key} style={{ textAlign: 'left' }}>{r.position || ''}</td>;
@@ -1893,9 +2040,11 @@ export default function EmployeeReportPage() {
                       const displayVal = isContract ? (r.officerType || '') : (r.civilServantId || r.officerId || r.staffId || r.idCardNumber || r.officerCardNumber || r.cardNumber || '');
                       return <td key={c.key} className="center">{displayVal}</td>;
                     }
+                    if (c.key === 'ministrySkill') {
+                      return <td key={c.key} style={{ textAlign: 'left' }}>{r.civilServantRole || ''}</td>;
+                    }
                     if (c.key === 'skill') {
-                      const skillVal = r.skill || r.technicalRole || r.civilServantRole || r.specialty || '';
-                      return <td key={c.key} style={{ textAlign: 'left' }}>{skillVal}</td>;
+                      return <td key={c.key} style={{ textAlign: 'left' }}>{r.skill || ''}</td>;
                     }
                     if (c.key === 'position') {
                       return <td key={c.key} style={{ textAlign: 'left' }}>{r.position || ''}</td>;
@@ -1960,6 +2109,9 @@ export default function EmployeeReportPage() {
                     if (c.key === 'nid') {
                       return <td key={c.key} className="center">{r.nid || r.nationalId || r.identityNumber || r.identity || ''}</td>;
                     }
+                    if (c.key === 'degree') {
+                      return <td key={c.key} style={{ textAlign: 'left' }}>{r.degree || r.education || r.certificate || ''}</td>;
+                    }
                     if (c.key === 'bankAccount') {
                       return <td key={c.key} style={{ textAlign: 'left' }}>{r.bankAccount || r.bank_account || r.bank || ''}</td>;
                     }
@@ -1999,9 +2151,11 @@ export default function EmployeeReportPage() {
 
       // 1. Define column structure
       const listColumnsLocal = [
+        { key: 'staffId', label: 'អត្តលេខកាត់', width: 15 },
         { key: 'serialOverall', label: 'ស.រ', width: 5.7 },
         { key: 'serialDept', label: 'ល.រ', width: 4.7 },
         { key: 'name', label: 'គោត្តនាម និងនាម', width: 17.1 },
+        { key: 'latinName', label: 'ឈ្មោះឡាតាំង', width: 20 },
         { key: 'gender', label: 'ភេទ', width: 4.8 },
         { key: 'dob', label: 'ថ្ងៃខែឆ្នាំកំណើត', width: 15.3 },
         { key: 'salaryLevel', label: 'កាំប្រាក់', width: 9.1 },
@@ -2009,16 +2163,13 @@ export default function EmployeeReportPage() {
         { key: 'skill', label: 'ជំនាញ', width: 26.7 },
         { key: 'position', label: 'តួនាទី', width: 26.1 },
         { key: 'department', label: 'ផ្នែក', width: 25 },
-        { key: 'staffId', label: 'អត្តលេខកាត់', width: 15 },
-        { key: 'totalMonthlyAttendance', label: 'សរុបវត្តមានប្រចាំខែ', width: 15 },
-        { key: 'performanceResult', label: 'លទ្ធផលការងារសម្រេចបាន', width: 20 },
-        { key: 'otherNotes', label: 'ផ្សេងៗ', width: 20 },
-        { key: 'latinName', label: 'ឈ្មោះឡាតាំង', width: 20 },
         { key: 'phone', label: 'លេខទូរស័ព្ទ', width: 15 },
         { key: 'joinDate', label: 'កាលបរិច្ឆេទចូល', width: 15 },
         { key: 'birthplace', label: 'ទីកន្លែងកំណើត/បច្ចុប្បន្ន', width: 30 },
         { key: 'nid', label: 'លេខអត្តសញ្ញាណ', width: 15 },
-        { key: 'bankAccount', label: 'លេខគណនីធនាគារ', width: 20 }
+        { key: 'degree', label: 'សញ្ញាប័ត្រ', width: 15 },
+        { key: 'bankAccount', label: 'លេខគណនីធនាគារ', width: 20 },
+        { key: 'ministrySkill', label: 'ជំនាញក្រសួង', width: 20 }
       ];
 
       const civilCols = [
@@ -2151,9 +2302,15 @@ export default function EmployeeReportPage() {
               const isContract = ['state', 'hospital', 'worker', 'hospitalPlus', 'hospitalPartTime', 'retiredThenContract'].includes(reportType);
               return isContract ? (hr.officerType || '') : (hr.civilServantId || hr.officerId || hr.staffId || hr.idCardNumber || hr.officerCardNumber || hr.cardNumber || '');
             }
-            if (k === 'skill') return hr.skill || hr.technicalRole || '';
+            if (k === 'ministrySkill') return hr.civilServantRole || '';
+            if (k === 'skill') return hr.skill || '';
             if (k === 'position') return hr.position || '';
             if (k === 'department') return hr.Department_Kh || hr.department || hr.unit || '';
+            if (k === 'phone') return hr.phone || hr.mobile || hr.tel || hr.contact || '';
+            if (k === 'joinDate') return fmtDateSlash(hr.joinDate || hr.dateJoinedMinistry || hr.nominationStartDate || hr.startDate || '');
+            if (k === 'birthplace') return hr.placeOfBirth || hr.birthPlace || hr.currentAddress || hr.address || '';
+            if (k === 'nid') return hr.nid || hr.nationalId || hr.identityNumber || hr.identity || '';
+            if (k === 'degree') return hr.degree || hr.education || hr.certificate || '';
             if (k === 'bankAccount') return hr.bankAccount || '';
             if (k === 'grant') {
               const grantVal = hr.grantAmount || hr.bonus || hr.allowance || '';
@@ -2301,7 +2458,7 @@ export default function EmployeeReportPage() {
             >បង្កើតក្រុមជំនាញ</button>
             <button
               type="button"
-              onClick={() => exportToExcel(filteredList, computedTitle)}
+              onClick={handleExportExcel}
               style={{ padding: '8px 16px', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
             >នាំចេញ Excel</button>
             <button
@@ -2348,7 +2505,8 @@ export default function EmployeeReportPage() {
             <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>ប្រភេទ:</label>
             <select value={reportType} onChange={(e) => setReportType(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '12px', background: '#fff', minWidth: '150px' }}>
               <option value="total">សរុបបុគ្គលិក</option>
-              <option value="technical">ជំនាញបច្ចេកទេស</option>
+              <option value="ministryTechnical">របាយការណ៍ជំនាញក្រសួង</option>
+              <option value="technical">របាយការណ៍ជំនាញមន្ទីរពេទ្យ</option>
               <option value="civil">មន្ត្រីរាជការ</option>
               <option value="state">កិច្ចសន្យារដ្ឋ</option>
               <option value="hospital">កិច្ចសន្យាមន្ទីរពេទ្យ</option>
@@ -2410,18 +2568,18 @@ export default function EmployeeReportPage() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '4px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <label style={{ fontSize: '10px', color: '#94a3b8', textAlign: 'center' }}>Row Height</label>
-              <input type="range" min={20} max={60} value={rowHeight} onChange={(e) => setRowHeight(Number(e.target.value))} style={{ width: '80px' }} />
+              <label style={{ fontSize: '10px', color: '#94a3b8', textAlign: 'center' }}>Row Height: {rowHeight}px</label>
+              <input type="range" min={0} max={60} value={rowHeight} onChange={(e) => setRowHeight(Number(e.target.value))} style={{ width: '80px' }} />
             </div>
             <div style={{ position: 'relative' }}>
               <button type="button" onClick={() => setShowColsMenu(v => !v)} style={{ padding: '6px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Columns</button>
               {showColsMenu && (
-                <div style={{ position: 'absolute', right: 0, bottom: '100%', marginBottom: '8px', background: '#fff', border: '1px solid #ddd', padding: '12px', minWidth: '200px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 100, borderRadius: '8px' }}>
+                <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '8px', background: '#fff', border: '1px solid #ddd', padding: '12px', minWidth: '200px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 100, borderRadius: '8px' }}>
                   <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
                     {Object.keys(defaultColumns).map(k => (
                       <label key={k} style={{ display: 'flex', alignItems: 'center', fontSize: '11px', marginBottom: '6px', cursor: 'pointer' }}>
                         <input type="checkbox" checked={!!visibleCols[k]} onChange={() => toggleCol(k)} style={{ marginRight: '8px' }} />
-                        {({ serialOverall: 'ស.រ', serialDept: 'ល.រ', name: 'ឈ្មោះ', staffId: 'អត្តលេខ', gender: 'ភេទ', dob: 'ថ្ងៃកំណើត', salaryLevel: 'កាំប្រាក់', skill: 'ជំនាញ', position: 'តួនាទី', department: 'ផ្នែក', phone: 'ទូរស័ព្ទ' }[k] || k)}
+                        {({ serialOverall: 'ស.រ', serialDept: 'ល.រ', name: 'ឈ្មោះ', latinName: 'ឈ្មោះឡាតាំង', staffId: 'អត្តលេខ', gender: 'ភេទ', dob: 'ថ្ងៃកំណើត', salaryLevel: 'កាំប្រាក់', idOrOfficerType: 'អត្តលេខមន្ត្រី', skill: 'ជំនាញ', position: 'តួនាទី', department: 'ផ្នែក', phone: 'ទូរស័ព្ទ', joinDate: 'កាលបរិច្ឆេទចូល', birthplace: 'ទីកន្លែងកំណើត/បច្ចុប្បន្ន', nid: 'លេខអត្តសញ្ញាណ', degree: 'សញ្ញាប័ត្រ', bankAccount: 'លេខគណនីធនាគារ', ministrySkill: 'ជំនាញក្រសួង' }[k] || k)}
                       </label>
                     ))}
                   </div>
@@ -2441,7 +2599,7 @@ export default function EmployeeReportPage() {
         <div ref={printRef} className="bg-white p-4 border rounded print-scope a4-portrait">
           {/* Screen-only style to match print layout */}
           <style dangerouslySetInnerHTML={{ __html: SCREEN_CSS }} />
-          <style>{`.print-scope tbody tr { min-height: ${rowHeight}px; }
+          <style>{`.print-scope tbody tr:not(.section-row) { height: ${rowHeight}px; }
             .print-scope thead tr > th {
               position: sticky;
               top: ${filterHeight - 24}px;
@@ -2460,7 +2618,7 @@ export default function EmployeeReportPage() {
               width: 100%;
               transform-origin: left center;
             }
-            .print-scope th, .print-scope td { padding: ${Math.max(6, Math.round(rowHeight / 4))}px ${Math.max(4, Math.round(rowHeight / 8))}px !important; line-height: ${Math.max(12, Math.round(rowHeight * 0.6))}px !important; }
+            .print-scope tbody td { padding: ${Math.round(rowHeight / 6)}px 2px !important; line-height: ${Math.max(10, Math.round(rowHeight * 0.6))}px !important; }
             `}</style>
           <div className="title">
             <h2 style={{ marginBottom: 0 }}>
@@ -2551,7 +2709,7 @@ export default function EmployeeReportPage() {
                 សំគាល់៖
               </div>
               <div style={{ fontSize: '12px', fontFamily: '"Khmer OS Siemreap","Noto Serif Khmer", serif', paddingLeft: '10px', lineHeight: '1.6' }}>
-                ១. វឌ្ឍនការងារ៖ ល្អ (≥៨៥%-១០០%), ល្អបង្គួរ (≥៦៥%-{"<"}៨៥%), មធ្យម (≥៤៥%-{"<"}៦៥%), ខ្សោយ ({"<"}៤៥%)<br />
+                ១. វត្តមានការងារ៖ ល្អ (≥៨៥%-១០០%), ល្អបង្គួរ (≥៦៥%-{"<"}៨៥%), មធ្យម (≥៤៥%-{"<"}៦៥%), ខ្សោយ ({"<"}៤៥%)<br />
                 ២. ការផ្តល់ប្រាក់លើកទឹកចិត្ត៖ ល្អ (១០០%), ល្អបង្គួរ (៧៥%), មធ្យម (៥០%), ខ្សោយ (០%)
               </div>
             </div>

@@ -51,7 +51,6 @@ import AttendancePage from './pages/AttendancePage';
 import AttendanceReportPage from './pages/AttendanceReportPage';
 import WorkCalendarPage from './pages/WorkCalendarPage';
 import WorkSchedulePage from './pages/WorkSchedulePage';
-import WorkSchedule1Page from './pages/WorkSchedule1Page';
 import AttendanceMonthlyDataPage from './pages/AttendanceMonthlyDataPage';
 import AttendancesumDayPage from './pages/AttendancesumDayPage';
 import AttendanceDayAttendanceDataPage from './pages/AttendanceDayAttendanceDataPage';
@@ -106,6 +105,7 @@ import MobileScanPage from './pages/MobileScanPage.jsx';
 import MobileFaceEnrollPage from './pages/MobileFaceEnrollPage.jsx';
 import GeoFencePoliciesPage from './pages/GeoFencePoliciesPage.jsx';
 import KamprakPage from './pages/KamprakPage.jsx';
+import BudgetReportPage from './pages/BudgetReportPage.jsx';
 import StaffBiographyPage from './pages/StaffBiographyPage.jsx';
 import TelegramPage from './pages/TelegramPage.jsx';
 import TelegramMiniApp from './pages/TelegramMiniApp.jsx';
@@ -114,6 +114,7 @@ import SystemSettingsPage from './pages/SystemSettingsPage.jsx';
 import PublicStaffProfile from './pages/PublicStaffProfile.jsx';
 import EmployeeIDDocsPage from './pages/EmployeeIDDocsPage.jsx';
 import EmployeeOtherDocsPage from './pages/EmployeeOtherDocsPage.jsx';
+import PayrollPage from './pages/PayrollPage.jsx';
 
 function RequireAuth({ children }) {
   const { isAuthenticated } = useAuth();
@@ -212,16 +213,6 @@ function WorkScheduleRoute() {
   );
 }
 
-// Small wrapper for WorkSchedule1Page
-function WorkSchedule1Route() {
-  const perms = usePermission();
-  return (
-    <PermissionGate allow={perms.canViewWorkSchedule}>
-      <WorkSchedule1Page />
-    </PermissionGate>
-  );
-}
-
 // Small wrapper for shifts route
 function ShiftsRoute() {
   const perms = usePermission();
@@ -270,6 +261,33 @@ function GeoFencePoliciesRoute() {
 }
 
 // Protected shell: everything that should only render AFTER login
+function StaffBiographyRoute() {
+  const perms = usePermission();
+  return (
+    <PermissionGate allow={perms.canViewStaffBiography}>
+      <StaffBiographyPage />
+    </PermissionGate>
+  );
+}
+
+function MeetingRoomsRoute() {
+  const perms = usePermission();
+  return (
+    <PermissionGate allow={perms.canViewMeetingRooms}>
+      <MeetingRoomPage />
+    </PermissionGate>
+  );
+}
+
+function MeetingRoomsV2Route() {
+  const perms = usePermission();
+  return (
+    <PermissionGate allow={perms.canViewMeetingRooms}>
+      <MeetingRoomV2Page />
+    </PermissionGate>
+  );
+}
+
 function ProtectedApp() {
   const perms = usePermission();
   const { user } = useAuth();
@@ -403,12 +421,6 @@ function ProtectedApp() {
             <WorkSchedulePage />
           </PermissionGate>
         );
-      case 'work-schedule1':
-        return (
-          <PermissionGate allow={perms.canViewAbsence}>
-            <WorkSchedule1Page />
-          </PermissionGate>
-        );
       case 'group-timetables':
         return (
           <PermissionGate allow={perms.canViewWorkSchedule}>
@@ -425,6 +437,12 @@ function ProtectedApp() {
         return (
           <PermissionGate allow={perms.canViewEmployeeReport}>
             <EmployeeReportPage />
+          </PermissionGate>
+        );
+      case 'payroll':
+        return (
+          <PermissionGate allow={perms.canViewEmployeeReport || perms.isAdmin}>
+            <PayrollPage />
           </PermissionGate>
         );
       case 'employee-id-docs':
@@ -628,7 +646,7 @@ function ProtectedApp() {
         );
       case 'instruction-letters':
         return (
-          <PermissionGate allow={perms.canViewDocuments}>
+          <PermissionGate allow={perms.canViewResignationLetter || perms.canViewOnboardingLetter || perms.canViewAppointmentLetter || perms.canViewTerminationLetter || perms.canViewOtherLetters || perms.canViewDocuments}>
             <InstructionLetterPage />
           </PermissionGate>
         );
@@ -643,9 +661,17 @@ function ProtectedApp() {
           </PermissionGate>
         );
       case 'meeting-rooms':
-        return <MeetingRoomPage />;
+        return (
+          <PermissionGate allow={perms.canViewMeetingRooms}>
+            <MeetingRoomPage />
+          </PermissionGate>
+        );
       case 'meeting-rooms-v2':
-        return <MeetingRoomV2Page />;
+        return (
+          <PermissionGate allow={perms.canViewMeetingRooms}>
+            <MeetingRoomV2Page />
+          </PermissionGate>
+        );
       case 'department-report':
         return (
           <div className="p-6">
@@ -692,7 +718,9 @@ function ProtectedApp() {
         );
       case 'staff-biography':
         return (
-          <StaffBiographyPage />
+          <PermissionGate allow={perms.canViewStaffBiography}>
+            <StaffBiographyPage />
+          </PermissionGate>
         );
       default:
         return <Dashboard />;
@@ -747,7 +775,6 @@ export default function App() {
           <Route path="/newpage" element={<RequireAuth><NewDocumentPage /></RequireAuth>} />
           <Route path="/work-calendar" element={<RequireAuth><LayoutWrapper section="work-calendar"><WorkCalendarRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/work-schedule" element={<RequireAuth><LayoutWrapper section="work-schedule"><WorkScheduleRoute /></LayoutWrapper></RequireAuth>} />
-          <Route path="/work-schedule1" element={<RequireAuth><LayoutWrapper section="work-schedule1"><WorkSchedule1Route /></LayoutWrapper></RequireAuth>} />
           <Route path="/shifts" element={<RequireAuth><LayoutWrapper section="shifts"><ShiftsRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/shift-groups" element={<RequireAuth><LayoutWrapper section="shift-groups"><ShiftGroupsRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/group-timetables" element={<RequireAuth><LayoutWrapper section="group-timetables"><GroupTimetablesRoute /></LayoutWrapper></RequireAuth>} />
@@ -764,8 +791,9 @@ export default function App() {
           <Route path="/file-transfer-outgoing" element={<RequireAuth><LayoutWrapper section="file-transfer-outgoing"><FileTransferPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/missions" element={<RequireAuth><LayoutWrapper section="missions"><MissionsRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/kamprak" element={<RequireAuth><LayoutWrapper section="kamprak"><KamprakPage /></LayoutWrapper></RequireAuth>} />
-          <Route path="/staff-biography" element={<RequireAuth><LayoutWrapper section="staff-biography"><StaffBiographyPage /></LayoutWrapper></RequireAuth>} />
-          <Route path="/staff-biography/:id" element={<RequireAuth><LayoutWrapper section="staff-biography"><StaffBiographyPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/budget-report" element={<RequireAuth><LayoutWrapper section="budget-report"><BudgetReportPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/staff-biography" element={<RequireAuth><LayoutWrapper section="staff-biography"><StaffBiographyRoute /></LayoutWrapper></RequireAuth>} />
+          <Route path="/staff-biography/:id" element={<RequireAuth><LayoutWrapper section="staff-biography"><StaffBiographyRoute /></LayoutWrapper></RequireAuth>} />
           <Route path="/file-transfer-stats" element={<RequireAuth><LayoutWrapper section="file-transfer-stats"><FileTransferStats /></LayoutWrapper></RequireAuth>} />
           <Route path="/send-feedback" element={<RequireAuth><LayoutWrapper section="send-feedback"><SendfeedbackPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/telegram-test" element={<RequireAuth><LayoutWrapper section="telegram-test"><TelegramTestPage /></LayoutWrapper></RequireAuth>} />
@@ -774,6 +802,7 @@ export default function App() {
           <Route path="/kshf_hospital_app/filetransfers-out" element={<RequireAuth><LayoutWrapper section="file-transfer"><FileTransfer1Page /></LayoutWrapper></RequireAuth>} />
           <Route path="/daily-attendance-report" element={<RequireAuth><DailyAttendanceReport /></RequireAuth>} />
           <Route path="/employee-report" element={<RequireAuth><LayoutWrapper section="employee-report"><EmployeeReportPage /></LayoutWrapper></RequireAuth>} />
+          <Route path="/payroll" element={<RequireAuth><LayoutWrapper section="payroll"><PayrollPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/evaluation" element={<RequireAuth><LayoutWrapper section="evaluation"><EvaluationReportPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/employee-id-docs" element={<RequireAuth><LayoutWrapper section="employee-id-docs"><EmployeeIDDocsPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/employee-other-docs" element={<RequireAuth><LayoutWrapper section="employee-other-docs"><EmployeeOtherDocsPage /></LayoutWrapper></RequireAuth>} />
@@ -786,8 +815,9 @@ export default function App() {
           <Route path="/telegram" element={<TelegramPage />} />
           <Route path="/telegram-mini-app" element={<RequireAuth><TelegramMiniApp /></RequireAuth>} />
           <Route path="/department-units" element={<RequireAuth><LayoutWrapper section="department-units"><DepartmentUnits /></LayoutWrapper></RequireAuth>} />
+          <Route path="/meeting-rooms" element={<RequireAuth><MeetingRoomsRoute /></RequireAuth>} />
+          <Route path="/meeting-rooms-v2" element={<RequireAuth><LayoutWrapper section="meeting-rooms-v2"><MeetingRoomsV2Route /></LayoutWrapper></RequireAuth>} />
           <Route path="/hr" element={<RequireAuth><LayoutWrapper section="hr"><HRPage /></LayoutWrapper></RequireAuth>} />
-          <Route path="/meeting-rooms-v2" element={<RequireAuth><LayoutWrapper section="meeting-rooms-v2"><MeetingRoomV2Page /></LayoutWrapper></RequireAuth>} />
           <Route path="/hr-display" element={<RequireAuth><LayoutWrapper section="hr"><HrDisplayPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/hr-display" element={<RequireAuth><LayoutWrapper section="hr"><HrDisplayPage /></LayoutWrapper></RequireAuth>} />
           <Route path="/dashboard" element={<RequireAuth><ProtectedApp /></RequireAuth>} />

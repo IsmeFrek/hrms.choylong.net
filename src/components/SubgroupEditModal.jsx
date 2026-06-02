@@ -31,6 +31,9 @@ const SubgroupEditModal = ({ isOpen, onClose, subgroup, onSave, categories = [] 
     sunday: { work: false, halfDay: false, start: '08:00', end: '17:00' },
   });
 
+  const [weekendRotation, setWeekendRotation] = useState('none');
+  const [holidayRotation, setHolidayRotation] = useState('none');
+
   useEffect(() => {
     if (isOpen && subgroup) {
       setSelectedCategory(subgroup.categoryId || '');
@@ -40,6 +43,12 @@ const SubgroupEditModal = ({ isOpen, onClose, subgroup, onSave, categories = [] 
           setFlexibleConfig(subgroup.customPattern.flexible || flexibleConfig);
         } else {
           setStandardConfig(subgroup.customPattern.standard || standardConfig);
+        }
+        if (subgroup.customPattern.weekendRotation) {
+          setWeekendRotation(subgroup.customPattern.weekendRotation);
+        }
+        if (subgroup.customPattern.holidayRotation) {
+          setHolidayRotation(subgroup.customPattern.holidayRotation);
         }
       }
     }
@@ -62,6 +71,8 @@ const SubgroupEditModal = ({ isOpen, onClose, subgroup, onSave, categories = [] 
       mode,
       standard: standardConfig,
       flexible: flexibleConfig,
+      weekendRotation,
+      holidayRotation
     };
     onSave(subgroup.id || subgroup._id, pattern);
     onClose();
@@ -120,6 +131,32 @@ const SubgroupEditModal = ({ isOpen, onClose, subgroup, onSave, categories = [] 
               />
               <span className={`text-sm font-bold transition-colors ${mode === 'standard' ? 'text-gray-900Scale' : 'text-gray-400 group-hover:text-gray-600'}`}>Standard</span>
             </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 pb-4 border-b">
+             <div>
+               <label className="block text-sm font-bold text-gray-700 mb-2">ច្បាប់ឆ្លាស់វេនសៅរ៍/អាទិត្យ</label>
+               <select 
+                 value={weekendRotation}
+                 onChange={e => setWeekendRotation(e.target.value)}
+                 className="w-full p-2.5 border border-gray-300 rounded-lg bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+               >
+                 <option value="none">គ្មាន (ធម្មតា)</option>
+                 <option value="alternateDays">ឆ្លាស់គ្នារាល់ថ្ងៃ (សៅរ៍ ១, អាទិត្យ ១)</option>
+                 <option value="alternateWeeks">ឆ្លាស់គ្នារាល់សប្តាហ៍ (អាទិត្យនេះ ១, អាទិត្យក្រោយ ១)</option>
+               </select>
+             </div>
+             <div>
+               <label className="block text-sm font-bold text-gray-700 mb-2">ច្បាប់ឆ្លាស់វេនថ្ងៃបុណ្យ</label>
+               <select 
+                 value={holidayRotation}
+                 onChange={e => setHolidayRotation(e.target.value)}
+                 className="w-full p-2.5 border border-gray-300 rounded-lg bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+               >
+                 <option value="none">គ្មាន (ធម្មតា)</option>
+                 <option value="alternate">ឆ្លាស់គ្នារាល់ថ្ងៃបុណ្យ</option>
+               </select>
+             </div>
           </div>
 
           <div className="border-t pt-8">

@@ -2034,9 +2034,9 @@ ${bodyHtmlContent}
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 print:p-0">
       {/* Page Header */}
-      <div className="mb-1 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between print:hidden">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">ទំព័រដើម</h1>
         </div>
@@ -2053,7 +2053,7 @@ ${bodyHtmlContent}
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-2 print:hidden">
         {/* Replace total-employees card with active-employees as the primary metric */}
         <StatCard
           title="បុគ្គលិកសកម្ម"
@@ -2159,7 +2159,7 @@ ${bodyHtmlContent}
       </div>
 
       {/* Extra Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-2 mb-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-2 mb-2 print:hidden">
         <StatCard
           title="សពុភាពបុគ្គលិក (សាកល្បង)"
           value={probationStatusCounts.total}
@@ -2313,7 +2313,7 @@ ${bodyHtmlContent}
 
 
       {/* Toggleable Summaries - Horizontal Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 print:hidden">
         {/* Skills Toggle */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
           <button
@@ -2382,7 +2382,7 @@ ${bodyHtmlContent}
       </div>
 
       {/* Expanded Content Area - Below the buttons */}
-      <div className="space-y-4 mb-6">
+      <div className="space-y-4 mb-6 print:hidden">
         {showSkills && (
           <div className="bg-white rounded-xl border border-amber-200 shadow-md overflow-hidden">
             <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4 flex items-center justify-between">
@@ -2571,7 +2571,7 @@ ${bodyHtmlContent}
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:hidden">
         {/* Recent Employees (hide details if user lacks HR view permission) */}
         {canViewHR ? (
           <div className="lg:col-span-2">
@@ -2719,8 +2719,15 @@ ${bodyHtmlContent}
 
       {/* Summary Report Modal */}
       {showReportModal && (
-        <div id="summary-report-modal-backdrop" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm print:static print:bg-white print:p-0">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[92vh] overflow-hidden flex flex-col print:max-h-none print:shadow-none print:rounded-none">
+        <div id="summary-report-modal-backdrop" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm print:static print:bg-transparent print:p-0">
+          <style media="print">
+            {`
+              @page { size: A4 portrait; margin: 1cm; }
+              body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+              #summary-report-content { overflow: visible !important; max-height: none !important; height: auto !important; }
+            `}
+          </style>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[92vh] overflow-hidden flex flex-col print:max-h-none print:shadow-none print:rounded-none print:block">
 
             {/* Modal Header Bar */}
             <div className="flex-shrink-0 bg-gradient-to-r from-blue-800 via-blue-700 to-indigo-700 p-4 flex items-center justify-between print:hidden">
@@ -2751,18 +2758,18 @@ ${bodyHtmlContent}
             </div>
 
             {/* Scrollable Content */}
-            <div id="summary-report-content" className="flex-1 overflow-y-auto p-6 print:p-0 space-y-6 bg-gray-50/50">
+            <div id="summary-report-content" className="flex-1 overflow-y-auto p-6 print:p-0 space-y-6 bg-gray-50/50 print:overflow-visible print:bg-white">
 
               {/* Printable Report Header */}
               <div className="text-center pb-5 border-b-2 border-blue-800 print:block hidden">
-                <h1 className="text-xl font-normal text-gray-900 mb-1" style={{ fontFamily: "'Khmer OS Muol Light'" }}>ព្រះរាជាណាចក្រកម្ពុជា</h1>
-                <h2 className="text-xl font-normal text-gray-900 mb-3" style={{ fontFamily: "'Khmer OS Muol Light'" }}>ជាតិ សាសនា ព្រះមហាក្សត្រ</h2>
+                <h1 className="text-[17px] font-normal text-gray-900 mb-1" style={{ fontFamily: "'Khmer OS Muol Light'" }}>ព្រះរាជាណាចក្រកម្ពុជា</h1>
+                <h2 className="text-[17px] font-normal text-gray-900 mb-3" style={{ fontFamily: "'Khmer OS Muol Light'" }}>ជាតិ សាសនា ព្រះមហាក្សត្រ</h2>
                 <h3 className="text-lg font-bold text-blue-900">របាយការណ៍សង្ខេបស្ថានភាពបុគ្គលិក</h3>
                 <p className="text-gray-600 text-[12px] mt-1">កាលបរិច្ឆេទ: {new Date().toLocaleDateString('km-KH', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
               </div>
 
               {/* Section 1 + 2 side-by-side */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-4">
                 {/* Section 1 - Staff Summary */}
                 <div className="bg-white rounded-xl border border-blue-100 shadow-sm overflow-hidden">
                   <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 h-[52px] flex items-center gap-2">
@@ -2828,7 +2835,7 @@ ${bodyHtmlContent}
                   <span className="text-white font-bold text-[14px]">⏳ ៣. ស្ថានភាពសាកល្បងបុគ្គលិក</span>
                 </div>
                 <div className="p-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-x-6 gap-y-1">
                     {[
                       { type: 'កំពុងសាកល្បង', count: probationStatusCounts.ongoing || 0, male: probationStatusCounts.ongoingMale || 0, female: probationStatusCounts.ongoingFemale || 0 },
                       { type: 'ជិតចប់ (10ថ្ងៃ)', count: probationStatusCounts.endingSoon || 0, male: probationStatusCounts.endingSoonMale || 0, female: probationStatusCounts.endingSoonFemale || 0 },
@@ -2862,7 +2869,7 @@ ${bodyHtmlContent}
                   <span className="text-white font-bold text-[14px]">📅 ៤. Work Schedule ប្រចាំថ្ងៃ</span>
                 </div>
                 <div className="p-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-x-6 gap-y-1">
                     {[
                       { label: 'ធ្វើការសរុប', value: workScheduleDaily.workingToday },
                       { label: 'វេនព្រឹក-ថ្ងៃ', value: workScheduleDaily.dayShift },
@@ -2892,7 +2899,7 @@ ${bodyHtmlContent}
                   <span className="text-white font-bold text-[14px]">🏥 ៥. ប្រភេទច្បាប់ (ខែនេះ)</span>
                 </div>
                 <div className="p-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-x-6 gap-y-1">
                     {metricsExtra.leaveTypes.map(l => (
                       <div key={l.type} className="flex justify-between items-center text-[12px] py-0 border-b border-gray-50 hover:bg-orange-50/40 px-2 rounded transition-colors">
                         <span className="text-gray-700 truncate font-bold mr-2">{l.type}</span>
@@ -2920,7 +2927,7 @@ ${bodyHtmlContent}
                   <span className="text-white font-bold text-[14px]">✈️ ៦. បេសកកម្ម និងការសិក្សា</span>
                 </div>
                 <div className="p-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-x-6 gap-y-1">
                     {[
                       { type: 'បេសកកម្មថ្ងៃនេះ', count: missionToday.length, male: missionToday.filter(m => m.gender === 'M' || m.gender === 'ប្រុស').length, female: missionToday.filter(m => m.gender === 'F' || m.gender === 'ស្រី').length },
                       { type: 'កំពុងសិក្សា', count: studyStatusCounts.studying?.total || 0, male: studyStatusCounts.studying?.male || 0, female: studyStatusCounts.studying?.female || 0 },
@@ -2954,7 +2961,7 @@ ${bodyHtmlContent}
                   <span className="text-purple-200 text-[12px]">{stats.departments} ផ្នែក</span>
                 </div>
                 <div className="p-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-1">
                     {[...departmentList].sort((a, b) => {
                       const absA = deptAttendanceMetrics[a.name]?.absent || 0;
                       const absB = deptAttendanceMetrics[b.name]?.absent || 0;
@@ -3008,7 +3015,7 @@ ${bodyHtmlContent}
                   <span className="text-white font-bold text-[12px]">🏅 ៨. សង្ខេបជំនាញ</span>
                 </div>
                 <div className="p-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-x-6 gap-y-1">
                     {metricsExtra.skills.map(s => {
                       return (
                         <div key={s.type} className={`flex justify-between items-center text-[12px] py-1.5 px-2 rounded hover:bg-amber-50 border-b border-gray-50 transition-colors ${s.isGroup ? 'bg-amber-50 font-bold' : ''}`}>
@@ -3039,7 +3046,7 @@ ${bodyHtmlContent}
                   <span className="text-white font-bold text-[12px]">🎖️ ៩. សង្ខេបតួនាទី</span>
                 </div>
                 <div className="p-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-x-6 gap-y-1">
                     {metricsExtra.positions.map(p => {
                       return (
                         <div key={p.type} className="flex justify-between items-center text-[12px] py-1.5 px-2 rounded hover:bg-sky-50 border-b border-gray-50 transition-colors">

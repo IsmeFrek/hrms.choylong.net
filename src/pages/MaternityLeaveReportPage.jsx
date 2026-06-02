@@ -693,7 +693,7 @@ export default function MaternityLeaveReportPage() {
                           <td className="center">
                             <div className="flex items-center justify-center gap-1">
                               <button className="border px-1 py-1 text-sm rounded bg-yellow-200" title="កែសម្រួល" onClick={() => openEdit(hr)}>Edit</button>
-                              <button className="border px-1 py-1 text-sm rounded bg-blue-200" title="លិខិតបង្គាប់ការ ចូលធ្វើការវិញ" onClick={() => window.location.href = '/instruction-letters?template=maternity'}>💼</button>
+                              <button className="border px-1 py-1 text-sm rounded bg-blue-200" title="លិខិតបង្គាប់ការ ចូលធ្វើការវិញ" onClick={() => window.location.href = `/instruction-letters?template=maternity&name=${encodeURIComponent(hr.khmerName || hr.name || '')}&department=${encodeURIComponent(hr.Department_Kh || '')}&position=${encodeURIComponent(hr.civilServantRole || hr.position || '')}&endDate=${encodeURIComponent(mat.endDate || '')}&civilType=${encodeURIComponent(hr.officerType || hr.civilServantType || hr.employeeType || hr.type || '')}`}>💼</button>
                               <button className="border px-1 py-1 text-sm rounded bg-green-200" title="បោះពុម្ពពាក្យសុំ (មន្ត្រីរាជការ)" onClick={() => setActivePrintTemplate({ type: 'app', hr })}>📝</button>
                               <button className="border px-1 py-1 text-sm rounded bg-purple-200" title="បោះពុម្ពលិខិតអនុញ្ញាត (មន្ត្រីកិច្ចសន្យា)" onClick={() => setActivePrintTemplate({ type: 'permission', hr })}>📜</button>
                             </div>

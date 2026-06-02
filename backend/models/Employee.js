@@ -6,8 +6,8 @@ const employeeSchema = new mongoose.Schema({
   
   // Basic Personal Information
   staffId: { type: String, unique: true },
-  khmerName: { type: String },
-  name: { type: String },
+  khmerName: { type: String, index: true },
+  name: { type: String, index: true },
   gender: { type: String, enum: ['Male', 'Female'] },
   dob: { type: Date },
   maritalStatus: { type: String, enum: ['Single', 'Married', 'Divorced', 'Widowed'] },
@@ -21,7 +21,8 @@ const employeeSchema = new mongoose.Schema({
   // Work Information (តាមរូបភាព)
   officerType: { type: String }, // ប្រភេទមន្ត្រី
   position: { type: String },    // តួនាទី
-  skill: { type: String },  // ឯកទេស
+  civilServantRole: { type: String }, // ជំនាញក្រសួង
+  skill: { type: String },  // ឯកទេស/ជំនាញមន្ទីរពេទ្យ
   Department_Kh: { type: String },  // ផ្នែក
   joinDate: { type: Date },      // កាលបរិច្ឆេទចូលបម្រើការងារ
   dateJoinedMinistry: { type: String }, // កាលបរិច្ឆេទចូលកាន់តំណែងមន្ទីរពេទ្យ
