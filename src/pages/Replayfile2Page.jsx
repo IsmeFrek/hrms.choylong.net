@@ -1201,6 +1201,16 @@ export default function Replayfile2Page(props) {
       pd.close();
       try { printWin.focus(); } catch (e) { }
 
+      // Wait for all images in the print window to finish loading
+      const images = Array.from(pd.images);
+      await Promise.all(images.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve; // proceed even if image fails to load
+        });
+      }));
+
       // Give the new window a moment to render before printing
       setTimeout(() => {
         try {
@@ -2824,7 +2834,9 @@ export default function Replayfile2Page(props) {
           } catch (e) {
             return abs;
           }
-        } catch (e) { return rawUrl; }
+        } catch (e) {
+          return rawUrl;
+        }
       };
 
       // Replace url(...) occurrences in a CSS text by converting resources to data: URIs when possible
@@ -2855,9 +2867,27 @@ export default function Replayfile2Page(props) {
       };
 
       // Convert img[src] inside clone to data: URIs when possible so images survive in the new print window
+      const originalImgs = Array.from(el.querySelectorAll('img'));
       const imgs = Array.from(clone.querySelectorAll('img'));
-      await Promise.all(imgs.map(async (img) => {
+      await Promise.all(imgs.map(async (img, i) => {
         try {
+          const origImg = originalImgs[i];
+          if (origImg && origImg.complete && origImg.naturalWidth > 0) {
+            // Attempt to grab the image data directly from the already-loaded original image
+            const canvas = document.createElement('canvas');
+            canvas.width = origImg.naturalWidth;
+            canvas.height = origImg.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(origImg, 0, 0);
+            try {
+              const dataUrl = canvas.toDataURL('image/png');
+              img.setAttribute('src', dataUrl);
+              return; // Success!
+            } catch (err) {
+              // Canvas tainted (cross-origin), fallback below
+            }
+          }
+          
           const s = img.getAttribute && img.getAttribute('src');
           if (!s) return;
           // prefer fetching and converting to data: URI for robust print embedding
@@ -2957,11 +2987,19 @@ export default function Replayfile2Page(props) {
       const wrapperStyle = `html,body{height:${printableHeight};margin:0;padding:0;overflow:hidden;} #replay-print-wrapper{width:${printableWidth};height:${printableHeight};display:flex;align-items:flex-start;justify-content:center;overflow:hidden;margin:0 auto;} #replay-print-wrapper .sheet{transform: scale(${scale}); transform-origin: top center; width:${printableWidth}; box-sizing: border-box;} /* hide reference panel/preview in print */ .ref-panel, .ref-panel * { display: none !important; }`;
       const printHtml = `<!doctype html><html><head><meta charset="utf-8"><base href="${document.baseURI}"><style>body{margin:0;padding:0;font-family:'Khmer OS Siemreap','Noto Sans Khmer',Arial,sans-serif;color:#000;background:#fff;}</style><style>${getPrintCss(scale, marginMM)}</style><style>${wrapperStyle}</style><style>${headCss}</style></head><body><div id="replay-print-wrapper">${clone.outerHTML}</div></body></html>`;
 
-      const printWin = window.open('', '_blank');
-      if (!printWin) {
-        setIsPrinting(false);
-        return printPage();
+      let printFrame = document.getElementById('print-iframe-v2');
+      if (!printFrame) {
+        printFrame = document.createElement('iframe');
+        printFrame.id = 'print-iframe-v2';
+        printFrame.style.position = 'fixed';
+        printFrame.style.right = '0';
+        printFrame.style.bottom = '0';
+        printFrame.style.width = '0';
+        printFrame.style.height = '0';
+        printFrame.style.border = '0';
+        document.body.appendChild(printFrame);
       }
+      const printWin = printFrame.contentWindow;
       printWin.document.open();
       printWin.document.write(printHtml);
       printWin.document.close();
@@ -2973,27 +3011,34 @@ export default function Replayfile2Page(props) {
       };
 
       try {
-        if (printWin.document && printWin.document.readyState === 'complete') {
-          doPrint();
-        } else {
-          // attach onload if available
-          printWin.addEventListener && printWin.addEventListener('load', doPrint);
-          // fallback: poll until the body has content
-          const start = Date.now();
-          const poll = setInterval(() => {
-            try {
-              const ok = printWin.document && printWin.document.body && printWin.document.body.childElementCount > 0;
-              if (ok || Date.now() - start > 3000) {
-                clearInterval(poll);
-                // remove the event listener to avoid duplicate prints
-                try { printWin.removeEventListener && printWin.removeEventListener('load', doPrint); } catch (e) { }
-                doPrint();
-              }
-            } catch (e) {
-              // ignore cross-origin or early access errors
+        const start = Date.now();
+        const poll = setInterval(() => {
+          try {
+            if (!printWin || printWin.closed) return clearInterval(poll);
+            if (Date.now() - start > 5000) {
+              clearInterval(poll);
+              return doPrint();
             }
-          }, 100);
-        }
+            // Wait for all images to be complete
+            const imgs = Array.from(printWin.document.images || []);
+            const allLoaded = imgs.every(img => img.complete && img.naturalWidth > 0);
+            if (allLoaded) {
+              clearInterval(poll);
+              // Give a small delay for browser to paint the rendered images
+              setTimeout(doPrint, 200);
+            }
+          } catch (e) {
+            // cross-origin access error or closed
+            clearInterval(poll);
+            doPrint();
+          }
+        }, 150);
+        
+        // 5 second fallback if some image is stuck
+        setTimeout(() => {
+          try { clearInterval(poll); } catch(e) {}
+          if (printWin && !printWin.closed) doPrint();
+        }, 5000);
       } catch (e) {
         // last-resort fallback
         setTimeout(() => { try { printWin.print(); } catch (err) { } }, 500);
